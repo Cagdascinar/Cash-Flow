@@ -179,6 +179,16 @@ def init_db():
             created_at   TEXT NOT NULL
         )""",
         "CREATE INDEX IF NOT EXISTS idx_txn_profile_date ON transactions(profile_id, date)",
+        """CREATE TABLE IF NOT EXISTS goals (
+            id             SERIAL PRIMARY KEY,
+            user_id        INTEGER NOT NULL DEFAULT 1,
+            profile_id     INTEGER NOT NULL DEFAULT 1,
+            name           TEXT NOT NULL,
+            goal_type      TEXT NOT NULL DEFAULT 'diger',
+            monthly_target DOUBLE PRECISION NOT NULL DEFAULT 0,
+            note           TEXT DEFAULT '',
+            created_at     TEXT NOT NULL
+        )""",
     ]
     migrations = [
         ("users",        "email",          "TEXT NOT NULL DEFAULT ''"),
@@ -810,6 +820,153 @@ def set_budget():
     db = get_db()
     db.execute("INSERT INTO budgets(user_id,profile_id,category,limit_) VALUES(?,?,?,?) ON CONFLICT(profile_id,category) DO UPDATE SET limit_=excluded.limit_",(uid,pid,cat,limit))
     db.commit(); return jsonify({"ok":True})
+
+@app.route("/api/goals", methods=["GET"])
+@login_required
+def list_goals():
+    pid = get_pid(); db = get_db()
+    rows = db.execute("SELECT * FROM goals WHERE profile_id=? ORDER BY created_at", (pid,)).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/goals", methods=["POST"])
+@login_required
+def add_goal():
+    uid = session["user_id"]; pid = get_pid()
+    d = request.get_json(force=True)
+    name = d.get("name","").strip()
+    gtype = d.get("goal_type","diger")
+    monthly = float(d.get("monthly_target",0))
+    note = d.get("note","").strip()
+    if not name or monthly <= 0:
+        return jsonify({"ok":False,"error":"İsim ve aylık hedef zorunlu"}), 400
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO goals (user_id,profile_id,name,goal_type,monthly_target,note,created_at) VALUES (?,?,?,?,?,?,?)",
+        (uid, pid, name, gtype, monthly, note, datetime.now().isoformat())
+    )
+    db.commit()
+    return jsonify({"ok":True,"id":cur.lastrowid})
+
+@app.route("/api/goals/<int:gid>", methods=["DELETE"])
+@login_required
+def del_goal(gid):
+    pid = get_pid(); db = get_db()
+    db.execute("DELETE FROM goals WHERE id=? AND profile_id=?", (gid, pid))
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/goals/analysis")
+@login_required
+def goals_analysis():
+    pid = get_pid(); db = get_db()
+    today_d = date.today()
+    from calendar import monthrange as mr
+
+    # Last 3 months of data
+    months_data = []
+    for i in range(3):
+        if today_d.month - i <= 0:
+            m = today_d.month - i + 12; y = today_d.year - 1
+        else:
+            m = today_d.month - i; y = today_d.year
+        _, last = mr(y, m)
+        s = f"{y:04d}-{m:02d}-01"; e = f"{y:04d}-{m:02d}-{last:02d}"
+        rows = db.execute(
+            "SELECT type,SUM(amount) as t FROM transactions WHERE profile_id=? AND date BETWEEN ? AND ? GROUP BY type",
+            (pid, s, e)
+        ).fetchall()
+        gelir = next((float(r["t"]) for r in rows if r["type"]=="gelir"), 0)
+        gider = next((float(r["t"]) for r in rows if r["type"]=="gider"), 0)
+        months_data.append({"gelir": gelir, "gider": gider, "net": gelir - gider})
+
+    avg_gelir = sum(x["gelir"] for x in months_data) / max(len(months_data), 1)
+    avg_gider = sum(x["gider"] for x in months_data) / max(len(months_data), 1)
+    avg_net   = avg_gelir - avg_gider
+
+    # Category breakdown for current month
+    _, last = mr(today_d.year, today_d.month)
+    m_start = today_d.replace(day=1).isoformat()
+    m_end   = today_d.replace(day=last).isoformat()
+    cat_rows = db.execute(
+        "SELECT category,SUM(amount) as t FROM transactions WHERE profile_id=? AND type='gider' AND date BETWEEN ? AND ? GROUP BY category ORDER BY t DESC",
+        (pid, m_start, m_end)
+    ).fetchall()
+    cat_spend = {r["category"]: float(r["t"]) for r in cat_rows}
+
+    # Goals
+    goals = db.execute("SELECT * FROM goals WHERE profile_id=?", (pid,)).fetchall()
+    total_monthly_goals = sum(float(g["monthly_target"]) for g in goals)
+    leftover = avg_net - total_monthly_goals
+
+    # Build commentary
+    comments = []
+
+    if avg_gelir == 0:
+        comments.append({"icon":"💡","text":"Henüz yeterli veri yok. Birkaç ay gelir ve gider girdikten sonra sana özel tasarruf önerileri sunabilirim.","type":"info"})
+        return jsonify({"ok":True,"avg_gelir":0,"avg_gider":0,"avg_net":0,"total_monthly_goals":0,"leftover":0,"comments":comments})
+
+    # Savings capacity comment
+    save_rate = round(avg_net / avg_gelir * 100) if avg_gelir > 0 else 0
+    if avg_net > 0:
+        if save_rate >= 30:
+            comments.append({"icon":"🏆","text":f"Harika! Gelirinin %{save_rate}'ini tasarruf ediyorsun. Ortalama aylık ₺{avg_net:,.0f} kenara ayırabiliyorsun. Yatırım hedeflerin için güçlü bir taban var.","type":"success"})
+        elif save_rate >= 15:
+            comments.append({"icon":"😊","text":f"İyi gidiyorsun! Aylık ortalama ₺{avg_net:,.0f} tasarruf potansiyelin var. Küçük harcamaları kısarak yatırım hedeflerine daha hızlı ulaşabilirsin.","type":"good"})
+        else:
+            comments.append({"icon":"⚠️","text":f"Bu ay aylık ₺{avg_net:,.0f} tasarruf yapabiliyorsun — gelirinin %{save_rate}'i. Giderlerini %10 azaltsan aylık ₺{avg_gelir*0.1:,.0f} ekstra tasarruf edersin.","type":"warn"})
+    else:
+        comments.append({"icon":"🔴","text":f"Son 3 ayda ortalama ₺{abs(avg_net):,.0f} açık veriyorsun. Yatırım hedefi koymadan önce giderleri dengelemeyi öneririm.","type":"danger"})
+
+    # Goal allocation comment
+    if goals and avg_net > 0:
+        if total_monthly_goals <= avg_net:
+            if leftover > 500:
+                comments.append({"icon":"💰","text":f"Tüm hedeflerini karşılayıp aylık ₺{leftover:,.0f} fazlan kalıyor. Bu fazlayı acil fona ya da yeni bir yatırım hedefine yönlendirebilirsin.","type":"success"})
+            else:
+                comments.append({"icon":"✅","text":f"Hedeflerin mevcut tasarruf kapasitene sığıyor. ₺{leftover:,.0f} küçük bir buffer var — bir şaşırtıcı gider olursa diye fazla zorlamaya gerek yok.","type":"good"})
+        else:
+            diff = total_monthly_goals - avg_net
+            comments.append({"icon":"⚠️","text":f"Aylık hedeflerinin toplamı (₺{total_monthly_goals:,.0f}) tasarruf kapasiteni ₺{diff:,.0f} aşıyor. Bir veya daha fazla hedefi küçültmeyi düşün.","type":"warn"})
+
+    # Category-specific insights
+    TRAVEL_CATS = ["Ulaşım", "Yemek / Restoran", "Eğlence"]
+    travel_total = sum(cat_spend.get(c, 0) for c in TRAVEL_CATS)
+    if travel_total > avg_gelir * 0.25:
+        comments.append({"icon":"✈️","text":f"Bu ay eğlence & ulaşım harcamaların gelirinin %{round(travel_total/avg_gelir*100)}'ini oluşturuyor (₺{travel_total:,.0f}). Bu kategoriyi %20 kıssaydın, döviz ya da altın hedefinize ₺{travel_total*0.2:,.0f} ekleyebilirdin.","type":"warn"})
+
+    food_spend = cat_spend.get("Market / Gıda", 0) + cat_spend.get("Yemek / Restoran", 0)
+    if food_spend > avg_gelir * 0.30:
+        comments.append({"icon":"🛒","text":f"Market ve yemek harcaman aylık gelirinin %{round(food_spend/avg_gelir*100)}'ini oluşturuyor. Haftalık menü planlaması ile bu kalemi %15 azaltmak mümkün — aylık ₺{food_spend*0.15:,.0f} tasarruf demek.","type":"info"})
+
+    # Goal-type specific tips
+    for g in goals:
+        gtype = g["goal_type"]
+        mt = float(g["monthly_target"])
+        if gtype in ("eur","usd","gbp"):
+            sym = {"eur":"€","usd":"$","gbp":"£"}[gtype]
+            comments.append({"icon":"💶" if gtype=="eur" else ("💵" if gtype=="usd" else "💷"),
+                "text":f"'{g['name']}' hedefin için aylık ₺{mt:,.0f} ayırıyorsun. Düzenli alımlar kur dalgalanmalarını dengelemek için ideal — her ay sabit bir günde al.","type":"tip"})
+        elif gtype == "gold":
+            comments.append({"icon":"🥇","text":f"'{g['name']}' için aylık ₺{mt:,.0f} hedefin var. Altın uzun vadeli bir güvence — gram altın fiyatlarını takip ederek küsürat gramları biriktirebilirsin.","type":"tip"})
+        elif gtype == "bitcoin":
+            comments.append({"icon":"₿","text":f"'{g['name']}' için aylık ₺{mt:,.0f} ayrılıyor. Bitcoin'de aylık düzenli alım (DCA) volatiliteye karşı en sağlıklı strateji. Tüm birikimini tek seferde yatırmaktan kaçın.","type":"tip"})
+        elif gtype == "arsa":
+            comments.append({"icon":"🏠","text":f"'{g['name']}' için aylık ₺{mt:,.0f} biriktiriyorsun. Arsa alımında hedef tutarını ve süreyi belirleyip bu tasarrufları vadeli hesapta tutmak getiri sağlar.","type":"tip"})
+
+    # If no goals yet
+    if not goals:
+        comments.append({"icon":"🎯","text":"Henüz bir yatırım hedefin yok. Euro, dolar, altın, bitcoin veya arsa gibi hedefler ekleyerek aylık ne kadar ayırman gerektiğini görüntüle.","type":"info"})
+
+    return jsonify({
+        "ok": True,
+        "avg_gelir": round(avg_gelir, 2),
+        "avg_gider": round(avg_gider, 2),
+        "avg_net": round(avg_net, 2),
+        "total_monthly_goals": round(total_monthly_goals, 2),
+        "leftover": round(leftover, 2),
+        "comments": comments
+    })
+
 
 @app.route("/api/categories")
 @login_required
@@ -2049,11 +2206,36 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .prev-table select{background:var(--bg4);border:1px solid var(--border2);color:var(--txt);
   padding:3px 6px;border-radius:6px;font-size:.76rem}
 
-/* ── BUDGET ── */
+/* ── BUDGET (legacy) ── */
 .budget-row{margin-bottom:14px}
 .budget-row .btop{display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:5px}
 .prog-bg{background:var(--bg3);border-radius:4px;height:6px;overflow:hidden}
 .prog-fill{height:100%;border-radius:4px;transition:width .7s cubic-bezier(.4,0,.2,1)}
+
+/* ── GOALS / TASARRUF ── */
+.goals-capacity-card{background:linear-gradient(160deg,#252535,#1e1e2e);border-color:#6366f128}
+.goals-stat-cell{background:var(--bg3);border-radius:12px;padding:12px 14px;text-align:center}
+.gsc-lbl{font-size:.63rem;text-transform:uppercase;letter-spacing:.09em;color:var(--txt2);font-weight:700;margin-bottom:4px}
+.gsc-val{font-size:1.05rem;font-weight:800;letter-spacing:-.02em}
+.gsc-val.gn{color:var(--g)}
+.gsc-val.rd{color:var(--r)}
+.goal-item{display:flex;align-items:center;gap:12px;padding:11px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:13px;margin-bottom:8px}
+.goal-icon-wrap{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.goal-info{flex:1;min-width:0}
+.goal-name{font-size:.86rem;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.goal-meta{font-size:.72rem;color:var(--txt2);margin-top:2px}
+.goal-amount{font-size:.9rem;font-weight:800;color:var(--b2);text-align:right;flex-shrink:0}
+.goal-del{background:none;border:none;color:var(--txt2);cursor:pointer;padding:4px 6px;border-radius:6px;transition:.15s;font-size:.85rem}
+.goal-del:hover{color:var(--r);background:#ff453a18}
+.comment-bubble{display:flex;gap:12px;align-items:flex-start;padding:14px 14px;border-radius:14px;margin-bottom:10px;border:1px solid transparent}
+.comment-bubble.success{background:#30d15812;border-color:#30d15828}
+.comment-bubble.good{background:#6366f112;border-color:#6366f128}
+.comment-bubble.warn{background:#ffd60a10;border-color:#ffd60a28}
+.comment-bubble.danger{background:#ff453a12;border-color:#ff453a28}
+.comment-bubble.info{background:var(--bg3);border-color:var(--border)}
+.comment-bubble.tip{background:#bf5af212;border-color:#bf5af228}
+.cb-ico{font-size:1.3rem;flex-shrink:0;margin-top:1px}
+.cb-text{font-size:.82rem;color:var(--txt);line-height:1.55}
 
 /* ── TOAST ── */
 #toast{position:fixed;bottom:72px;right:20px;background:var(--bg3);border:1px solid var(--b);
@@ -2417,7 +2599,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       <span class="ico">🔁</span>Düzenli
     </div>
     <div class="nl" data-page="budget" onclick="goPage('budget',this)">
-      <span class="ico">🎯</span>Bütçe
+      <span class="ico">🎯</span>Tasarruf
     </div>
     <div class="nl nl-desktop" data-page="import" onclick="goPage('import',this)">
       <span class="ico">📂</span>İçe Aktar
@@ -3065,20 +3247,75 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 
 <!-- BUDGET -->
 <div class="page" id="page-budget">
-  <div class="page-title">Bütçe Hedefleri</div>
-  <div class="page-sub">Kategorilere aylık harcama limiti koy — otomatik takip edilir</div>
+  <div class="page-title">Tasarruf & Yatırım</div>
+  <div class="page-sub">Aylık yatırım hedefleri koy, Kirpi sana ne kadar ayırman gerektiğini söylesin</div>
 
-  <div class="grid2">
+  <!-- Tasarruf kapasitesi -->
+  <div class="card goals-capacity-card" id="goals-capacity" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="section-title" style="margin:0">Aylık Tasarruf Kapasitesi</div>
+      <span class="badge" id="goals-save-badge" style="font-size:.7rem;padding:3px 10px">Hesaplanıyor…</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+      <div class="goals-stat-cell">
+        <div class="gsc-lbl">Ort. Gelir</div>
+        <div class="gsc-val gn" id="gs-gelir">—</div>
+      </div>
+      <div class="goals-stat-cell">
+        <div class="gsc-lbl">Ort. Gider</div>
+        <div class="gsc-val rd" id="gs-gider">—</div>
+      </div>
+      <div class="goals-stat-cell">
+        <div class="gsc-lbl">Kalan</div>
+        <div class="gsc-val" id="gs-net" style="color:var(--b2)">—</div>
+      </div>
+    </div>
+    <div class="prog-bg" style="height:7px;margin-bottom:6px">
+      <div class="prog-fill" id="goals-alloc-fill" style="width:0%;background:var(--b2);transition:width .8s cubic-bezier(.4,0,.2,1)"></div>
+    </div>
+    <div style="font-size:.72rem;color:var(--txt2)" id="goals-alloc-lbl">Hedeflere ayrılan: —</div>
+  </div>
+
+  <!-- Hedef ekle + liste -->
+  <div class="grid2" style="margin-bottom:16px">
     <div class="card">
-      <div class="section-title">Hedef Ekle / Güncelle</div>
-      <div style="margin-bottom:12px"><label>Kategori</label><select class="f-input" id="b-cat"></select></div>
-      <div style="margin-bottom:16px"><label>Aylık Limit (₺)</label><input class="f-input" type="text" inputmode="decimal" data-num id="b-limit" placeholder="5.000"></div>
-      <button class="btn btn-primary" style="width:100%" onclick="saveBudget()">Kaydet</button>
+      <div class="section-title">Yeni Hedef Ekle</div>
+      <label>Hedef Adı</label>
+      <input class="f-input" id="g-name" placeholder="Euro Birikimi" style="margin-bottom:10px">
+      <label>Yatırım Türü</label>
+      <select class="f-input" id="g-type" style="margin-bottom:10px">
+        <option value="eur">💶 Euro (EUR)</option>
+        <option value="usd">💵 Dolar (USD)</option>
+        <option value="gbp">💷 Sterlin (GBP)</option>
+        <option value="gold">🥇 Altın</option>
+        <option value="bitcoin">₿ Bitcoin</option>
+        <option value="arsa">🏠 Arsa / Gayrimenkul</option>
+        <option value="emeklilik">📦 Emeklilik Fonu</option>
+        <option value="diger">💎 Diğer Yatırım</option>
+      </select>
+      <label>Aylık Hedef Tutar (₺)</label>
+      <input class="f-input" type="text" inputmode="decimal" data-num id="g-monthly" placeholder="5.000" style="margin-bottom:10px">
+      <label>Not <span style="color:var(--txt2);font-size:.7rem">(isteğe bağlı)</span></label>
+      <input class="f-input" id="g-note" placeholder="3 yılda 10.000€ hedefi" style="margin-bottom:14px">
+      <button class="btn btn-primary" style="width:100%" onclick="addGoal()">Hedef Ekle</button>
     </div>
-    <div class="card" id="budget-display">
-      <div class="section-title">Bu Ay Durum</div>
-      <div id="budget-rows"><div class="empty-state"><div class="icon">🎯</div>Henüz hedef yok</div></div>
+    <div class="card">
+      <div class="section-title">Hedeflerim</div>
+      <div id="goals-list"><div class="empty-state"><div class="icon">🎯</div>Henüz hedef eklenmedi</div></div>
     </div>
+  </div>
+
+  <!-- Kirpi Yorumu -->
+  <div class="card" id="goals-commentary-card">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <div style="font-size:1.6rem">🦔</div>
+      <div>
+        <div style="font-weight:700;font-size:.9rem;color:var(--txt)">Kirpi'nin Yorumu</div>
+        <div style="font-size:.72rem;color:var(--txt2)">Son 3 aylık verine göre kişisel analiz</div>
+      </div>
+      <button onclick="loadGoalsAnalysis()" style="margin-left:auto;padding:5px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--txt2);font-size:.75rem;cursor:pointer" title="Yenile">↻ Yenile</button>
+    </div>
+    <div id="goals-comments"><div class="empty-state" style="padding:24px"><div class="icon">🦔</div>Analiz yükleniyor…</div></div>
   </div>
 </div>
 
@@ -3238,6 +3475,7 @@ function goPage(id, el){
     if(id==='invest') initInvestPage();
     if(id==='cards') loadCards();
     if(id==='settings') initSettingsPage();
+    if(id==='budget') loadGoalsPage();
   }
 
   if(prev){
@@ -3996,28 +4234,120 @@ function drawDonut(cats){
   });
 }
 
-// ── BUDGET PAGE ───────────────────────────────────────────────────────────────
-function renderBudgetPage(gider_cats,budgets){
-  var el=document.getElementById('budget-rows');
-  var keys=Object.keys(budgets);
-  if(!keys.length){el.innerHTML='<div class="empty-state"><div class="icon">🎯</div>Henüz hedef yok</div>';return}
-  el.innerHTML=keys.map(function(cat){
-    var lim=budgets[cat],spent=gider_cats[cat]||0;
-    var pct=Math.min(100,Math.round(spent/lim*100));
-    var color=spent>lim?'var(--r)':pct>75?'var(--y)':'var(--g)';
-    return '<div class="budget-row"><div class="btop"><span>'+cat+'</span>'+
-      '<span style="color:var(--txt2)">'+fmt(spent)+' / '+fmt(lim)+
-      ' <span class="badge '+(spent>lim?'badge-r':'badge-g')+'">%'+pct+'</span></span></div>'+
-      '<div class="prog-bg"><div class="prog-fill" style="width:'+pct+'%;background:'+color+'"></div></div></div>';
-  }).join('');
+// ── GOALS / TASARRUF PAGE ─────────────────────────────────────────────────────
+function renderBudgetPage(gider_cats,budgets){} // kept for compat, no-op now
+
+var GOAL_ICONS={'eur':'💶','usd':'💵','gbp':'💷','gold':'🥇','bitcoin':'₿','arsa':'🏠','emeklilik':'📦','diger':'💎'};
+var GOAL_COLORS={'eur':'#30d15818','usd':'#30d15818','gbp':'#30d15818','gold':'#ffd60a18','bitcoin':'#f97316 18','bitcoin':'#ff9f0a18','arsa':'#6366f118','emeklilik':'#bf5af218','diger':'#818cf818'};
+var GOAL_BORDER={'eur':'#30d15830','usd':'#30d15830','gbp':'#30d15830','gold':'#ffd60a30','bitcoin':'#ff9f0a30','arsa':'#6366f130','emeklilik':'#bf5af230','diger':'#818cf830'};
+
+function loadGoalsPage(){
+  loadGoalsList();
+  loadGoalsAnalysis();
 }
-function saveBudget(){
-  var cat=document.getElementById('b-cat').value, limit=getNumVal(document.getElementById('b-limit'));
-  if(!cat||!limit||limit<=0){toast('Kategori ve limit giriniz');return}
-  xhr('/api/budgets',{category:cat,limit:limit},function(){
-    document.getElementById('b-limit').value='';
-    loadDashboard();toast('Bütçe kaydedildi ✓');
+
+function loadGoalsList(){
+  xhr('/api/goals',null,function(goals){
+    var el=document.getElementById('goals-list');
+    if(!goals||!goals.length){
+      el.innerHTML='<div class="empty-state"><div class="icon">🎯</div>Henüz hedef eklenmedi</div>';
+      updateCapacityBar(goals||[]);
+      return;
+    }
+    el.innerHTML=goals.map(function(g){
+      var ico=GOAL_ICONS[g.goal_type]||'💎';
+      var bg=GOAL_COLORS[g.goal_type]||'#6366f118';
+      var bd=GOAL_BORDER[g.goal_type]||'#6366f130';
+      return '<div class="goal-item" style="border-color:'+bd+';background:'+bg+'">'
+        +'<div class="goal-icon-wrap" style="background:'+bg+'">'+ico+'</div>'
+        +'<div class="goal-info">'
+          +'<div class="goal-name">'+g.name+'</div>'
+          +'<div class="goal-meta">'+(g.note||typeLabel(g.goal_type))+'</div>'
+        +'</div>'
+        +'<div class="goal-amount">'+fmt(g.monthly_target)+'/ay</div>'
+        +'<button class="goal-del" onclick="deleteGoal('+g.id+')" title="Sil">✕</button>'
+        +'</div>';
+    }).join('');
+    updateCapacityBar(goals);
   });
+}
+
+function typeLabel(t){
+  var labels={'eur':'Euro (EUR)','usd':'Dolar (USD)','gbp':'Sterlin (GBP)','gold':'Altın','bitcoin':'Bitcoin','arsa':'Arsa / Gayrimenkul','emeklilik':'Emeklilik Fonu','diger':'Diğer Yatırım'};
+  return labels[t]||t;
+}
+
+function updateCapacityBar(goals){
+  var totalGoals=goals.reduce(function(s,g){return s+parseFloat(g.monthly_target||0);},0);
+  var analysis=window._lastGoalsAnalysis;
+  if(!analysis) return;
+  var net=analysis.avg_net||0;
+  var pct=net>0?Math.min(100,Math.round(totalGoals/net*100)):0;
+  var fill=document.getElementById('goals-alloc-fill');
+  var lbl=document.getElementById('goals-alloc-lbl');
+  if(fill) fill.style.width=pct+'%';
+  if(fill) fill.style.background=pct>100?'var(--r)':pct>75?'var(--y)':'var(--b2)';
+  if(lbl) lbl.textContent='Hedeflere ayrılan: '+fmt(totalGoals)+' / '+fmt(Math.max(0,net))+' ('+pct+'%)';
+}
+
+function loadGoalsAnalysis(){
+  xhr('/api/goals/analysis',null,function(d){
+    window._lastGoalsAnalysis=d;
+    var gelirEl=document.getElementById('gs-gelir');
+    var giderEl=document.getElementById('gs-gider');
+    var netEl=document.getElementById('gs-net');
+    var badge=document.getElementById('goals-save-badge');
+    if(gelirEl) gelirEl.textContent=fmt(d.avg_gelir);
+    if(giderEl) giderEl.textContent=fmt(d.avg_gider);
+    if(netEl){
+      netEl.textContent=fmt(d.avg_net);
+      netEl.style.color=d.avg_net>=0?'var(--b2)':'var(--r)';
+    }
+    if(badge){
+      var sr=d.avg_gelir>0?Math.round(d.avg_net/d.avg_gelir*100):0;
+      badge.textContent='%'+sr+' tasarruf';
+      badge.style.background=sr>=25?'#30d15820':sr>=10?'#ffd60a20':'#ff453a20';
+      badge.style.color=sr>=25?'var(--g)':sr>=10?'var(--y)':'var(--r)';
+      badge.style.border='1px solid '+(sr>=25?'#30d15840':sr>=10?'#ffd60a40':'#ff453a40');
+    }
+    // render comments
+    var el=document.getElementById('goals-comments');
+    if(!el) return;
+    if(!d.comments||!d.comments.length){el.innerHTML='<div class="empty-state" style="padding:24px"><div class="icon">🦔</div>Yeterli veri yok</div>';return;}
+    el.innerHTML=d.comments.map(function(c){
+      return '<div class="comment-bubble '+(c.type||'info')+'">'
+        +'<div class="cb-ico">'+c.icon+'</div>'
+        +'<div class="cb-text">'+c.text+'</div>'
+        +'</div>';
+    }).join('');
+    // also update bar with goals
+    xhr('/api/goals',null,function(goals){updateCapacityBar(goals);});
+  });
+}
+
+function addGoal(){
+  var name=document.getElementById('g-name').value.trim();
+  var gtype=document.getElementById('g-type').value;
+  var monthly=getNumVal(document.getElementById('g-monthly'));
+  var note=document.getElementById('g-note').value.trim();
+  if(!name){showToast('Hedef adı zorunlu','#ff453a');return}
+  if(!monthly||monthly<=0){showToast('Aylık tutar giriniz','#ff453a');return}
+  xhr('/api/goals',{name:name,goal_type:gtype,monthly_target:monthly,note:note},function(d){
+    if(!d.ok){showToast('Hata','#ff453a');return}
+    document.getElementById('g-name').value='';
+    document.getElementById('g-monthly').value='';
+    document.getElementById('g-note').value='';
+    loadGoalsPage();
+    showToast('Hedef eklendi ✓','#30d158');
+  });
+}
+
+function deleteGoal(id){
+  if(!confirm('Bu hedefi silmek istediğine emin misin?')) return;
+  xhr('/api/goals/'+id,null,function(){
+    loadGoalsPage();
+    showToast('Hedef silindi','#ff453a');
+  },false,true);
 }
 
 // ── ADD TX ────────────────────────────────────────────────────────────────────
@@ -4890,7 +5220,8 @@ def assetlinks():
 @login_required
 def index():
     display = session.get("display","")
-    return HTML.replace("__USER_DISPLAY__", display)
+    first_name = display.split()[0] if display.strip() else display
+    return HTML.replace("__USER_DISPLAY__", first_name)
 
 # ── LEGAL PAGES ───────────────────────────────────────────────────────────────
 
