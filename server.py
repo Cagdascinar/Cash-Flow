@@ -1776,6 +1776,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <div style="font-size:.75rem;color:var(--txt2);margin-bottom:8px">👤 <strong style="color:var(--txt)">__USER_DISPLAY__</strong></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <a href="/logout" style="color:#ef4444;font-size:.72rem;text-decoration:none">↩ Çıkış</a>
+      <span onclick="triggerInstall()" style="color:#818cf8;font-size:.72rem;cursor:pointer;text-decoration:none">⬇ Uygulamayı Kur</span>
       <a href="/kvkk" style="color:#475569;font-size:.72rem;text-decoration:none">KVKK</a>
       <a href="/gizlilik" style="color:#475569;font-size:.72rem;text-decoration:none">Gizlilik</a>
       <a href="/kullanim-kosullari" style="color:#475569;font-size:.72rem;text-decoration:none">Koşullar</a>
@@ -3333,7 +3334,106 @@ window.addEventListener('resize',function(){
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('/sw.js').catch(function(){});
 }
+
+// ── PWA INSTALL BANNER ───────────────────────────────────────────────────────
+var _installPrompt = null;
+
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  _installPrompt = e;
+  showInstallBanner();
+});
+
+window.addEventListener('appinstalled', function(){
+  hideInstallBanner();
+  showToast('Uygulama kuruldu! Ana ekranınızdan açabilirsiniz.','#22c55e');
+});
+
+function isIOS(){
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+}
+
+function isInStandaloneMode(){
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+}
+
+function showInstallBanner(){
+  if(isInStandaloneMode()) return;
+  var b = document.getElementById('install-banner');
+  if(b){ b.style.display='flex'; }
+}
+
+function hideInstallBanner(){
+  var b = document.getElementById('install-banner');
+  if(b) b.style.display='none';
+  localStorage.setItem('install-dismissed','1');
+}
+
+function triggerInstall(){
+  if(_installPrompt){
+    _installPrompt.prompt();
+    _installPrompt.userChoice.then(function(r){
+      if(r.outcome==='accepted') hideInstallBanner();
+      _installPrompt = null;
+    });
+  } else if(isIOS()){
+    document.getElementById('ios-install-modal').style.display='flex';
+  }
+}
+
+function closeIOSModal(){
+  document.getElementById('ios-install-modal').style.display='none';
+}
+
+// Show iOS banner on first visit if not installed
+if(isIOS() && !isInStandaloneMode() && !localStorage.getItem('install-dismissed')){
+  window.addEventListener('load', function(){
+    setTimeout(function(){ showInstallBanner(); }, 2000);
+  });
+}
 </script>
+
+<!-- INSTALL BANNER -->
+<div id="install-banner" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:9000;background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:14px 20px;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 -4px 24px rgba(0,0,0,.4)">
+  <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0">
+    <span style="font-size:1.8rem;flex-shrink:0">🦔</span>
+    <div style="min-width:0">
+      <div style="font-size:.88rem;font-weight:700;color:#fff">Kirpi'yi Kur</div>
+      <div style="font-size:.75rem;color:rgba(255,255,255,.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Ana ekrana ekle, uygulama gibi kullan</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;flex-shrink:0">
+    <button onclick="triggerInstall()" style="background:#fff;color:#4f46e5;border:none;border-radius:8px;padding:8px 16px;font-size:.82rem;font-weight:700;cursor:pointer">Kur</button>
+    <button onclick="hideInstallBanner()" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:8px;padding:8px 10px;font-size:.82rem;cursor:pointer">✕</button>
+  </div>
+</div>
+
+<!-- iOS INSTALL MODAL -->
+<div id="ios-install-modal" style="display:none;position:fixed;inset:0;z-index:9100;background:rgba(0,0,0,.7);align-items:flex-end;justify-content:center">
+  <div style="background:#1a1d26;border-radius:20px 20px 0 0;padding:28px 24px 40px;width:100%;max-width:480px;border-top:1px solid #2a2f45">
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:2.5rem;margin-bottom:8px">🦔</div>
+      <div style="font-size:1rem;font-weight:700;color:#e2e8f0;margin-bottom:6px">Kirpi'yi Ana Ekrana Ekle</div>
+      <div style="font-size:.82rem;color:#64748b">iPhone/iPad'de uygulama gibi kullanmak için:</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px">
+      <div style="display:flex;align-items:center;gap:12px;background:#111318;border-radius:10px;padding:12px">
+        <span style="font-size:1.4rem;flex-shrink:0">1️⃣</span>
+        <span style="font-size:.85rem;color:#c7d2fe">Safari'de alt ortadaki <strong style="color:#818cf8">Paylaş</strong> butonuna bas <span style="font-size:1rem">⎙</span></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;background:#111318;border-radius:10px;padding:12px">
+        <span style="font-size:1.4rem;flex-shrink:0">2️⃣</span>
+        <span style="font-size:.85rem;color:#c7d2fe"><strong style="color:#818cf8">"Ana Ekrana Ekle"</strong> seçeneğine bas</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;background:#111318;border-radius:10px;padding:12px">
+        <span style="font-size:1.4rem;flex-shrink:0">3️⃣</span>
+        <span style="font-size:.85rem;color:#c7d2fe">Sağ üstten <strong style="color:#818cf8">"Ekle"</strong> ye bas</span>
+      </div>
+    </div>
+    <button onclick="closeIOSModal();hideInstallBanner();" style="width:100%;padding:13px;background:#4f46e5;border:none;border-radius:10px;color:#fff;font-size:.9rem;font-weight:700;cursor:pointer">Anladım</button>
+  </div>
+</div>
+
 </body>
 </html>"""
 
