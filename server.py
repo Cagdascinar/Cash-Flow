@@ -59,9 +59,18 @@ def init_db():
             created_at TEXT NOT NULL,
             FOREIGN KEY(user_id) REFERENCES users(id)
         );
+        CREATE TABLE IF NOT EXISTS profiles (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER NOT NULL,
+            name       TEXT NOT NULL,
+            type       TEXT NOT NULL DEFAULT 'sahis',
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
         CREATE TABLE IF NOT EXISTS transactions (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id     INTEGER NOT NULL DEFAULT 1,
+            profile_id  INTEGER NOT NULL DEFAULT 1,
             type        TEXT NOT NULL,
             amount      REAL NOT NULL,
             category    TEXT NOT NULL,
@@ -70,15 +79,17 @@ def init_db():
             created_at  TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS budgets (
-            id       INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id  INTEGER NOT NULL DEFAULT 1,
-            category TEXT NOT NULL,
-            limit_   REAL NOT NULL,
-            UNIQUE(user_id, category)
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER NOT NULL DEFAULT 1,
+            profile_id INTEGER NOT NULL DEFAULT 1,
+            category   TEXT NOT NULL,
+            limit_     REAL NOT NULL,
+            UNIQUE(profile_id, category)
         );
         CREATE TABLE IF NOT EXISTS cards (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id         INTEGER NOT NULL DEFAULT 1,
+            profile_id      INTEGER NOT NULL DEFAULT 1,
             bank_name       TEXT NOT NULL,
             card_name       TEXT NOT NULL DEFAULT '',
             owner           TEXT NOT NULL DEFAULT '',
@@ -92,6 +103,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS investments (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id     INTEGER NOT NULL DEFAULT 1,
+            profile_id  INTEGER NOT NULL DEFAULT 1,
             name        TEXT NOT NULL,
             itype       TEXT NOT NULL,
             symbol      TEXT NOT NULL DEFAULT '',
@@ -104,6 +116,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS recurring (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id      INTEGER NOT NULL DEFAULT 1,
+            profile_id   INTEGER NOT NULL DEFAULT 1,
             type         TEXT NOT NULL,
             amount       REAL NOT NULL,
             category     TEXT NOT NULL,
@@ -112,16 +125,21 @@ def init_db():
             active       INTEGER NOT NULL DEFAULT 1,
             created_at   TEXT NOT NULL
         );
-        CREATE INDEX IF NOT EXISTS idx_txn_user_date ON transactions(user_id, date);
+        CREATE INDEX IF NOT EXISTS idx_txn_profile_date ON transactions(profile_id, date);
         """)
         # Migration: add missing columns to existing databases
         migrations = [
-            ("users",        "email",   "TEXT NOT NULL DEFAULT ''"),
-            ("transactions", "user_id", "INTEGER NOT NULL DEFAULT 1"),
-            ("budgets",      "user_id", "INTEGER NOT NULL DEFAULT 1"),
-            ("cards",        "user_id", "INTEGER NOT NULL DEFAULT 1"),
-            ("investments",  "user_id", "INTEGER NOT NULL DEFAULT 1"),
-            ("recurring",    "user_id", "INTEGER NOT NULL DEFAULT 1"),
+            ("users",        "email",      "TEXT NOT NULL DEFAULT ''"),
+            ("transactions", "user_id",    "INTEGER NOT NULL DEFAULT 1"),
+            ("transactions", "profile_id", "INTEGER NOT NULL DEFAULT 1"),
+            ("budgets",      "user_id",    "INTEGER NOT NULL DEFAULT 1"),
+            ("budgets",      "profile_id", "INTEGER NOT NULL DEFAULT 1"),
+            ("cards",        "user_id",    "INTEGER NOT NULL DEFAULT 1"),
+            ("cards",        "profile_id", "INTEGER NOT NULL DEFAULT 1"),
+            ("investments",  "user_id",    "INTEGER NOT NULL DEFAULT 1"),
+            ("investments",  "profile_id", "INTEGER NOT NULL DEFAULT 1"),
+            ("recurring",    "user_id",    "INTEGER NOT NULL DEFAULT 1"),
+            ("recurring",    "profile_id", "INTEGER NOT NULL DEFAULT 1"),
         ]
         for table, col, col_def in migrations:
             try:
@@ -129,6 +147,17 @@ def init_db():
                 log.info("Migration: added %s.%s", table, col)
             except sqlite3.OperationalError:
                 pass  # column already exists
+        # Ensure every user has at least a default "Şahıs" profile
+        users = con.execute("SELECT id FROM users").fetchall()
+        for u in users:
+            uid = u[0]
+            has_profile = con.execute("SELECT id FROM profiles WHERE user_id=?", (uid,)).fetchone()
+            if not has_profile:
+                con.execute(
+                    "INSERT INTO profiles (user_id,name,type,created_at) VALUES (?,?,?,?)",
+                    (uid, "Şahıs", "sahis", datetime.now().isoformat())
+                )
+        con.commit()
 
 def row_to_dict(r): return dict(r)
 def today_str():    return date.today().isoformat()
@@ -281,9 +310,15 @@ def register():
             return AUTH_HTML_render("register", error)
         try:
             with sqlite3.connect(DB) as con:
-                con.execute(
+                con.row_factory = sqlite3.Row
+                cur = con.execute(
                     "INSERT INTO users (username,display_name,password_hash,email,created_at) VALUES (?,?,?,?,?)",
                     (username, display or username, generate_password_hash(password), email, datetime.now().isoformat())
+                )
+                uid = cur.lastrowid
+                con.execute(
+                    "INSERT INTO profiles (user_id,name,type,created_at) VALUES (?,?,?,?)",
+                    (uid, "Şahıs", "sahis", datetime.now().isoformat())
                 )
         except sqlite3.IntegrityError:
             return AUTH_HTML_render("register", "Bu kullanıcı adı zaten alınmış")
@@ -304,6 +339,13 @@ def login():
             session["user_id"]  = row["id"]
             session["username"] = row["username"]
             session["display"]  = row["display_name"]
+            with sqlite3.connect(DB) as con2:
+                con2.row_factory = sqlite3.Row
+                prof = con2.execute("SELECT * FROM profiles WHERE user_id=? ORDER BY id LIMIT 1",(row["id"],)).fetchone()
+                if prof:
+                    session["profile_id"]   = prof["id"]
+                    session["profile_name"] = prof["name"]
+                    session["profile_type"] = prof["type"]
             return redirect("/")
         return AUTH_HTML_render("login", "Kullanıcı adı veya şifre hatalı")
     msg = "Kayıt başarılı! Şimdi giriş yapabilirsiniz." if request.args.get("registered") else ""
@@ -365,7 +407,77 @@ def logout():
 @app.route("/api/me")
 @login_required
 def api_me():
-    return jsonify({"username": session.get("username"), "display": session.get("display")})
+    return jsonify({
+        "username":     session.get("username"),
+        "display":      session.get("display"),
+        "profile_id":   session.get("profile_id"),
+        "profile_name": session.get("profile_name"),
+        "profile_type": session.get("profile_type"),
+    })
+
+def get_pid():
+    """Return active profile_id from session (fallback: first profile of user)."""
+    pid = session.get("profile_id")
+    if not pid:
+        uid = session.get("user_id")
+        with sqlite3.connect(DB) as con:
+            row = con.execute("SELECT id FROM profiles WHERE user_id=? ORDER BY id LIMIT 1",(uid,)).fetchone()
+            if row: pid = row[0]; session["profile_id"] = pid
+    return pid
+
+# ── PROFILES API ──────────────────────────────────────────────────────────────
+
+@app.route("/api/profiles", methods=["GET"])
+@login_required
+def list_profiles():
+    uid = session["user_id"]
+    rows = get_db().execute("SELECT * FROM profiles WHERE user_id=? ORDER BY id",(uid,)).fetchall()
+    return jsonify([row_to_dict(r) for r in rows])
+
+@app.route("/api/profiles", methods=["POST"])
+@login_required
+def add_profile():
+    uid = session["user_id"]
+    d = request.get_json(force=True)
+    name  = d.get("name","").strip()
+    ptype = d.get("type","sahis")
+    if not name or ptype not in ("sahis","sirket"):
+        return jsonify({"ok":False,"error":"Geçersiz veri"}),400
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO profiles (user_id,name,type,created_at) VALUES (?,?,?,?)",
+        (uid, name, ptype, datetime.now().isoformat()))
+    db.commit()
+    return jsonify({"ok":True,"id":cur.lastrowid,"name":name,"type":ptype})
+
+@app.route("/api/profiles/<int:pid>/switch", methods=["POST"])
+@login_required
+def switch_profile(pid):
+    uid = session["user_id"]
+    db  = get_db()
+    prof = db.execute("SELECT * FROM profiles WHERE id=? AND user_id=?",(pid,uid)).fetchone()
+    if not prof: return jsonify({"ok":False,"error":"Profil bulunamadı"}),404
+    session["profile_id"]   = prof["id"]
+    session["profile_name"] = prof["name"]
+    session["profile_type"] = prof["type"]
+    return jsonify({"ok":True,"name":prof["name"],"type":prof["type"]})
+
+@app.route("/api/profiles/<int:pid>", methods=["DELETE"])
+@login_required
+def del_profile(pid):
+    uid = session["user_id"]
+    db  = get_db()
+    count = db.execute("SELECT COUNT(*) FROM profiles WHERE user_id=?",(uid,)).fetchone()[0]
+    if count <= 1: return jsonify({"ok":False,"error":"En az bir profil olmalı"}),400
+    db.execute("DELETE FROM profiles WHERE id=? AND user_id=?",(pid,uid))
+    db.commit()
+    if session.get("profile_id") == pid:
+        first = db.execute("SELECT * FROM profiles WHERE user_id=? ORDER BY id LIMIT 1",(uid,)).fetchone()
+        if first:
+            session["profile_id"]   = first["id"]
+            session["profile_name"] = first["name"]
+            session["profile_type"] = first["type"]
+    return jsonify({"ok":True})
 
 def month_range(year, month):
     from calendar import monthrange
@@ -380,9 +492,9 @@ def list_transactions():
     db    = get_db()
     year  = request.args.get("year",  type=int)
     month = request.args.get("month", type=int)
-    uid   = session["user_id"]
-    q     = "SELECT * FROM transactions WHERE user_id=?"
-    params = [uid]
+    pid   = get_pid()
+    q     = "SELECT * FROM transactions WHERE profile_id=?"
+    params = [pid]
     if year and month:
         s, e = month_range(year, month)
         q += " AND date BETWEEN ? AND ?"; params += [s, e]
@@ -394,7 +506,7 @@ def list_transactions():
 @app.route("/api/transactions", methods=["POST"])
 @login_required
 def add_transaction():
-    uid = session["user_id"]
+    uid = session["user_id"]; pid = get_pid()
     d = request.get_json(force=True)
     ttype = d.get("type"); amount = float(d.get("amount", 0))
     cat = d.get("category",""); desc = d.get("description",""); dt = d.get("date", today_str())
@@ -402,15 +514,15 @@ def add_transaction():
         return jsonify({"ok": False, "error": "Geçersiz veri"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO transactions (user_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?)",
-        (uid, ttype, amount, cat, desc, dt, datetime.now().isoformat()))
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?,?)",
+        (uid, pid, ttype, amount, cat, desc, dt, datetime.now().isoformat()))
     db.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
 
 @app.route("/api/transactions/<int:tid>", methods=["PUT"])
 @login_required
 def update_transaction(tid):
-    uid = session["user_id"]
+    pid = get_pid()
     d = request.get_json(force=True)
     fields, params = [], []
     for col in ("type","amount","category","description","date"):
@@ -418,40 +530,40 @@ def update_transaction(tid):
             fields.append(f"{col}=?")
             params.append(float(d[col]) if col == "amount" else d[col])
     if not fields: return jsonify({"ok": False}), 400
-    params += [tid, uid]
-    get_db().execute(f"UPDATE transactions SET {','.join(fields)} WHERE id=? AND user_id=?", params)
+    params += [tid, pid]
+    get_db().execute(f"UPDATE transactions SET {','.join(fields)} WHERE id=? AND profile_id=?", params)
     get_db().commit()
     return jsonify({"ok": True})
 
 @app.route("/api/transactions/<int:tid>", methods=["DELETE"])
 @login_required
 def del_transaction(tid):
-    uid = session["user_id"]
-    get_db().execute("DELETE FROM transactions WHERE id=? AND user_id=?", (tid, uid)); get_db().commit()
+    pid = get_pid()
+    get_db().execute("DELETE FROM transactions WHERE id=? AND profile_id=?", (tid, pid)); get_db().commit()
     return jsonify({"ok": True})
 
 @app.route("/api/transactions/bulk-delete", methods=["POST"])
 @login_required
 def bulk_delete():
-    uid = session["user_id"]
+    pid = get_pid()
     ids = request.get_json(force=True)
     if not isinstance(ids, list): return jsonify({"ok": False}), 400
     placeholders = ",".join("?" * len(ids))
-    get_db().execute(f"DELETE FROM transactions WHERE id IN ({placeholders}) AND user_id=?", ids + [uid])
+    get_db().execute(f"DELETE FROM transactions WHERE id IN ({placeholders}) AND profile_id=?", ids + [pid])
     get_db().commit()
     return jsonify({"ok": True, "deleted": len(ids)})
 
 @app.route("/api/summary")
 @login_required
 def summary():
-    uid   = session["user_id"]
+    pid   = get_pid()
     db    = get_db()
     year  = request.args.get("year",  date.today().year,  type=int)
     month = request.args.get("month", date.today().month, type=int)
     start, end = month_range(year, month)
     rows = db.execute(
         "SELECT type,category,SUM(amount) as total FROM transactions "
-        "WHERE user_id=? AND date BETWEEN ? AND ? GROUP BY type,category", (uid, start, end)).fetchall()
+        "WHERE profile_id=? AND date BETWEEN ? AND ? GROUP BY type,category", (pid, start, end)).fetchall()
     gelir_total = gider_total = 0.0
     gelir_cats  = {}; gider_cats = {}
     for r in rows:
@@ -460,12 +572,12 @@ def summary():
     bar = []
     for m in range(1,13):
         s,e2 = month_range(year,m)
-        totals = db.execute("SELECT type,SUM(amount) as t FROM transactions WHERE user_id=? AND date BETWEEN ? AND ? GROUP BY type",(uid,s,e2)).fetchall()
+        totals = db.execute("SELECT type,SUM(amount) as t FROM transactions WHERE profile_id=? AND date BETWEEN ? AND ? GROUP BY type",(pid,s,e2)).fetchall()
         g_val  = next((r["t"] for r in totals if r["type"]=="gelir"),0)
         ex_val = next((r["t"] for r in totals if r["type"]=="gider"),0)
         bar.append({"month":m,"gelir":round(g_val,2),"gider":round(ex_val,2)})
-    bal = db.execute("SELECT SUM(CASE WHEN type='gelir' THEN amount ELSE -amount END) as b FROM transactions WHERE user_id=?",(uid,)).fetchone()
-    budgets = {r["category"]:r["limit_"] for r in db.execute("SELECT * FROM budgets WHERE user_id=?",(uid,)).fetchall()}
+    bal = db.execute("SELECT SUM(CASE WHEN type='gelir' THEN amount ELSE -amount END) as b FROM transactions WHERE profile_id=?",(pid,)).fetchone()
+    budgets = {r["category"]:r["limit_"] for r in db.execute("SELECT * FROM budgets WHERE profile_id=?",(pid,)).fetchall()}
     return jsonify({"gelir":round(gelir_total,2),"gider":round(gider_total,2),
                     "net":round(gelir_total-gider_total,2),"balance":round(bal["b"] or 0,2),
                     "gelir_cats":gelir_cats,"gider_cats":gider_cats,"bar":bar,"budgets":budgets})
@@ -473,12 +585,12 @@ def summary():
 @app.route("/api/budgets", methods=["POST"])
 @login_required
 def set_budget():
-    uid = session["user_id"]
+    uid = session["user_id"]; pid = get_pid()
     d = request.get_json(force=True)
     cat = d.get("category",""); limit = float(d.get("limit",0))
     if not cat or limit<=0: return jsonify({"ok":False}),400
     db = get_db()
-    db.execute("INSERT INTO budgets(user_id,category,limit_) VALUES(?,?,?) ON CONFLICT(user_id,category) DO UPDATE SET limit_=excluded.limit_",(uid,cat,limit))
+    db.execute("INSERT INTO budgets(user_id,profile_id,category,limit_) VALUES(?,?,?,?) ON CONFLICT(profile_id,category) DO UPDATE SET limit_=excluded.limit_",(uid,pid,cat,limit))
     db.commit(); return jsonify({"ok":True})
 
 @app.route("/api/categories")
@@ -492,8 +604,8 @@ def motivation():
     db = get_db(); today = date.today()
     year, month = today.year, today.month
     start, end  = month_range(year, month)
-    uid = session["user_id"]
-    rows = db.execute("SELECT type,SUM(amount) as t FROM transactions WHERE user_id=? AND date BETWEEN ? AND ? GROUP BY type",(uid,start,end)).fetchall()
+    pid = get_pid()
+    rows = db.execute("SELECT type,SUM(amount) as t FROM transactions WHERE profile_id=? AND date BETWEEN ? AND ? GROUP BY type",(pid,start,end)).fetchall()
     gelir  = next((r["t"] for r in rows if r["type"]=="gelir"),0) or 0
     gider  = next((r["t"] for r in rows if r["type"]=="gider"),0) or 0
     net    = gelir - gider
@@ -502,9 +614,9 @@ def motivation():
     days_passed = today.day; days_left = days_in_month - days_passed
     daily_spend = gider / max(days_passed,1)
     projected   = daily_spend * days_in_month
-    bal = (db.execute("SELECT SUM(CASE WHEN type='gelir' THEN amount ELSE -amount END) as b FROM transactions WHERE user_id=?",(uid,)).fetchone()["b"] or 0)
-    budgets = {r["category"]:r["limit_"] for r in db.execute("SELECT * FROM budgets WHERE user_id=?",(uid,)).fetchall()}
-    top = db.execute("SELECT category,SUM(amount) as t FROM transactions WHERE user_id=? AND date BETWEEN ? AND ? AND type='gider' GROUP BY category ORDER BY t DESC LIMIT 1",(uid,start,end)).fetchall()
+    bal = (db.execute("SELECT SUM(CASE WHEN type='gelir' THEN amount ELSE -amount END) as b FROM transactions WHERE profile_id=?",(pid,)).fetchone()["b"] or 0)
+    budgets = {r["category"]:r["limit_"] for r in db.execute("SELECT * FROM budgets WHERE profile_id=?",(pid,)).fetchall()}
+    top = db.execute("SELECT category,SUM(amount) as t FROM transactions WHERE profile_id=? AND date BETWEEN ? AND ? AND type='gider' GROUP BY category ORDER BY t DESC LIMIT 1",(pid,start,end)).fetchall()
     top_cat = top[0]["category"] if top else None; top_amt = top[0]["t"] if top else 0
     msgs=[]; score=0
     if gelir==0:
@@ -522,7 +634,7 @@ def motivation():
     if budgets:
         over=[]
         for cat,lim in budgets.items():
-            sp=(db.execute("SELECT SUM(amount) as t FROM transactions WHERE user_id=? AND date BETWEEN ? AND ? AND type='gider' AND category=?",(uid,start,end,cat)).fetchone()["t"] or 0)
+            sp=(db.execute("SELECT SUM(amount) as t FROM transactions WHERE profile_id=? AND date BETWEEN ? AND ? AND type='gider' AND category=?",(pid,start,end,cat)).fetchone()["t"] or 0)
             if sp>lim: over.append((cat,sp-lim))
         if not over: score+=20; msgs.append({"icon":"🎯","text":"Tüm bütçe hedeflerini tutturuyorsun. Süper disiplin!"})
         else:
@@ -657,13 +769,13 @@ def import_preview():
 @app.route("/api/cards", methods=["GET"])
 @login_required
 def list_cards():
-    uid = session["user_id"]
-    return jsonify([row_to_dict(r) for r in get_db().execute("SELECT * FROM cards WHERE user_id=? ORDER BY bank_name",(uid,)).fetchall()])
+    pid = get_pid()
+    return jsonify([row_to_dict(r) for r in get_db().execute("SELECT * FROM cards WHERE profile_id=? ORDER BY bank_name",(pid,)).fetchall()])
 
 @app.route("/api/cards", methods=["POST"])
 @login_required
 def add_card():
-    uid = session["user_id"]
+    uid = session["user_id"]; pid = get_pid()
     d = request.get_json(force=True)
     bank = d.get("bank_name","").strip(); card = d.get("card_name","").strip()
     owner = d.get("owner","").strip()
@@ -672,29 +784,29 @@ def add_card():
     stmt_day = int(d.get("statement_day",20))
     if not bank or limit <= 0: return jsonify({"ok":False}), 400
     db = get_db()
-    cur = db.execute("INSERT INTO cards (user_id,bank_name,card_name,owner,limit_,used_,due_day,min_pct,statement_day,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                     (uid,bank,card,owner,limit,used,due_day,min_pct,stmt_day,datetime.now().isoformat()))
+    cur = db.execute("INSERT INTO cards (user_id,profile_id,bank_name,card_name,owner,limit_,used_,due_day,min_pct,statement_day,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                     (uid,pid,bank,card,owner,limit,used,due_day,min_pct,stmt_day,datetime.now().isoformat()))
     db.commit(); return jsonify({"ok":True,"id":cur.lastrowid})
 
 @app.route("/api/cards/<int:cid>", methods=["PUT"])
 @login_required
 def update_card(cid):
-    uid = session["user_id"]
+    pid = get_pid()
     d = request.get_json(force=True); fields=[]; params=[]
     for col in ("bank_name","card_name","limit_","used_","due_day","min_pct","statement_day"):
         if col in d:
             fields.append(f"{col}=?")
             params.append(float(d[col]) if col in ("limit_","used_","min_pct") else int(d[col]) if col in ("due_day","statement_day") else d[col])
     if not fields: return jsonify({"ok":False}),400
-    params += [cid, uid]
-    get_db().execute(f"UPDATE cards SET {','.join(fields)} WHERE id=? AND user_id=?",params); get_db().commit()
+    params += [cid, pid]
+    get_db().execute(f"UPDATE cards SET {','.join(fields)} WHERE id=? AND profile_id=?",params); get_db().commit()
     return jsonify({"ok":True})
 
 @app.route("/api/cards/<int:cid>", methods=["DELETE"])
 @login_required
 def del_card(cid):
-    uid = session["user_id"]
-    get_db().execute("DELETE FROM cards WHERE id=? AND user_id=?",(cid,uid)); get_db().commit()
+    pid = get_pid()
+    get_db().execute("DELETE FROM cards WHERE id=? AND profile_id=?",(cid,pid)); get_db().commit()
     return jsonify({"ok":True})
 
 # ── RATES & INVESTMENTS ───────────────────────────────────────────────────────
@@ -747,14 +859,14 @@ def api_rates():
 @app.route("/api/investments", methods=["GET"])
 @login_required
 def list_investments():
-    uid = session["user_id"]
-    rows = get_db().execute("SELECT * FROM investments WHERE user_id=? ORDER BY buy_date DESC",(uid,)).fetchall()
+    pid = get_pid()
+    rows = get_db().execute("SELECT * FROM investments WHERE profile_id=? ORDER BY buy_date DESC",(pid,)).fetchall()
     return jsonify([row_to_dict(r) for r in rows])
 
 @app.route("/api/investments", methods=["POST"])
 @login_required
 def add_investment():
-    uid = session["user_id"]
+    uid = session["user_id"]; pid = get_pid()
     d = request.get_json(force=True)
     name     = d.get("name","").strip()
     itype    = d.get("itype","")
@@ -767,24 +879,23 @@ def add_investment():
         return jsonify({"ok": False, "error": "Geçersiz veri"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO investments (user_id,name,itype,symbol,quantity,buy_price,buy_date,note,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
-        (uid, name, itype, symbol, quantity, buy_price, buy_date, note, datetime.now().isoformat()))
+        "INSERT INTO investments (user_id,profile_id,name,itype,symbol,quantity,buy_price,buy_date,note,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (uid, pid, name, itype, symbol, quantity, buy_price, buy_date, note, datetime.now().isoformat()))
     db.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
 
 @app.route("/api/investments/<int:iid>", methods=["DELETE"])
 @login_required
 def del_investment(iid):
-    uid = session["user_id"]
-    get_db().execute("DELETE FROM investments WHERE id=? AND user_id=?", (iid,uid)); get_db().commit()
+    pid = get_pid()
+    get_db().execute("DELETE FROM investments WHERE id=? AND profile_id=?", (iid,pid)); get_db().commit()
     return jsonify({"ok": True})
 
 @app.route("/api/investments/value", methods=["GET"])
 @login_required
 def investment_values():
-    """Return all investments with current TRY value and profit/loss."""
-    uid   = session["user_id"]
-    rows  = get_db().execute("SELECT * FROM investments WHERE user_id=?",(uid,)).fetchall()
+    pid   = get_pid()
+    rows  = get_db().execute("SELECT * FROM investments WHERE profile_id=?",(pid,)).fetchall()
     rates = get_rates()
     result = []
     for row in rows:
@@ -837,10 +948,10 @@ def book_investment_income(iid):
     dt     = d.get("date", today_str())
     if amount <= 0: return jsonify({"ok": False}), 400
     db = get_db()
-    uid = session["user_id"]
+    uid = session["user_id"]; pid = get_pid()
     cur = db.execute(
-        "INSERT INTO transactions (user_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?)",
-        (uid, "gelir", amount, cat, desc, dt, datetime.now().isoformat()))
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?,?)",
+        (uid, pid, "gelir", amount, cat, desc, dt, datetime.now().isoformat()))
     db.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
 
@@ -878,14 +989,14 @@ def tefas_fon(fon_kod):
 @app.route("/api/recurring", methods=["GET"])
 @login_required
 def list_recurring():
-    uid = session["user_id"]
-    rows = get_db().execute("SELECT * FROM recurring WHERE user_id=? ORDER BY type DESC, day_of_month",(uid,)).fetchall()
+    pid = get_pid()
+    rows = get_db().execute("SELECT * FROM recurring WHERE profile_id=? ORDER BY type DESC, day_of_month",(pid,)).fetchall()
     return jsonify([row_to_dict(r) for r in rows])
 
 @app.route("/api/recurring", methods=["POST"])
 @login_required
 def add_recurring():
-    uid = session["user_id"]
+    uid = session["user_id"]; pid = get_pid()
     d = request.get_json(force=True)
     ttype = d.get("type"); amount = float(d.get("amount", 0))
     cat = d.get("category",""); desc = d.get("description","")
@@ -894,22 +1005,22 @@ def add_recurring():
         return jsonify({"ok": False, "error": "Geçersiz veri"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO recurring (user_id,type,amount,category,description,day_of_month,active,created_at) VALUES (?,?,?,?,?,?,1,?)",
-        (uid, ttype, amount, cat, desc, day, datetime.now().isoformat()))
+        "INSERT INTO recurring (user_id,profile_id,type,amount,category,description,day_of_month,active,created_at) VALUES (?,?,?,?,?,?,?,1,?)",
+        (uid, pid, ttype, amount, cat, desc, day, datetime.now().isoformat()))
     db.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
 
 @app.route("/api/recurring/<int:rid>", methods=["DELETE"])
 @login_required
 def del_recurring(rid):
-    uid = session["user_id"]
-    get_db().execute("DELETE FROM recurring WHERE id=? AND user_id=?", (rid,uid)); get_db().commit()
+    pid = get_pid()
+    get_db().execute("DELETE FROM recurring WHERE id=? AND profile_id=?", (rid,pid)); get_db().commit()
     return jsonify({"ok": True})
 
 @app.route("/api/recurring/<int:rid>", methods=["PUT"])
 @login_required
 def update_recurring(rid):
-    uid = session["user_id"]
+    pid = get_pid()
     d = request.get_json(force=True)
     fields, params = [], []
     for col in ("type","amount","category","description","day_of_month","active"):
@@ -918,22 +1029,22 @@ def update_recurring(rid):
             val = float(d[col]) if col == "amount" else int(d[col]) if col in ("day_of_month","active") else d[col]
             params.append(val)
     if not fields: return jsonify({"ok": False}), 400
-    params += [rid, uid]
-    get_db().execute(f"UPDATE recurring SET {','.join(fields)} WHERE id=? AND user_id=?", params)
+    params += [rid, pid]
+    get_db().execute(f"UPDATE recurring SET {','.join(fields)} WHERE id=? AND profile_id=?", params)
     get_db().commit()
     return jsonify({"ok": True})
 
 @app.route("/api/recurring/apply", methods=["POST"])
 @login_required
 def apply_recurring():
-    uid = session["user_id"]
+    uid = session["user_id"]; pid = get_pid()
     d = request.get_json(force=True)
     year   = int(d.get("year",  date.today().year))
     month  = d.get("month")
     months = [int(month)] if month else list(range(1, 13))
 
     db        = get_db()
-    templates = db.execute("SELECT * FROM recurring WHERE user_id=? AND active=1",(uid,)).fetchall()
+    templates = db.execute("SELECT * FROM recurring WHERE profile_id=? AND active=1",(pid,)).fetchall()
     created   = 0; skipped = 0
 
     from calendar import monthrange
@@ -943,13 +1054,13 @@ def apply_recurring():
             day = min(tpl["day_of_month"], last_day)
             dt  = f"{year:04d}-{m:02d}-{day:02d}"
             exists = db.execute(
-                "SELECT id FROM transactions WHERE user_id=? AND type=? AND category=? AND description=? AND date=? AND amount=?",
-                (uid, tpl["type"], tpl["category"], tpl["description"], dt, tpl["amount"])
+                "SELECT id FROM transactions WHERE profile_id=? AND type=? AND category=? AND description=? AND date=? AND amount=?",
+                (pid, tpl["type"], tpl["category"], tpl["description"], dt, tpl["amount"])
             ).fetchone()
             if exists: skipped += 1; continue
             db.execute(
-                "INSERT INTO transactions (user_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?)",
-                (uid, tpl["type"], tpl["amount"], tpl["category"], tpl["description"], dt, datetime.now().isoformat()))
+                "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?,?)",
+                (uid, pid, tpl["type"], tpl["amount"], tpl["category"], tpl["description"], dt, datetime.now().isoformat()))
             created += 1
 
     db.commit()
@@ -974,14 +1085,14 @@ def backup_download():
 @app.route("/api/import/confirm", methods=["POST"])
 @login_required
 def import_confirm():
-    uid=session["user_id"]
+    uid=session["user_id"]; pid=get_pid()
     rows=request.get_json(force=True)
     if not isinstance(rows,list): return jsonify({"ok":False}),400
     db=get_db(); now=datetime.now().isoformat(); count=0
     for r in rows:
         if not r.get("skip") and r.get("amount",0)>0:
-            db.execute("INSERT INTO transactions (user_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?)",
-                       (uid,r["type"],r["amount"],r["category"],r.get("description",""),r["date"],now))
+            db.execute("INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?,?)",
+                       (uid,pid,r["type"],r["amount"],r["category"],r.get("description",""),r["date"],now))
             count+=1
     db.commit(); return jsonify({"ok":True,"imported":count})
 
@@ -1126,9 +1237,9 @@ def AUTH_HTML_render(mode, msg="", token=None):
     {msg_html}
     <form method="POST" action="/register">
       <label>Ad Soyad</label>
-      <input type="text" name="display_name" placeholder="Çağdaş Çınar" autocomplete="name">
+      <input type="text" name="display_name" placeholder="Ad Soyad" autocomplete="name">
       <label>Kullanıcı Adı</label>
-      <input type="text" name="username" placeholder="cagdas" required autocomplete="username">
+      <input type="text" name="username" placeholder="kullanici_adi" required autocomplete="username">
       <label>Email</label>
       <input type="email" name="email" placeholder="ornek@gmail.com" required autocomplete="email">
       <label>Şifre <span style="color:#64748b">(en az 6 karakter)</span></label>
@@ -1160,7 +1271,7 @@ def AUTH_HTML_render(mode, msg="", token=None):
     {msg_html}
     <form method="POST" action="/forgot-password">
       <label>Kullanıcı Adı veya Email</label>
-      <input type="text" name="identifier" required placeholder="cagdas veya ornek@gmail.com" autocomplete="email">
+      <input type="text" name="identifier" required placeholder="kullanici_adi veya ornek@gmail.com" autocomplete="email">
       <button class="btn" type="submit">Sıfırlama Linki Gönder</button>
     </form>
     <div class="link"><a href="/login">← Giriş ekranına dön</a></div>"""
@@ -1594,7 +1705,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       <button class="type-tab" id="tab-r" onclick="setTab('gider')">📉  Gider</button>
     </div>
     <div class="form-row">
-      <div><label>Tutar (₺)</label><input class="f-input" type="number" id="f-amount" placeholder="0.00" min="0" step="0.01"></div>
+      <div><label>Tutar (₺)</label><input class="f-input" type="text" inputmode="decimal" data-num id="f-amount" placeholder="0,00"></div>
       <div><label>Tarih</label><input class="f-input" type="date" id="f-date"></div>
     </div>
     <div style="margin-bottom:12px"><label>Kategori</label><select class="f-input" id="f-cat"></select></div>
@@ -1881,7 +1992,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <!-- ADD CARD FORM -->
     <div class="card">
       <div class="section-title">Kart Ekle / Güncelle</div>
-      <div style="margin-bottom:12px"><label>Kart Sahibi</label><input class="f-input" type="text" id="card-owner" placeholder="ör. Çağdaş, Eşim, Annem"></div>
+      <div style="margin-bottom:12px"><label>Kart Sahibi</label><input class="f-input" type="text" id="card-owner" placeholder="ör. Ben, Eşim, Annem"></div>
       <div class="form-row">
         <div>
           <label>Banka Adı</label>
@@ -2067,6 +2178,29 @@ function loadDashboard(){
 
 function fmt(n){return '₺'+Number(n).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})}
 function fmtK(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(0)+'K';return Math.round(n)+''}
+function fmtNum(n){return Number(n).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+
+// Tutar inputlarını yazarken formatla (100000 → 100.000,00)
+function setupNumInputs(){
+  document.querySelectorAll('input[data-num]').forEach(function(el){
+    el.addEventListener('input',function(){
+      var raw=el.value.replace(/\./g,'').replace(',','.');
+      el.dataset.raw=raw;
+    });
+    el.addEventListener('blur',function(){
+      var raw=parseFloat(el.value.replace(/\./g,'').replace(',','.'));
+      if(!isNaN(raw)){el.value=fmtNum(raw);}
+      el.dataset.raw=isNaN(raw)?'':raw;
+    });
+    el.addEventListener('focus',function(){
+      if(el.dataset.raw) el.value=el.dataset.raw.replace('.',',');
+    });
+  });
+}
+function getNumVal(el){
+  var raw=el.dataset.raw||el.value.replace(/\./g,'').replace(',','.');
+  return parseFloat(raw)||0;
+}
 
 function renderStats(d){
   var b=document.getElementById('s-bal');
