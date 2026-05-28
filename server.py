@@ -1847,11 +1847,11 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
       <div style="flex:1;min-width:120px">
         <label>Yatırdığım TL</label>
-        <input class="f-input" type="number" id="calc-tl" placeholder="50000" oninput="calcInvest()">
+        <input class="f-input" type="text" inputmode="decimal" data-num id="calc-tl" placeholder="50.000" oninput="calcInvest()">
       </div>
       <div style="flex:1;min-width:120px">
         <label>O gündeki kur</label>
-        <input class="f-input" type="number" id="calc-buy" placeholder="32.50" step="0.01" oninput="calcInvest()">
+        <input class="f-input" type="text" inputmode="decimal" data-num id="calc-buy" placeholder="32,50" oninput="calcInvest()">
       </div>
       <div style="flex:1;min-width:140px">
         <label>Araç</label>
@@ -1899,8 +1899,8 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
         <div><label id="inv-sym-lbl">Sembol / Fon Kodu</label><input class="f-input" type="text" id="inv-sym" placeholder="USD"></div>
       </div>
       <div class="form-row">
-        <div><label id="inv-qty-lbl">Miktar</label><input class="f-input" type="number" id="inv-qty" placeholder="1000" step="0.001"></div>
-        <div><label id="inv-price-lbl">Alış Fiyatı (TRY)</label><input class="f-input" type="number" id="inv-price" placeholder="32.50" step="0.01"></div>
+        <div><label id="inv-qty-lbl">Miktar</label><input class="f-input" type="text" inputmode="decimal" data-num id="inv-qty" placeholder="1.000"></div>
+        <div><label id="inv-price-lbl">Alış Fiyatı (TRY)</label><input class="f-input" type="text" inputmode="decimal" data-num id="inv-price" placeholder="32,50"></div>
       </div>
       <div class="form-row">
         <div><label>Alış Tarihi</label><input class="f-input" type="date" id="inv-date"></div>
@@ -1953,7 +1953,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
         <button class="type-tab" id="rec-tab-r" onclick="setRecTab('gider')">📉 Gider</button>
       </div>
       <div class="form-row">
-        <div><label>Tutar (₺)</label><input class="f-input" type="number" id="rec-amount" placeholder="0.00" min="0" step="0.01"></div>
+        <div><label>Tutar (₺)</label><input class="f-input" type="text" inputmode="decimal" data-num id="rec-amount" placeholder="0,00"></div>
         <div>
           <label>Her ayın kaçında?</label>
           <select class="f-input" id="rec-day">
@@ -2044,8 +2044,8 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
         <div><label>Kart Adı / Türü</label><input class="f-input" type="text" id="card-name" placeholder="ör. Miles&Smiles, Bonus"></div>
       </div>
       <div class="form-row">
-        <div><label>Toplam Limit (₺)</label><input class="f-input" type="number" id="card-limit" placeholder="50000"></div>
-        <div><label>Mevcut Borç (₺)</label><input class="f-input" type="number" id="card-used" placeholder="12000"></div>
+        <div><label>Toplam Limit (₺)</label><input class="f-input" type="text" inputmode="decimal" data-num id="card-limit" placeholder="50.000"></div>
+        <div><label>Mevcut Borç (₺)</label><input class="f-input" type="text" inputmode="decimal" data-num id="card-used" placeholder="12.000"></div>
       </div>
       <div class="form-row">
         <div>
@@ -2111,7 +2111,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <div class="card">
       <div class="section-title">Hedef Ekle / Güncelle</div>
       <div style="margin-bottom:12px"><label>Kategori</label><select class="f-input" id="b-cat"></select></div>
-      <div style="margin-bottom:16px"><label>Aylık Limit (₺)</label><input class="f-input" type="number" id="b-limit" placeholder="örn. 5000"></div>
+      <div style="margin-bottom:16px"><label>Aylık Limit (₺)</label><input class="f-input" type="text" inputmode="decimal" data-num id="b-limit" placeholder="5.000"></div>
       <button class="btn btn-primary" style="width:100%" onclick="saveBudget()">Kaydet</button>
     </div>
     <div class="card" id="budget-display">
@@ -2452,7 +2452,7 @@ function renderBudgetPage(gider_cats,budgets){
   }).join('');
 }
 function saveBudget(){
-  var cat=document.getElementById('b-cat').value, limit=parseFloat(document.getElementById('b-limit').value);
+  var cat=document.getElementById('b-cat').value, limit=getNumVal(document.getElementById('b-limit'));
   if(!cat||!limit||limit<=0){toast('Kategori ve limit giriniz');return}
   xhr('/api/budgets',{category:cat,limit:limit},function(){
     document.getElementById('b-limit').value='';
@@ -2462,7 +2462,7 @@ function saveBudget(){
 
 // ── ADD TX ────────────────────────────────────────────────────────────────────
 function addTx(){
-  var amount=parseFloat(document.getElementById('f-amount').value);
+  var amount=getNumVal(document.getElementById('f-amount'));
   var cat=document.getElementById('f-cat').value;
   var desc=document.getElementById('f-desc').value;
   var dt=document.getElementById('f-date').value;
@@ -2696,8 +2696,8 @@ function loadRates(){
 }
 
 function calcInvest(){
-  var tl   = parseFloat(document.getElementById('calc-tl').value);
-  var buy  = parseFloat(document.getElementById('calc-buy').value);
+  var tl   = getNumVal(document.getElementById('calc-tl'));
+  var buy  = getNumVal(document.getElementById('calc-buy'));
   var type = document.getElementById('calc-type').value;
   if(!tl || !buy || tl<=0 || buy<=0){ document.getElementById('calc-result').style.display='none'; return; }
   var curRate = type==='usd' ? liveRates.usd_try :
@@ -2742,7 +2742,9 @@ function lookupFon(){
     if(d.ok){
       el.innerHTML = '<span style="color:var(--g)">✓ '+d.fon+' — Güncel fiyat: <strong>'+d.fiyat.toFixed(4)+'₺</strong> ('+d.tarih+')</span>';
       document.getElementById('inv-sym').value   = d.fon;
-      document.getElementById('inv-price').value = d.fiyat.toFixed(4);
+      var priceEl=document.getElementById('inv-price');
+      priceEl.value=Number(d.fiyat).toLocaleString('tr-TR',{minimumFractionDigits:4,maximumFractionDigits:4});
+      priceEl.dataset.raw=d.fiyat;
     } else {
       el.innerHTML = '<span style="color:var(--r)">Fon bulunamadı. Fon kodu doğru mu? (ör. MAC)</span>';
     }
@@ -2754,8 +2756,8 @@ function addInvestment(){
     name:      document.getElementById('inv-name').value.trim(),
     itype:     document.getElementById('inv-type').value,
     symbol:    document.getElementById('inv-sym').value.trim().toUpperCase(),
-    quantity:  parseFloat(document.getElementById('inv-qty').value),
-    buy_price: parseFloat(document.getElementById('inv-price').value),
+    quantity:  getNumVal(document.getElementById('inv-qty')),
+    buy_price: getNumVal(document.getElementById('inv-price')),
     buy_date:  document.getElementById('inv-date').value,
     note:      document.getElementById('inv-note').value,
   };
@@ -2889,7 +2891,7 @@ function loadRecurring(){
 }
 
 function addRecurring(){
-  var amount = parseFloat(document.getElementById('rec-amount').value);
+  var amount = getNumVal(document.getElementById('rec-amount'));
   var cat    = document.getElementById('rec-cat').value;
   var desc   = document.getElementById('rec-desc').value;
   var day    = parseInt(document.getElementById('rec-day').value);
@@ -3000,8 +3002,8 @@ function addCard(){
     bank_name:    document.getElementById('card-bank').value,
     card_name:    document.getElementById('card-name').value,
     owner:        document.getElementById('card-owner').value,
-    limit_:       parseFloat(document.getElementById('card-limit').value)||0,
-    used_:        parseFloat(document.getElementById('card-used').value)||0,
+    limit_:       getNumVal(document.getElementById('card-limit')),
+    used_:        getNumVal(document.getElementById('card-used')),
     due_day:      parseInt(document.getElementById('card-due').value),
     statement_day:parseInt(document.getElementById('card-stmt').value),
     min_pct:      parseFloat(document.getElementById('card-minpct').value),
@@ -3056,7 +3058,7 @@ function loadCards(){
         '<div style="margin-top:10px">'+
           '<label style="font-size:.72rem">Borcu Güncelle (₺)</label>'+
           '<div style="display:flex;gap:8px;margin-top:4px">'+
-            '<input type="number" id="upd-used-'+c.id+'" value="'+c.used_+'" class="f-input" style="flex:1" placeholder="Güncel borç">'+
+            '<input type="text" inputmode="decimal" data-num data-raw="'+c.used_+'" id="upd-used-'+c.id+'" value="'+Number(c.used_).toLocaleString("tr-TR",{minimumFractionDigits:2,maximumFractionDigits:2})+'" class="f-input" style="flex:1" placeholder="Güncel borç">'+
             '<button class="btn btn-ghost" style="padding:8px 14px;font-size:.78rem" onclick="updateCardUsed('+c.id+')">Kaydet</button>'+
           '</div>'+
         '</div>'+
