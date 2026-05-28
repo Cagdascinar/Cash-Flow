@@ -1,12 +1,25 @@
-import sqlite3, json, os, csv, io, re, requests, secrets
-from datetime import datetime, date
+import sqlite3, json, os, csv, io, re, requests, secrets, smtplib, threading, time, logging
+from datetime import datetime, date, timedelta
 from functools import wraps
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 from flask import Flask, request, jsonify, g, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger("kirpi")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 DB = os.path.join(os.path.dirname(__file__), "cashflow.db")
+
+# ── MAIL CONFIG ───────────────────────────────────────────────────────────────
+MAIL_FROM     = os.environ.get("MAIL_FROM", "")
+MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "")
+BACKUP_EMAIL  = os.environ.get("BACKUP_EMAIL", MAIL_FROM)
+APP_URL       = os.environ.get("APP_URL", "https://web-production-ba700.up.railway.app")
 
 GELIR_CATS = ["Maaş", "Serbest Meslek", "Kira Geliri", "Yatırım / Temettü", "Hediye / İkramiye", "Diğer Gelir"]
 GIDER_CATS = ["Kira / Mortgage", "Market / Gıda", "Faturalar", "Ulaşım", "Yemek / Restoran",
@@ -29,8 +42,26 @@ def close_db(e=None):
 def init_db():
     with sqlite3.connect(DB) as con:
         con.executescript("""
+        CREATE TABLE IF NOT EXISTS users (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            username      TEXT UNIQUE NOT NULL,
+            display_name  TEXT NOT NULL DEFAULT '',
+            password_hash TEXT NOT NULL,
+            email         TEXT NOT NULL DEFAULT '',
+            created_at    TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER NOT NULL,
+            token      TEXT UNIQUE NOT NULL,
+            expires_at TEXT NOT NULL,
+            used       INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
         CREATE TABLE IF NOT EXISTS transactions (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER NOT NULL DEFAULT 1,
             type        TEXT NOT NULL,
             amount      REAL NOT NULL,
             category    TEXT NOT NULL,
@@ -40,18 +71,14 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS budgets (
             id       INTEGER PRIMARY KEY AUTOINCREMENT,
-            category TEXT UNIQUE NOT NULL,
-            limit_   REAL NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS users (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            username      TEXT UNIQUE NOT NULL,
-            display_name  TEXT NOT NULL DEFAULT '',
-            password_hash TEXT NOT NULL,
-            created_at    TEXT NOT NULL
+            user_id  INTEGER NOT NULL DEFAULT 1,
+            category TEXT NOT NULL,
+            limit_   REAL NOT NULL,
+            UNIQUE(user_id, category)
         );
         CREATE TABLE IF NOT EXISTS cards (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id         INTEGER NOT NULL DEFAULT 1,
             bank_name       TEXT NOT NULL,
             card_name       TEXT NOT NULL DEFAULT '',
             owner           TEXT NOT NULL DEFAULT '',
@@ -64,6 +91,7 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS investments (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     INTEGER NOT NULL DEFAULT 1,
             name        TEXT NOT NULL,
             itype       TEXT NOT NULL,
             symbol      TEXT NOT NULL DEFAULT '',
@@ -74,20 +102,149 @@ def init_db():
             created_at  TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS recurring (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            type        TEXT NOT NULL,
-            amount      REAL NOT NULL,
-            category    TEXT NOT NULL,
-            description TEXT DEFAULT '',
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id      INTEGER NOT NULL DEFAULT 1,
+            type         TEXT NOT NULL,
+            amount       REAL NOT NULL,
+            category     TEXT NOT NULL,
+            description  TEXT DEFAULT '',
             day_of_month INTEGER NOT NULL DEFAULT 1,
-            active      INTEGER NOT NULL DEFAULT 1,
-            created_at  TEXT NOT NULL
+            active       INTEGER NOT NULL DEFAULT 1,
+            created_at   TEXT NOT NULL
         );
-        CREATE INDEX IF NOT EXISTS idx_date ON transactions(date);
+        CREATE INDEX IF NOT EXISTS idx_txn_user_date ON transactions(user_id, date);
         """)
+        # Migration: add missing columns to existing databases
+        migrations = [
+            ("users",        "email",   "TEXT NOT NULL DEFAULT ''"),
+            ("transactions", "user_id", "INTEGER NOT NULL DEFAULT 1"),
+            ("budgets",      "user_id", "INTEGER NOT NULL DEFAULT 1"),
+            ("cards",        "user_id", "INTEGER NOT NULL DEFAULT 1"),
+            ("investments",  "user_id", "INTEGER NOT NULL DEFAULT 1"),
+            ("recurring",    "user_id", "INTEGER NOT NULL DEFAULT 1"),
+        ]
+        for table, col, col_def in migrations:
+            try:
+                con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
+                log.info("Migration: added %s.%s", table, col)
+            except sqlite3.OperationalError:
+                pass  # column already exists
 
 def row_to_dict(r): return dict(r)
 def today_str():    return date.today().isoformat()
+
+# ── EMAIL ─────────────────────────────────────────────────────────────────────
+
+def _smtp_send(msg):
+    """Send an email message via Gmail SMTP. Returns True on success."""
+    if not MAIL_FROM or not MAIL_PASSWORD:
+        log.warning("Mail credentials not configured — skipping email send")
+        return False
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as s:
+            s.ehlo(); s.starttls(); s.ehlo()
+            s.login(MAIL_FROM, MAIL_PASSWORD)
+            s.sendmail(MAIL_FROM, msg["To"], msg.as_string())
+        log.info("Email sent to %s", msg["To"])
+        return True
+    except Exception as exc:
+        log.error("Email send failed: %s", exc)
+        return False
+
+def send_reset_email(to_email, username, token):
+    reset_url = f"{APP_URL}/reset-password/{token}"
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "🦔 Kirpi — Şifre Sıfırlama"
+    msg["From"]    = f"Kirpi Nakit Akışı <{MAIL_FROM}>"
+    msg["To"]      = to_email
+
+    text = f"Merhaba {username},\n\nŞifrenizi sıfırlamak için aşağıdaki bağlantıya tıklayın:\n{reset_url}\n\nBu bağlantı 1 saat geçerlidir.\n\nEğer bu talebi siz yapmadıysanız bu maili görmezden gelebilirsiniz."
+
+    html = f"""<!DOCTYPE html>
+<html lang="tr"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#0a0c12;font-family:'Inter',system-ui,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0c12;padding:40px 20px">
+  <tr><td align="center">
+    <table width="520" cellpadding="0" cellspacing="0" style="background:#111318;border:1px solid #1e2233;border-radius:16px;overflow:hidden">
+      <tr><td style="background:linear-gradient(135deg,#6366f1,#a855f7);padding:32px;text-align:center">
+        <div style="font-size:40px;margin-bottom:8px">🦔</div>
+        <h1 style="color:#fff;font-size:1.4rem;font-weight:800;margin:0">Kirpi</h1>
+        <p style="color:rgba(255,255,255,.7);font-size:.85rem;margin:4px 0 0">Nakit Akışı Takibi</p>
+      </td></tr>
+      <tr><td style="padding:36px 40px">
+        <h2 style="color:#e2e8f0;font-size:1.1rem;font-weight:700;margin:0 0 12px">Merhaba, {username} 👋</h2>
+        <p style="color:#94a3b8;font-size:.9rem;line-height:1.7;margin:0 0 28px">
+          Kirpi hesabınız için bir <strong style="color:#e2e8f0">şifre sıfırlama talebi</strong> aldık.<br>
+          Şifrenizi sıfırlamak için aşağıdaki butona tıklayın.
+        </p>
+        <table cellpadding="0" cellspacing="0" style="margin:0 auto 28px">
+          <tr><td style="background:#6366f1;border-radius:10px;text-align:center">
+            <a href="{reset_url}" style="display:block;padding:14px 36px;color:#fff;font-size:.95rem;font-weight:700;text-decoration:none">Şifremi Sıfırla</a>
+          </td></tr>
+        </table>
+        <div style="background:#1a1d26;border:1px solid #2a2f45;border-radius:8px;padding:14px 16px;margin-bottom:24px">
+          <p style="color:#64748b;font-size:.78rem;margin:0 0 6px">Ya da bu bağlantıyı tarayıcınıza yapıştırın:</p>
+          <p style="color:#818cf8;font-size:.76rem;word-break:break-all;margin:0">{reset_url}</p>
+        </div>
+        <p style="color:#64748b;font-size:.78rem;line-height:1.6;margin:0">
+          ⏰ Bu bağlantı <strong style="color:#94a3b8">1 saat</strong> geçerlidir.<br>
+          🔒 Eğer bu talebi siz yapmadıysanız bu maili görmezden gelebilirsiniz.
+        </p>
+      </td></tr>
+      <tr><td style="background:#0d0f18;border-top:1px solid #1e2233;padding:20px 40px;text-align:center">
+        <p style="color:#475569;font-size:.75rem;margin:0">🦔 Kirpi Nakit Akışı • Otomatik mesaj, lütfen yanıtlamayın.</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"""
+
+    msg.attach(MIMEText(text, "plain", "utf-8"))
+    msg.attach(MIMEText(html,  "html",  "utf-8"))
+    return _smtp_send(msg)
+
+def send_backup_email(to_email):
+    """Attach the SQLite DB as a .sql dump and email it."""
+    try:
+        with sqlite3.connect(DB) as con:
+            dump = "\n".join(con.iterdump())
+        dump_bytes = dump.encode("utf-8")
+    except Exception as exc:
+        log.error("Backup dump failed: %s", exc)
+        return False
+
+    now_str  = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    filename = f"kirpi_backup_{now_str}.sql"
+
+    msg = MIMEMultipart()
+    msg["Subject"] = f"🦔 Kirpi Yedek — {now_str}"
+    msg["From"]    = f"Kirpi Yedekleme <{MAIL_FROM}>"
+    msg["To"]      = to_email
+
+    body = MIMEText(
+        f"Kirpi veritabanı yedeği — {now_str}\n\n"
+        "Bu mail otomatik olarak oluşturulmuştur.\n"
+        "Yedeği geri yüklemek için .sql dosyasını bir SQLite istemcisine aktarabilirsiniz.",
+        "plain", "utf-8"
+    )
+    msg.attach(body)
+
+    part = MIMEBase("application", "octet-stream")
+    part.set_payload(dump_bytes)
+    encoders.encode_base64(part)
+    part.add_header("Content-Disposition", f'attachment; filename="{filename}"')
+    msg.attach(part)
+
+    return _smtp_send(msg)
+
+def _daily_backup_loop():
+    """Background thread: send a DB backup email every 24 hours."""
+    time.sleep(30)  # wait for app to fully start
+    while True:
+        if BACKUP_EMAIL:
+            log.info("Running scheduled daily backup...")
+            send_backup_email(BACKUP_EMAIL)
+        time.sleep(86400)  # 24 hours
 
 # ── AUTH ──────────────────────────────────────────────────────────────────────
 
@@ -101,53 +258,101 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
-def has_users():
-    with sqlite3.connect(DB) as con:
-        return con.execute("SELECT COUNT(*) FROM users").fetchone()[0] > 0
-
 @app.route("/register", methods=["GET", "POST"])
 def register():
-    # Only allow registration if no users exist yet
-    if has_users():
-        return redirect("/login")
+    if session.get("user_id"):
+        return redirect("/")
     if request.method == "POST":
         username = request.form.get("username","").strip().lower()
         display  = request.form.get("display_name","").strip()
+        email    = request.form.get("email","").strip().lower()
         password = request.form.get("password","")
         confirm  = request.form.get("confirm","")
         error = None
-        if not username or not password:
-            error = "Kullanıcı adı ve şifre zorunlu"
+        if not username or not password or not email:
+            error = "Kullanıcı adı, email ve şifre zorunlu"
+        elif "@" not in email or "." not in email.split("@")[-1]:
+            error = "Geçerli bir email adresi girin"
         elif len(password) < 6:
             error = "Şifre en az 6 karakter olmalı"
         elif password != confirm:
             error = "Şifreler eşleşmiyor"
         if error:
             return AUTH_HTML_render("register", error)
-        with sqlite3.connect(DB) as con:
-            con.execute("INSERT INTO users (username,display_name,password_hash,created_at) VALUES (?,?,?,?)",
-                        (username, display or username, generate_password_hash(password), datetime.now().isoformat()))
+        try:
+            with sqlite3.connect(DB) as con:
+                con.execute(
+                    "INSERT INTO users (username,display_name,password_hash,email,created_at) VALUES (?,?,?,?,?)",
+                    (username, display or username, generate_password_hash(password), email, datetime.now().isoformat())
+                )
+        except sqlite3.IntegrityError:
+            return AUTH_HTML_render("register", "Bu kullanıcı adı zaten alınmış")
         return redirect("/login?registered=1")
     return AUTH_HTML_render("register")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    # If no users at all, go to register
-    if not has_users():
-        return redirect("/register")
+    if session.get("user_id"):
+        return redirect("/")
     if request.method == "POST":
         username = request.form.get("username","").strip().lower()
         password = request.form.get("password","")
         with sqlite3.connect(DB) as con:
             row = con.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
-        if row and check_password_hash(row[3], password):
-            session["user_id"]   = row[0]
-            session["username"]  = row[1]
-            session["display"]   = row[2]
+        if row and check_password_hash(row["password_hash"], password):
+            session["user_id"]  = row["id"]
+            session["username"] = row["username"]
+            session["display"]  = row["display_name"]
             return redirect("/")
         return AUTH_HTML_render("login", "Kullanıcı adı veya şifre hatalı")
     msg = "Kayıt başarılı! Şimdi giriş yapabilirsiniz." if request.args.get("registered") else ""
+    if request.args.get("reset"):
+        msg = "Şifreniz başarıyla güncellendi. Giriş yapabilirsiniz."
     return AUTH_HTML_render("login", msg)
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        identifier = request.form.get("identifier","").strip().lower()
+        with sqlite3.connect(DB) as con:
+            row = con.execute(
+                "SELECT * FROM users WHERE username=? OR email=?", (identifier, identifier)
+            ).fetchone()
+        if row:
+            token = secrets.token_urlsafe(32)
+            expires = (datetime.now() + timedelta(hours=1)).isoformat()
+            with sqlite3.connect(DB) as con:
+                con.execute(
+                    "INSERT INTO password_reset_tokens (user_id,token,expires_at,created_at) VALUES (?,?,?,?)",
+                    (row["id"], token, expires, datetime.now().isoformat())
+                )
+            sent = send_reset_email(row["email"], row["display_name"] or row["username"], token)
+            log.info("Reset email sent=%s for user=%s", sent, row["username"])
+        # Always show success to prevent user enumeration
+        return AUTH_HTML_render("forgot_sent", "Eğer bu hesap varsa, şifre sıfırlama linki email adresinize gönderildi.")
+    return AUTH_HTML_render("forgot")
+
+@app.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    with sqlite3.connect(DB) as con:
+        tok = con.execute(
+            "SELECT * FROM password_reset_tokens WHERE token=? AND used=0", (token,)
+        ).fetchone()
+    if not tok or datetime.fromisoformat(tok["expires_at"]) < datetime.now():
+        return AUTH_HTML_render("reset_invalid", "Bu link geçersiz veya süresi dolmuş.")
+    if request.method == "POST":
+        password = request.form.get("password","")
+        confirm  = request.form.get("confirm","")
+        if len(password) < 6:
+            return AUTH_HTML_render("reset", "Şifre en az 6 karakter olmalı", token=token)
+        if password != confirm:
+            return AUTH_HTML_render("reset", "Şifreler eşleşmiyor", token=token)
+        with sqlite3.connect(DB) as con:
+            con.execute("UPDATE users SET password_hash=? WHERE id=?",
+                        (generate_password_hash(password), tok["user_id"]))
+            con.execute("UPDATE password_reset_tokens SET used=1 WHERE token=?", (token,))
+        return redirect("/login?reset=1")
+    return AUTH_HTML_render("reset", token=token)
 
 @app.route("/logout")
 def logout():
@@ -172,19 +377,21 @@ def list_transactions():
     db    = get_db()
     year  = request.args.get("year",  type=int)
     month = request.args.get("month", type=int)
-    q     = "SELECT * FROM transactions"
-    params = []
+    uid   = session["user_id"]
+    q     = "SELECT * FROM transactions WHERE user_id=?"
+    params = [uid]
     if year and month:
         s, e = month_range(year, month)
-        q += " WHERE date BETWEEN ? AND ?"; params = [s, e]
+        q += " AND date BETWEEN ? AND ?"; params += [s, e]
     elif year:
-        q += " WHERE date LIKE ?"; params = [f"{year}-%"]
+        q += " AND date LIKE ?"; params.append(f"{year}-%")
     q += " ORDER BY date DESC, id DESC"
     return jsonify([row_to_dict(r) for r in db.execute(q, params).fetchall()])
 
 @app.route("/api/transactions", methods=["POST"])
 @login_required
 def add_transaction():
+    uid = session["user_id"]
     d = request.get_json(force=True)
     ttype = d.get("type"); amount = float(d.get("amount", 0))
     cat = d.get("category",""); desc = d.get("description",""); dt = d.get("date", today_str())
@@ -192,14 +399,15 @@ def add_transaction():
         return jsonify({"ok": False, "error": "Geçersiz veri"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO transactions (type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?)",
-        (ttype, amount, cat, desc, dt, datetime.now().isoformat()))
+        "INSERT INTO transactions (user_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?)",
+        (uid, ttype, amount, cat, desc, dt, datetime.now().isoformat()))
     db.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
 
 @app.route("/api/transactions/<int:tid>", methods=["PUT"])
 @login_required
 def update_transaction(tid):
+    uid = session["user_id"]
     d = request.get_json(force=True)
     fields, params = [], []
     for col in ("type","amount","category","description","date"):
@@ -207,36 +415,40 @@ def update_transaction(tid):
             fields.append(f"{col}=?")
             params.append(float(d[col]) if col == "amount" else d[col])
     if not fields: return jsonify({"ok": False}), 400
-    params.append(tid)
-    get_db().execute(f"UPDATE transactions SET {','.join(fields)} WHERE id=?", params)
+    params += [tid, uid]
+    get_db().execute(f"UPDATE transactions SET {','.join(fields)} WHERE id=? AND user_id=?", params)
     get_db().commit()
     return jsonify({"ok": True})
 
 @app.route("/api/transactions/<int:tid>", methods=["DELETE"])
 @login_required
 def del_transaction(tid):
-    get_db().execute("DELETE FROM transactions WHERE id=?", (tid,)); get_db().commit()
+    uid = session["user_id"]
+    get_db().execute("DELETE FROM transactions WHERE id=? AND user_id=?", (tid, uid)); get_db().commit()
     return jsonify({"ok": True})
 
 @app.route("/api/transactions/bulk-delete", methods=["POST"])
 @login_required
 def bulk_delete():
+    uid = session["user_id"]
     ids = request.get_json(force=True)
     if not isinstance(ids, list): return jsonify({"ok": False}), 400
-    get_db().execute(f"DELETE FROM transactions WHERE id IN ({','.join('?'*len(ids))})", ids)
+    placeholders = ",".join("?" * len(ids))
+    get_db().execute(f"DELETE FROM transactions WHERE id IN ({placeholders}) AND user_id=?", ids + [uid])
     get_db().commit()
     return jsonify({"ok": True, "deleted": len(ids)})
 
 @app.route("/api/summary")
 @login_required
 def summary():
+    uid   = session["user_id"]
     db    = get_db()
     year  = request.args.get("year",  date.today().year,  type=int)
     month = request.args.get("month", date.today().month, type=int)
     start, end = month_range(year, month)
     rows = db.execute(
         "SELECT type,category,SUM(amount) as total FROM transactions "
-        "WHERE date BETWEEN ? AND ? GROUP BY type,category", (start, end)).fetchall()
+        "WHERE user_id=? AND date BETWEEN ? AND ? GROUP BY type,category", (uid, start, end)).fetchall()
     gelir_total = gider_total = 0.0
     gelir_cats  = {}; gider_cats = {}
     for r in rows:
@@ -245,12 +457,12 @@ def summary():
     bar = []
     for m in range(1,13):
         s,e2 = month_range(year,m)
-        totals = db.execute("SELECT type,SUM(amount) as t FROM transactions WHERE date BETWEEN ? AND ? GROUP BY type",(s,e2)).fetchall()
+        totals = db.execute("SELECT type,SUM(amount) as t FROM transactions WHERE user_id=? AND date BETWEEN ? AND ? GROUP BY type",(uid,s,e2)).fetchall()
         g_val  = next((r["t"] for r in totals if r["type"]=="gelir"),0)
         ex_val = next((r["t"] for r in totals if r["type"]=="gider"),0)
         bar.append({"month":m,"gelir":round(g_val,2),"gider":round(ex_val,2)})
-    bal = db.execute("SELECT SUM(CASE WHEN type='gelir' THEN amount ELSE -amount END) as b FROM transactions").fetchone()
-    budgets = {r["category"]:r["limit_"] for r in db.execute("SELECT * FROM budgets").fetchall()}
+    bal = db.execute("SELECT SUM(CASE WHEN type='gelir' THEN amount ELSE -amount END) as b FROM transactions WHERE user_id=?",(uid,)).fetchone()
+    budgets = {r["category"]:r["limit_"] for r in db.execute("SELECT * FROM budgets WHERE user_id=?",(uid,)).fetchall()}
     return jsonify({"gelir":round(gelir_total,2),"gider":round(gider_total,2),
                     "net":round(gelir_total-gider_total,2),"balance":round(bal["b"] or 0,2),
                     "gelir_cats":gelir_cats,"gider_cats":gider_cats,"bar":bar,"budgets":budgets})
@@ -258,11 +470,12 @@ def summary():
 @app.route("/api/budgets", methods=["POST"])
 @login_required
 def set_budget():
+    uid = session["user_id"]
     d = request.get_json(force=True)
     cat = d.get("category",""); limit = float(d.get("limit",0))
     if not cat or limit<=0: return jsonify({"ok":False}),400
     db = get_db()
-    db.execute("INSERT INTO budgets(category,limit_) VALUES(?,?) ON CONFLICT(category) DO UPDATE SET limit_=excluded.limit_",(cat,limit))
+    db.execute("INSERT INTO budgets(user_id,category,limit_) VALUES(?,?,?) ON CONFLICT(user_id,category) DO UPDATE SET limit_=excluded.limit_",(uid,cat,limit))
     db.commit(); return jsonify({"ok":True})
 
 @app.route("/api/categories")
@@ -276,7 +489,8 @@ def motivation():
     db = get_db(); today = date.today()
     year, month = today.year, today.month
     start, end  = month_range(year, month)
-    rows = db.execute("SELECT type,SUM(amount) as t FROM transactions WHERE date BETWEEN ? AND ? GROUP BY type",(start,end)).fetchall()
+    uid = session["user_id"]
+    rows = db.execute("SELECT type,SUM(amount) as t FROM transactions WHERE user_id=? AND date BETWEEN ? AND ? GROUP BY type",(uid,start,end)).fetchall()
     gelir  = next((r["t"] for r in rows if r["type"]=="gelir"),0) or 0
     gider  = next((r["t"] for r in rows if r["type"]=="gider"),0) or 0
     net    = gelir - gider
@@ -285,9 +499,9 @@ def motivation():
     days_passed = today.day; days_left = days_in_month - days_passed
     daily_spend = gider / max(days_passed,1)
     projected   = daily_spend * days_in_month
-    bal = (db.execute("SELECT SUM(CASE WHEN type='gelir' THEN amount ELSE -amount END) as b FROM transactions").fetchone()["b"] or 0)
-    budgets = {r["category"]:r["limit_"] for r in db.execute("SELECT * FROM budgets").fetchall()}
-    top = db.execute("SELECT category,SUM(amount) as t FROM transactions WHERE date BETWEEN ? AND ? AND type='gider' GROUP BY category ORDER BY t DESC LIMIT 1",(start,end)).fetchall()
+    bal = (db.execute("SELECT SUM(CASE WHEN type='gelir' THEN amount ELSE -amount END) as b FROM transactions WHERE user_id=?",(uid,)).fetchone()["b"] or 0)
+    budgets = {r["category"]:r["limit_"] for r in db.execute("SELECT * FROM budgets WHERE user_id=?",(uid,)).fetchall()}
+    top = db.execute("SELECT category,SUM(amount) as t FROM transactions WHERE user_id=? AND date BETWEEN ? AND ? AND type='gider' GROUP BY category ORDER BY t DESC LIMIT 1",(uid,start,end)).fetchall()
     top_cat = top[0]["category"] if top else None; top_amt = top[0]["t"] if top else 0
     msgs=[]; score=0
     if gelir==0:
@@ -305,7 +519,7 @@ def motivation():
     if budgets:
         over=[]
         for cat,lim in budgets.items():
-            sp=(db.execute("SELECT SUM(amount) as t FROM transactions WHERE date BETWEEN ? AND ? AND type='gider' AND category=?",(start,end,cat)).fetchone()["t"] or 0)
+            sp=(db.execute("SELECT SUM(amount) as t FROM transactions WHERE user_id=? AND date BETWEEN ? AND ? AND type='gider' AND category=?",(uid,start,end,cat)).fetchone()["t"] or 0)
             if sp>lim: over.append((cat,sp-lim))
         if not over: score+=20; msgs.append({"icon":"🎯","text":"Tüm bütçe hedeflerini tutturuyorsun. Süper disiplin!"})
         else:
@@ -440,11 +654,13 @@ def import_preview():
 @app.route("/api/cards", methods=["GET"])
 @login_required
 def list_cards():
-    return jsonify([row_to_dict(r) for r in get_db().execute("SELECT * FROM cards ORDER BY bank_name").fetchall()])
+    uid = session["user_id"]
+    return jsonify([row_to_dict(r) for r in get_db().execute("SELECT * FROM cards WHERE user_id=? ORDER BY bank_name",(uid,)).fetchall()])
 
 @app.route("/api/cards", methods=["POST"])
 @login_required
 def add_card():
+    uid = session["user_id"]
     d = request.get_json(force=True)
     bank = d.get("bank_name","").strip(); card = d.get("card_name","").strip()
     owner = d.get("owner","").strip()
@@ -453,32 +669,33 @@ def add_card():
     stmt_day = int(d.get("statement_day",20))
     if not bank or limit <= 0: return jsonify({"ok":False}), 400
     db = get_db()
-    cur = db.execute("INSERT INTO cards (bank_name,card_name,owner,limit_,used_,due_day,min_pct,statement_day,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
-                     (bank,card,owner,limit,used,due_day,min_pct,stmt_day,datetime.now().isoformat()))
+    cur = db.execute("INSERT INTO cards (user_id,bank_name,card_name,owner,limit_,used_,due_day,min_pct,statement_day,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                     (uid,bank,card,owner,limit,used,due_day,min_pct,stmt_day,datetime.now().isoformat()))
     db.commit(); return jsonify({"ok":True,"id":cur.lastrowid})
 
 @app.route("/api/cards/<int:cid>", methods=["PUT"])
 @login_required
 def update_card(cid):
+    uid = session["user_id"]
     d = request.get_json(force=True); fields=[]; params=[]
     for col in ("bank_name","card_name","limit_","used_","due_day","min_pct","statement_day"):
         if col in d:
             fields.append(f"{col}=?")
             params.append(float(d[col]) if col in ("limit_","used_","min_pct") else int(d[col]) if col in ("due_day","statement_day") else d[col])
     if not fields: return jsonify({"ok":False}),400
-    params.append(cid)
-    get_db().execute(f"UPDATE cards SET {','.join(fields)} WHERE id=?",params); get_db().commit()
+    params += [cid, uid]
+    get_db().execute(f"UPDATE cards SET {','.join(fields)} WHERE id=? AND user_id=?",params); get_db().commit()
     return jsonify({"ok":True})
 
 @app.route("/api/cards/<int:cid>", methods=["DELETE"])
 @login_required
 def del_card(cid):
-    get_db().execute("DELETE FROM cards WHERE id=?",(cid,)); get_db().commit()
+    uid = session["user_id"]
+    get_db().execute("DELETE FROM cards WHERE id=? AND user_id=?",(cid,uid)); get_db().commit()
     return jsonify({"ok":True})
 
 # ── RATES & INVESTMENTS ───────────────────────────────────────────────────────
 
-import threading, time as _time
 _rates_cache = {"data": None, "ts": 0}
 _rates_lock  = threading.Lock()
 
@@ -514,9 +731,9 @@ def _fetch_rates():
 
 def get_rates():
     with _rates_lock:
-        if _time.time() - _rates_cache["ts"] > 300 or not _rates_cache["data"]:
+        if time.time() - _rates_cache["ts"] > 300 or not _rates_cache["data"]:
             _rates_cache["data"] = _fetch_rates()
-            _rates_cache["ts"]   = _time.time()
+            _rates_cache["ts"]   = time.time()
         return _rates_cache["data"]
 
 @app.route("/api/rates")
@@ -527,15 +744,17 @@ def api_rates():
 @app.route("/api/investments", methods=["GET"])
 @login_required
 def list_investments():
-    rows = get_db().execute("SELECT * FROM investments ORDER BY buy_date DESC").fetchall()
+    uid = session["user_id"]
+    rows = get_db().execute("SELECT * FROM investments WHERE user_id=? ORDER BY buy_date DESC",(uid,)).fetchall()
     return jsonify([row_to_dict(r) for r in rows])
 
 @app.route("/api/investments", methods=["POST"])
 @login_required
 def add_investment():
+    uid = session["user_id"]
     d = request.get_json(force=True)
     name     = d.get("name","").strip()
-    itype    = d.get("itype","")       # doviz | altin | fon | hisse
+    itype    = d.get("itype","")
     symbol   = d.get("symbol","").strip().upper()
     quantity = float(d.get("quantity", 0))
     buy_price= float(d.get("buy_price", 0))
@@ -545,22 +764,24 @@ def add_investment():
         return jsonify({"ok": False, "error": "Geçersiz veri"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO investments (name,itype,symbol,quantity,buy_price,buy_date,note,created_at) VALUES (?,?,?,?,?,?,?,?)",
-        (name, itype, symbol, quantity, buy_price, buy_date, note, datetime.now().isoformat()))
+        "INSERT INTO investments (user_id,name,itype,symbol,quantity,buy_price,buy_date,note,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        (uid, name, itype, symbol, quantity, buy_price, buy_date, note, datetime.now().isoformat()))
     db.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
 
 @app.route("/api/investments/<int:iid>", methods=["DELETE"])
 @login_required
 def del_investment(iid):
-    get_db().execute("DELETE FROM investments WHERE id=?", (iid,)); get_db().commit()
+    uid = session["user_id"]
+    get_db().execute("DELETE FROM investments WHERE id=? AND user_id=?", (iid,uid)); get_db().commit()
     return jsonify({"ok": True})
 
 @app.route("/api/investments/value", methods=["GET"])
 @login_required
 def investment_values():
     """Return all investments with current TRY value and profit/loss."""
-    rows  = get_db().execute("SELECT * FROM investments").fetchall()
+    uid   = session["user_id"]
+    rows  = get_db().execute("SELECT * FROM investments WHERE user_id=?",(uid,)).fetchall()
     rates = get_rates()
     result = []
     for row in rows:
@@ -613,9 +834,10 @@ def book_investment_income(iid):
     dt     = d.get("date", today_str())
     if amount <= 0: return jsonify({"ok": False}), 400
     db = get_db()
+    uid = session["user_id"]
     cur = db.execute(
-        "INSERT INTO transactions (type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?)",
-        ("gelir", amount, cat, desc, dt, datetime.now().isoformat()))
+        "INSERT INTO transactions (user_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?)",
+        (uid, "gelir", amount, cat, desc, dt, datetime.now().isoformat()))
     db.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
 
@@ -653,12 +875,14 @@ def tefas_fon(fon_kod):
 @app.route("/api/recurring", methods=["GET"])
 @login_required
 def list_recurring():
-    rows = get_db().execute("SELECT * FROM recurring ORDER BY type DESC, day_of_month").fetchall()
+    uid = session["user_id"]
+    rows = get_db().execute("SELECT * FROM recurring WHERE user_id=? ORDER BY type DESC, day_of_month",(uid,)).fetchall()
     return jsonify([row_to_dict(r) for r in rows])
 
 @app.route("/api/recurring", methods=["POST"])
 @login_required
 def add_recurring():
+    uid = session["user_id"]
     d = request.get_json(force=True)
     ttype = d.get("type"); amount = float(d.get("amount", 0))
     cat = d.get("category",""); desc = d.get("description","")
@@ -667,20 +891,22 @@ def add_recurring():
         return jsonify({"ok": False, "error": "Geçersiz veri"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO recurring (type,amount,category,description,day_of_month,active,created_at) VALUES (?,?,?,?,?,1,?)",
-        (ttype, amount, cat, desc, day, datetime.now().isoformat()))
+        "INSERT INTO recurring (user_id,type,amount,category,description,day_of_month,active,created_at) VALUES (?,?,?,?,?,?,1,?)",
+        (uid, ttype, amount, cat, desc, day, datetime.now().isoformat()))
     db.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
 
 @app.route("/api/recurring/<int:rid>", methods=["DELETE"])
 @login_required
 def del_recurring(rid):
-    get_db().execute("DELETE FROM recurring WHERE id=?", (rid,)); get_db().commit()
+    uid = session["user_id"]
+    get_db().execute("DELETE FROM recurring WHERE id=? AND user_id=?", (rid,uid)); get_db().commit()
     return jsonify({"ok": True})
 
 @app.route("/api/recurring/<int:rid>", methods=["PUT"])
 @login_required
 def update_recurring(rid):
+    uid = session["user_id"]
     d = request.get_json(force=True)
     fields, params = [], []
     for col in ("type","amount","category","description","day_of_month","active"):
@@ -689,24 +915,23 @@ def update_recurring(rid):
             val = float(d[col]) if col == "amount" else int(d[col]) if col in ("day_of_month","active") else d[col]
             params.append(val)
     if not fields: return jsonify({"ok": False}), 400
-    params.append(rid)
-    get_db().execute(f"UPDATE recurring SET {','.join(fields)} WHERE id=?", params)
+    params += [rid, uid]
+    get_db().execute(f"UPDATE recurring SET {','.join(fields)} WHERE id=? AND user_id=?", params)
     get_db().commit()
     return jsonify({"ok": True})
 
 @app.route("/api/recurring/apply", methods=["POST"])
 @login_required
 def apply_recurring():
-    """Generate transactions from recurring templates for given year (or year+month)."""
+    uid = session["user_id"]
     d = request.get_json(force=True)
     year   = int(d.get("year",  date.today().year))
-    month  = d.get("month")  # None = tüm yıl
+    month  = d.get("month")
     months = [int(month)] if month else list(range(1, 13))
 
-    db       = get_db()
-    templates = db.execute("SELECT * FROM recurring WHERE active=1").fetchall()
-    created  = 0
-    skipped  = 0
+    db        = get_db()
+    templates = db.execute("SELECT * FROM recurring WHERE user_id=? AND active=1",(uid,)).fetchall()
+    created   = 0; skipped = 0
 
     from calendar import monthrange
     for tpl in templates:
@@ -714,35 +939,46 @@ def apply_recurring():
             _, last_day = monthrange(year, m)
             day = min(tpl["day_of_month"], last_day)
             dt  = f"{year:04d}-{m:02d}-{day:02d}"
-
-            # çift kayıt önle: aynı recurring_id + tarih kombinasyonu
             exists = db.execute(
-                "SELECT id FROM transactions WHERE type=? AND category=? AND description=? AND date=? AND amount=?",
-                (tpl["type"], tpl["category"], tpl["description"], dt, tpl["amount"])
+                "SELECT id FROM transactions WHERE user_id=? AND type=? AND category=? AND description=? AND date=? AND amount=?",
+                (uid, tpl["type"], tpl["category"], tpl["description"], dt, tpl["amount"])
             ).fetchone()
-
-            if exists:
-                skipped += 1
-                continue
-
+            if exists: skipped += 1; continue
             db.execute(
-                "INSERT INTO transactions (type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?)",
-                (tpl["type"], tpl["amount"], tpl["category"], tpl["description"], dt, datetime.now().isoformat()))
+                "INSERT INTO transactions (user_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?)",
+                (uid, tpl["type"], tpl["amount"], tpl["category"], tpl["description"], dt, datetime.now().isoformat()))
             created += 1
 
     db.commit()
     return jsonify({"ok": True, "created": created, "skipped": skipped})
 
+@app.route("/api/backup/download")
+@login_required
+def backup_download():
+    """Download the full DB as a SQL dump."""
+    try:
+        with sqlite3.connect(DB) as con:
+            dump = "\n".join(con.iterdump())
+        now_str  = datetime.now().strftime("%Y-%m-%d_%H-%M")
+        filename = f"kirpi_backup_{now_str}.sql"
+        return dump, 200, {
+            "Content-Type":        "application/octet-stream",
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        }
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
 @app.route("/api/import/confirm", methods=["POST"])
 @login_required
 def import_confirm():
+    uid=session["user_id"]
     rows=request.get_json(force=True)
     if not isinstance(rows,list): return jsonify({"ok":False}),400
     db=get_db(); now=datetime.now().isoformat(); count=0
     for r in rows:
         if not r.get("skip") and r.get("amount",0)>0:
-            db.execute("INSERT INTO transactions (type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?)",
-                       (r["type"],r["amount"],r["category"],r.get("description",""),r["date"],now))
+            db.execute("INSERT INTO transactions (user_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?)",
+                       (uid,r["type"],r["amount"],r["category"],r.get("description",""),r["date"],now))
             count+=1
     db.commit(); return jsonify({"ok":True,"imported":count})
 
@@ -860,27 +1096,50 @@ input:focus{border-color:#6366f1}
     <p>Nakit Akışı Takibi</p>
   </div>
 
-  <!-- __MODE__ === register -->
-  <div id="reg-form" style="display:__REG_DISPLAY__">
+  <!-- __FORM_CONTENT__ -->
+</div>
+</div><!-- /right -->
+</body>
+</html>"""
+
+def AUTH_HTML_render(mode, msg="", token=None):
+    ok_modes  = {"forgot_sent", "reset_invalid"}
+    is_ok     = msg and (mode in ok_modes or msg.startswith("Kayıt") or msg.startswith("Şifreniz"))
+    msg_html  = f'<div class="msg {"ok" if is_ok else "err"}">{msg}</div>' if msg else ""
+
+    titles = {
+        "register":    "Hesap Oluştur",
+        "login":       "Giriş Yap",
+        "forgot":      "Şifremi Unuttum",
+        "forgot_sent": "Mail Gönderildi",
+        "reset":       "Yeni Şifre Belirle",
+        "reset_invalid": "Link Geçersiz",
+    }
+    page_title = titles.get(mode, "Kirpi")
+
+    if mode == "register":
+        form = f"""
     <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:20px;text-align:center">Hesap Oluştur</h2>
-    __ERROR_BLOCK__
+    {msg_html}
     <form method="POST" action="/register">
       <label>Ad Soyad</label>
       <input type="text" name="display_name" placeholder="Çağdaş Çınar" autocomplete="name">
       <label>Kullanıcı Adı</label>
       <input type="text" name="username" placeholder="cagdas" required autocomplete="username">
+      <label>Email</label>
+      <input type="email" name="email" placeholder="ornek@gmail.com" required autocomplete="email">
       <label>Şifre <span style="color:#64748b">(en az 6 karakter)</span></label>
       <input type="password" name="password" required autocomplete="new-password">
       <label>Şifre Tekrar</label>
       <input type="password" name="confirm" required autocomplete="new-password">
       <button class="btn" type="submit">Kayıt Ol</button>
     </form>
-  </div>
+    <div class="link">Zaten hesabın var mı? <a href="/login">Giriş Yap</a></div>"""
 
-  <!-- __MODE__ === login -->
-  <div id="login-form" style="display:__LOGIN_DISPLAY__">
+    elif mode == "login":
+        form = f"""
     <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:20px;text-align:center">Giriş Yap</h2>
-    __ERROR_BLOCK__
+    {msg_html}
     <form method="POST" action="/login">
       <label>Kullanıcı Adı</label>
       <input type="text" name="username" required autocomplete="username">
@@ -888,27 +1147,55 @@ input:focus{border-color:#6366f1}
       <input type="password" name="password" required autocomplete="current-password">
       <button class="btn" type="submit">Giriş Yap</button>
     </form>
-  </div>
-</div>
-</div><!-- /right -->
-</body>
-</html>"""
+    <div class="link" style="margin-top:12px"><a href="/forgot-password">Şifremi unuttum</a></div>
+    <div class="link">Hesabın yok mu? <a href="/register">Kayıt Ol</a></div>"""
 
-def AUTH_HTML_render(mode, msg=""):
-    is_reg   = mode == "register"
-    is_err   = msg and not msg.startswith("Kayıt")
-    msg_html = f'<div class="msg {"err" if is_err else "ok"}">{msg}</div>' if msg else ""
+    elif mode == "forgot":
+        form = f"""
+    <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:8px;text-align:center">Şifremi Unuttum</h2>
+    <p style="text-align:center;color:#64748b;font-size:.82rem;margin-bottom:20px">Kullanıcı adın veya email adresin ile şifre sıfırlama linki alabilirsin.</p>
+    {msg_html}
+    <form method="POST" action="/forgot-password">
+      <label>Kullanıcı Adı veya Email</label>
+      <input type="text" name="identifier" required placeholder="cagdas veya ornek@gmail.com" autocomplete="email">
+      <button class="btn" type="submit">Sıfırlama Linki Gönder</button>
+    </form>
+    <div class="link"><a href="/login">← Giriş ekranına dön</a></div>"""
+
+    elif mode == "forgot_sent":
+        form = f"""
+    <div style="text-align:center;padding:20px 0">
+      <div style="font-size:3rem;margin-bottom:16px">📬</div>
+      <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:12px">Mail Gönderildi</h2>
+      {msg_html}
+      <p style="color:#64748b;font-size:.82rem;margin-top:12px">Spam/Junk klasörünü de kontrol etmeyi unutma.</p>
+    </div>
+    <div class="link"><a href="/login">← Giriş ekranına dön</a></div>"""
+
+    elif mode == "reset":
+        form = f"""
+    <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:20px;text-align:center">Yeni Şifre Belirle</h2>
+    {msg_html}
+    <form method="POST" action="/reset-password/{token}">
+      <label>Yeni Şifre <span style="color:#64748b">(en az 6 karakter)</span></label>
+      <input type="password" name="password" required autocomplete="new-password">
+      <label>Şifre Tekrar</label>
+      <input type="password" name="confirm" required autocomplete="new-password">
+      <button class="btn" type="submit">Şifremi Güncelle</button>
+    </form>"""
+
+    else:  # reset_invalid
+        form = f"""
+    <div style="text-align:center;padding:20px 0">
+      <div style="font-size:3rem;margin-bottom:16px">⚠️</div>
+      <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:12px">Link Geçersiz</h2>
+      {msg_html}
+    </div>
+    <div class="link"><a href="/forgot-password">Yeni link al →</a></div>"""
+
     return (AUTH_HTML
-        .replace("__MODE_TITLE__", "Kayıt Ol" if is_reg else "Giriş Yap")
-        .replace("__REG_DISPLAY__",   "block" if is_reg  else "none")
-        .replace("__LOGIN_DISPLAY__", "none"  if is_reg  else "block")
-        .replace("__ERROR_BLOCK__", msg_html)
-        .replace("__MODE__", mode))
-
-# patch string-based replacements with the real renderer
-class _AuthProxy:
-    def replace(self, key, val):
-        return self  # handled by AUTH_HTML_render
+        .replace("__MODE_TITLE__", page_title)
+        .replace("  <!-- __FORM_CONTENT__ -->", form))
 
 HTML = r"""<!DOCTYPE html>
 <html lang="tr">
@@ -2618,6 +2905,10 @@ def index():
 
 if __name__ == "__main__":
     init_db()
+    t = threading.Thread(target=_daily_backup_loop, daemon=True)
+    t.start()
     app.run(debug=True, port=5001)
 
 init_db()
+_backup_thread = threading.Thread(target=_daily_backup_loop, daemon=True)
+_backup_thread.start()
