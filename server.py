@@ -194,6 +194,7 @@ def init_db():
         ("investments",  "profile_id",      "INTEGER NOT NULL DEFAULT 1"),
         ("recurring",    "user_id",         "INTEGER NOT NULL DEFAULT 1"),
         ("recurring",    "profile_id",      "INTEGER NOT NULL DEFAULT 1"),
+        ("users",        "avatar",          "TEXT NOT NULL DEFAULT ''"),
     ]
     with pg_connect() as con:
         for stmt in stmts:
@@ -568,13 +569,55 @@ def logout():
 @app.route("/api/me")
 @login_required
 def api_me():
+    uid = session.get("user_id")
+    db  = get_db()
+    row = db.execute("SELECT display_name,username,email,avatar FROM users WHERE id=?", (uid,)).fetchone()
+    avatar = row["avatar"] if row else ""
     return jsonify({
         "username":     session.get("username"),
-        "display":      session.get("display"),
+        "display":      session.get("display") or (row["display_name"] if row else ""),
         "profile_id":   session.get("profile_id"),
         "profile_name": session.get("profile_name"),
         "profile_type": session.get("profile_type"),
+        "email":        row["email"] if row else "",
+        "avatar":       avatar or "",
     })
+
+@app.route("/api/me/update", methods=["POST"])
+@login_required
+def api_me_update():
+    data    = request.get_json(force=True)
+    display = (data.get("display_name") or "").strip()
+    avatar  = data.get("avatar", None)
+    uid     = session["user_id"]
+    db      = get_db()
+    if display:
+        db.execute("UPDATE users SET display_name=? WHERE id=?", (display, uid))
+        session["display"] = display
+    if avatar is not None:
+        db.execute("UPDATE users SET avatar=? WHERE id=?", (avatar, uid))
+    db.commit()
+    return jsonify({"ok": True})
+
+@app.route("/api/me/password", methods=["POST"])
+@login_required
+def api_me_password():
+    data    = request.get_json(force=True)
+    current = data.get("current", "")
+    new_pw  = data.get("new", "")
+    confirm = data.get("confirm", "")
+    uid     = session["user_id"]
+    db      = get_db()
+    user    = db.execute("SELECT password_hash FROM users WHERE id=?", (uid,)).fetchone()
+    if not user or not check_password_hash(user["password_hash"], current):
+        return jsonify({"ok": False, "error": "Mevcut şifre yanlış"})
+    if len(new_pw) < 6:
+        return jsonify({"ok": False, "error": "Şifre en az 6 karakter olmalı"})
+    if new_pw != confirm:
+        return jsonify({"ok": False, "error": "Şifreler eşleşmiyor"})
+    db.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(new_pw), uid))
+    db.commit()
+    return jsonify({"ok": True})
 
 def get_pid():
     """Return active profile_id from session (fallback: first profile of user)."""
@@ -768,7 +811,7 @@ def categories():
 @login_required
 def today_summary():
     pid  = get_pid(); db = get_db()
-    today_str = date.today().isoformat()
+    today_str = request.args.get("date") or date.today().isoformat()
 
     # All today's transactions
     rows = db.execute(
@@ -1658,9 +1701,10 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
 @media(max-width:768px){.nav-bottom{display:none}}
 
 /* ── PAGE ── */
-.page{display:none;padding:28px 28px;max-width:1280px;will-change:opacity,transform;opacity:0;transform:translateY(10px)}
+.main{display:flex;flex-direction:column}
+.page{display:none;padding:20px 28px;max-width:1280px;will-change:opacity,transform;opacity:0;transform:translateY(10px)}
 .page.active{display:block;opacity:1;transform:translateY(0);transition:opacity .22s ease,transform .22s ease}
-@media(max-width:600px){.page{padding:16px}}
+@media(max-width:600px){.page{padding:14px 14px 20px}}
 .page-title{font-size:1.4rem;font-weight:800;margin-bottom:4px;letter-spacing:-.02em}
 .page-sub{font-size:.82rem;color:var(--txt2);margin-bottom:24px}
 
@@ -1820,6 +1864,117 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .divider{height:1px;background:var(--border);margin:20px 0}
 .section-title{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt2);margin-bottom:14px}
 
+/* ── TOP HEADER ─────────────────────────────────────────────── */
+.top-header{
+  position:sticky;top:0;z-index:90;height:54px;
+  background:rgba(10,12,18,.88);backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:flex-end;
+  padding:0 24px;flex-shrink:0;
+}
+@media(max-width:768px){.top-header{padding:0 16px;justify-content:space-between}}
+.top-header-logo{font-size:.95rem;font-weight:800;display:none;align-items:center;gap:8px;color:var(--txt)}
+@media(max-width:768px){.top-header-logo{display:flex}}
+.top-header-right{display:flex;align-items:center;gap:10px}
+.avatar-btn{
+  width:36px;height:36px;border-radius:50%;
+  background:linear-gradient(135deg,#6366f1,#818cf8);
+  border:2px solid #6366f140;color:#fff;
+  font-size:.85rem;font-weight:800;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;transition:.15s;outline:none;flex-shrink:0;
+}
+.avatar-btn:hover{transform:scale(1.06);box-shadow:0 0 0 3px #6366f128}
+.avatar-btn img,.avatar-btn-inner-img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+
+/* ── USER DROPDOWN ───────────────────────────────────────────── */
+.udrop-wrap{position:relative}
+.user-dropdown{
+  position:absolute;right:0;top:calc(100% + 10px);
+  width:286px;background:var(--bg2);border:1px solid var(--border2);
+  border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.7);
+  z-index:500;overflow:hidden;
+  opacity:0;transform:translateY(-8px) scale(.96);
+  pointer-events:none;
+  transition:opacity .2s,transform .2s cubic-bezier(.4,0,.2,1);
+}
+.user-dropdown.open{opacity:1;transform:translateY(0) scale(1);pointer-events:all}
+.udrop-head{
+  padding:14px 14px 12px;
+  background:linear-gradient(135deg,#1a1f3a,#0d1025);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:12px;
+}
+.udrop-ava-lg{
+  width:42px;height:42px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,#6366f1,#818cf8);
+  color:#fff;font-size:.95rem;font-weight:800;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;border:2px solid #6366f140;
+}
+.udrop-name{font-size:.88rem;font-weight:700;color:var(--txt)}
+.udrop-sub{font-size:.72rem;color:var(--txt2);margin-top:2px}
+.udrop-prof-item{
+  display:flex;align-items:center;gap:9px;padding:8px 10px;
+  border-radius:9px;cursor:pointer;transition:.1s;font-size:.82rem;color:var(--txt2);
+}
+.udrop-prof-item:hover{background:var(--bg3)}
+.udrop-prof-item.cur{background:#6366f112;color:var(--b2);font-weight:600}
+.udrop-prof-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.udrop-add-btn{
+  width:100%;margin-top:5px;padding:7px;background:transparent;
+  border:1px dashed var(--border2);border-radius:8px;
+  color:var(--b2);font-size:.75rem;cursor:pointer;font-weight:600;transition:.15s;
+}
+.udrop-add-btn:hover{border-color:var(--b2);background:#6366f110}
+.udrop-divider{height:1px;background:var(--border);margin:4px 0}
+.udrop-actions{padding:8px}
+.udrop-action{
+  display:flex;align-items:center;gap:10px;padding:9px 10px;
+  border-radius:10px;cursor:pointer;transition:.1s;font-size:.83rem;
+  color:var(--txt2);font-weight:500;width:100%;text-align:left;
+  background:none;border:none;font-family:inherit;text-decoration:none;
+}
+.udrop-action:hover{background:var(--bg3);color:var(--txt)}
+.udrop-action.danger{color:var(--r)}
+.udrop-action.danger:hover{background:#ef444412}
+.udrop-action-ico{
+  width:30px;height:30px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:.88rem;flex-shrink:0;
+}
+
+/* ── SETTINGS PAGE ────────────────────────────────────────────── */
+.settings-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px}
+.settings-sect-title{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt2);margin-bottom:16px}
+.avatar-upload-wrap{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.avatar-lg{
+  width:68px;height:68px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,#6366f1,#818cf8);
+  color:#fff;font-size:1.5rem;font-weight:800;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;border:3px solid #6366f140;
+}
+.avatar-lg img{width:100%;height:100%;object-fit:cover}
+.avatar-upload-btn{padding:7px 14px;background:var(--bg3);border:1px solid var(--border2);color:var(--txt2);border-radius:9px;font-size:.8rem;cursor:pointer;font-weight:600;transition:.15s}
+.avatar-upload-btn:hover{border-color:var(--b2);color:var(--b2)}
+.settings-link-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 4px;border-bottom:1px solid var(--border);
+  font-size:.84rem;color:var(--txt);text-decoration:none;cursor:pointer;
+  background:none;border-left:none;border-right:none;border-top:none;
+  width:100%;text-align:left;font-family:inherit;
+  transition:.1s;
+}
+.settings-link-row:last-child{border-bottom:none}
+.settings-link-row:hover{color:var(--b2)}
+.settings-profile-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:8px;
+}
+.settings-profile-item .sp-info{font-size:.83rem;font-weight:600;color:var(--txt)}
+.settings-profile-item .sp-type{font-size:.72rem;color:var(--txt2)}
+.settings-profile-item .sp-active{font-size:.68rem;color:var(--g);font-weight:700;padding:2px 8px;background:#22c55e15;border-radius:8px;border:1px solid #22c55e25}
+
 /* ── HERO BALANCE CARD ────────────────────────────────────── */
 .hero-card{background:linear-gradient(135deg,#1a1f3a 0%,#0d1025 100%);border:1px solid #6366f128;border-radius:20px;padding:22px 20px 18px;margin-bottom:4px;position:relative;overflow:hidden}
 .hero-card::before{content:'';position:absolute;top:-50px;right:-40px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,#6366f120,transparent 70%)}
@@ -1966,7 +2121,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   </div>
   <div class="nav-links">
     <div class="nl active" data-page="dashboard" onclick="goPage('dashboard',this)">
-      <span class="ico">📊</span>Dashboard
+      <span class="ico">🏠</span>Anasayfa
     </div>
     <div class="nl" data-page="ledger" onclick="goPage('ledger',this)">
       <span class="ico">📋</span>Tablo
@@ -1989,47 +2144,66 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <div class="nl nl-desktop" data-page="cards" onclick="goPage('cards',this)">
       <span class="ico">💳</span>Kartlar
     </div>
+    <div class="nl nl-desktop" data-page="settings" onclick="goPage('settings',this)">
+      <span class="ico">⚙️</span>Ayarlar
+    </div>
   </div>
   <div class="nav-bottom">
-    <!-- Profil göstergesi ve geçiş -->
-    <div id="profile-badge" onclick="toggleProfileMenu()" style="cursor:pointer;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;margin-bottom:10px;transition:.2s" onmouseover="this.style.borderColor='var(--b)'" onmouseout="this.style.borderColor='var(--border2)'">
-      <div style="display:flex;align-items:center;justify-content:space-between">
-        <div>
-          <div id="profile-name-badge" style="font-size:.82rem;font-weight:700;color:var(--txt)">Şahıs</div>
-          <div id="profile-type-badge" style="font-size:.7rem;color:var(--txt2)">Kişisel Profil</div>
-        </div>
-        <span style="color:var(--txt2);font-size:.85rem">⇅</span>
-      </div>
-    </div>
-    <div id="profile-menu" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:8px;margin-bottom:10px">
-      <div id="profile-list"></div>
-      <button onclick="showAddProfile()" style="width:100%;margin-top:6px;padding:8px;background:transparent;border:1px dashed var(--border2);border-radius:7px;color:var(--b2);font-size:.75rem;cursor:pointer;font-weight:600">+ Yeni Kullanıcı Ekle</button>
-    </div>
-    <div id="add-profile-form" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px;margin-bottom:10px">
-      <div style="font-size:.72rem;color:var(--txt2);margin-bottom:6px;font-weight:600">YENİ PROFİL</div>
-      <select id="new-profile-type" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--txt);padding:7px 10px;border-radius:7px;font-size:.8rem;margin-bottom:6px;outline:none">
-        <option value="sahis">👤 Şahıs (Kişisel)</option>
-        <option value="sirket">🏢 Şirket (Kurumsal)</option>
-      </select>
-      <input id="new-profile-name" placeholder="İsim ya da Ünvan" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--txt);padding:7px 10px;border-radius:7px;font-size:.8rem;margin-bottom:8px;outline:none">
-      <div style="display:flex;gap:6px">
-        <button onclick="createProfile()" style="flex:1;padding:7px;background:var(--b);border:none;border-radius:7px;color:#fff;font-size:.78rem;cursor:pointer;font-weight:600">Profil Oluştur</button>
-        <button onclick="cancelAddProfile()" style="padding:7px 10px;background:transparent;border:1px solid var(--border2);border-radius:7px;color:var(--txt2);font-size:.78rem;cursor:pointer">İptal</button>
-      </div>
-    </div>
-    <div style="font-size:.75rem;color:var(--txt2);margin-bottom:8px">👤 <strong style="color:var(--txt)">__USER_DISPLAY__</strong></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <a href="/logout" style="color:#ef4444;font-size:.72rem;text-decoration:none">↩ Çıkış</a>
-      <span onclick="triggerInstall()" style="color:#818cf8;font-size:.72rem;cursor:pointer;text-decoration:none">⬇ Uygulamayı Kur</span>
-      <a href="/kvkk" style="color:#475569;font-size:.72rem;text-decoration:none">KVKK</a>
-      <a href="/gizlilik" style="color:#475569;font-size:.72rem;text-decoration:none">Gizlilik</a>
-      <a href="/kullanim-kosullari" style="color:#475569;font-size:.72rem;text-decoration:none">Koşullar</a>
-    </div>
+    <div style="font-size:.7rem;color:var(--txt2);padding:0 4px">v1.0</div>
   </div>
 </nav>
 
 <!-- ── MAIN ── -->
 <div class="main">
+
+<!-- TOP HEADER -->
+<div class="top-header">
+  <div class="top-header-logo">🦔 Kirpi</div>
+  <div class="top-header-right">
+    <div class="udrop-wrap">
+      <button class="avatar-btn" id="avatar-btn" onclick="toggleUserMenu(event)">
+        <span id="avatar-btn-inner">?</span>
+      </button>
+      <div class="user-dropdown" id="user-dropdown">
+        <div class="udrop-head">
+          <div class="udrop-ava-lg" id="udrop-ava">?</div>
+          <div class="udrop-user-info">
+            <div class="udrop-name" id="udrop-name">—</div>
+            <div class="udrop-sub" id="udrop-sub">—</div>
+          </div>
+        </div>
+        <div style="padding:8px 8px 4px">
+          <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--txt2);padding:0 6px;margin-bottom:4px">Profiller</div>
+          <div id="udrop-profiles"></div>
+          <button onclick="showAddProfile2()" class="udrop-add-btn">+ Yeni Profil Ekle</button>
+          <div id="add-profile-form2" style="display:none;background:var(--bg);border:1px solid var(--border2);border-radius:10px;padding:10px;margin-top:6px">
+            <select id="new-profile-type" style="width:100%;background:var(--bg2);border:1px solid var(--border2);color:var(--txt);padding:7px 10px;border-radius:7px;font-size:.8rem;margin-bottom:6px;outline:none">
+              <option value="sahis">👤 Şahıs (Kişisel)</option>
+              <option value="sirket">🏢 Şirket (Kurumsal)</option>
+            </select>
+            <input id="new-profile-name" placeholder="İsim ya da Ünvan" style="width:100%;background:var(--bg2);border:1px solid var(--border2);color:var(--txt);padding:7px 10px;border-radius:7px;font-size:.8rem;margin-bottom:8px;outline:none">
+            <div style="display:flex;gap:6px">
+              <button onclick="createProfile()" style="flex:1;padding:7px;background:var(--b);border:none;border-radius:7px;color:#fff;font-size:.78rem;cursor:pointer;font-weight:600">Oluştur</button>
+              <button onclick="cancelAddProfile()" style="padding:7px 10px;background:transparent;border:1px solid var(--border2);border-radius:7px;color:var(--txt2);font-size:.78rem;cursor:pointer">İptal</button>
+            </div>
+          </div>
+        </div>
+        <div class="udrop-divider"></div>
+        <div class="udrop-actions">
+          <button class="udrop-action" onclick="goPage('settings',document.querySelector('[data-page=settings]'));toggleUserMenu()">
+            <span class="udrop-action-ico" style="background:#6366f118;color:var(--b2)">⚙️</span>Ayarlar
+          </button>
+          <button class="udrop-action" onclick="triggerInstall()">
+            <span class="udrop-action-ico" style="background:#22c55e18;color:var(--g)">⬇️</span>Uygulamayı Kur
+          </button>
+          <a class="udrop-action danger" href="/logout">
+            <span class="udrop-action-ico" style="background:#ef444418;color:var(--r)">↩</span>Çıkış Yap
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- DASHBOARD -->
 <div class="page active" id="page-dashboard">
@@ -2051,7 +2225,9 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 
   <!-- ── GÜNÜN GELİRLERİ ── -->
   <div class="s-header" onclick="toggleSection('gelir')">
-    <div class="sh-left"><span class="sh-dot gn"></span>Günün Gelirleri</div>
+    <div class="sh-left"><span class="sh-dot gn"></span><span id="gelir-section-lbl">Günün Gelirleri</span></div>
+    <input type="date" id="today-date-pick" onclick="event.stopPropagation()" onchange="changeTodayDate(this.value)"
+      style="background:var(--bg3);border:1px solid var(--border2);color:var(--txt2);padding:3px 8px;border-radius:7px;font-size:.72rem;outline:none;cursor:pointer">
     <span class="sh-badge" id="gelir-badge" style="display:none">0</span>
     <span class="sh-chevron" id="chevron-gelir">▾</span>
   </div>
@@ -2064,7 +2240,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 
   <!-- ── GÜNÜN GİDERLERİ ── -->
   <div class="s-header" onclick="toggleSection('gider')">
-    <div class="sh-left"><span class="sh-dot rd"></span>Günün Giderleri</div>
+    <div class="sh-left"><span class="sh-dot rd"></span><span id="gider-section-lbl">Günün Giderleri</span></div>
     <span class="sh-badge" id="gider-badge" style="display:none">0</span>
     <span class="sh-chevron" id="chevron-gider">▾</span>
   </div>
@@ -2598,6 +2774,82 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   </div>
 </div>
 
+<!-- SETTINGS -->
+<div class="page" id="page-settings">
+  <div class="page-title">Ayarlar</div>
+  <div class="page-sub">Hesap bilgileri ve uygulama tercihleri</div>
+
+  <!-- Avatar + Account -->
+  <div class="settings-card">
+    <div class="settings-sect-title">Profil</div>
+    <div class="avatar-upload-wrap">
+      <div class="avatar-lg" id="settings-avatar-img">?</div>
+      <div>
+        <div id="settings-display-name-show" style="font-size:.95rem;font-weight:700;color:var(--txt);margin-bottom:2px">—</div>
+        <div id="settings-username-show" style="font-size:.78rem;color:var(--txt2);margin-bottom:10px">—</div>
+        <button class="avatar-upload-btn" onclick="document.getElementById('avatar-file-input').click()">📷 Fotoğraf Değiştir</button>
+        <input type="file" id="avatar-file-input" accept="image/*" style="display:none" onchange="handleAvatarUpload(this)">
+      </div>
+    </div>
+    <label style="margin-top:12px">Ad Soyad / Ünvan</label>
+    <input type="text" class="f-input" id="settings-display" placeholder="Ad Soyad" style="margin-bottom:10px">
+    <label>Kullanıcı Adı <span style="color:var(--txt2);font-size:.72rem">(değiştirilemez)</span></label>
+    <input type="text" class="f-input" id="settings-username" disabled style="margin-bottom:10px;opacity:.5">
+    <label>E-posta <span style="color:var(--txt2);font-size:.72rem">(değiştirilemez)</span></label>
+    <input type="email" class="f-input" id="settings-email" disabled style="margin-bottom:14px;opacity:.5">
+    <button class="btn btn-primary" onclick="saveAccountInfo()" style="width:100%">Bilgileri Kaydet</button>
+  </div>
+
+  <!-- Change Password -->
+  <div class="settings-card">
+    <div class="settings-sect-title">Şifre Değiştir</div>
+    <label>Mevcut Şifre</label>
+    <input type="password" class="f-input" id="pw-current" placeholder="••••••" style="margin-bottom:10px">
+    <label>Yeni Şifre</label>
+    <input type="password" class="f-input" id="pw-new" placeholder="En az 6 karakter" style="margin-bottom:10px">
+    <label>Yeni Şifre Tekrar</label>
+    <input type="password" class="f-input" id="pw-confirm" placeholder="••••••" style="margin-bottom:14px">
+    <div id="pw-msg" style="font-size:.82rem;margin-bottom:10px;min-height:18px"></div>
+    <button class="btn btn-primary" onclick="changePassword()" style="width:100%">Şifreyi Güncelle</button>
+  </div>
+
+  <!-- Profil Yönetimi -->
+  <div class="settings-card">
+    <div class="settings-sect-title">Profil Yönetimi</div>
+    <div id="settings-profile-list" style="margin-bottom:12px"></div>
+    <div id="add-profile-form-settings" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:12px;margin-bottom:12px">
+      <select id="new-profile-type-s" class="f-input" style="margin-bottom:8px">
+        <option value="sahis">👤 Şahıs (Kişisel)</option>
+        <option value="sirket">🏢 Şirket (Kurumsal)</option>
+      </select>
+      <input id="new-profile-name-s" class="f-input" placeholder="İsim ya da Ünvan" style="margin-bottom:8px">
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" style="flex:1" onclick="createProfileFromSettings()">Oluştur</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('add-profile-form-settings').style.display='none'">İptal</button>
+      </div>
+    </div>
+    <button class="btn btn-ghost" style="width:100%" onclick="document.getElementById('add-profile-form-settings').style.display='block'">+ Yeni Profil Ekle</button>
+  </div>
+
+  <!-- App Info -->
+  <div class="settings-card">
+    <div class="settings-sect-title">Uygulama</div>
+    <button class="settings-link-row" onclick="triggerInstall()">
+      <span>⬇️ Uygulamayı Telefona Kur</span><span style="color:var(--txt2);font-size:.8rem">›</span>
+    </button>
+    <a class="settings-link-row" href="/kvkk" target="_blank">
+      <span>📋 KVKK Aydınlatma Metni</span><span style="color:var(--txt2);font-size:.8rem">›</span>
+    </a>
+    <a class="settings-link-row" href="/gizlilik" target="_blank">
+      <span>🔒 Gizlilik Politikası</span><span style="color:var(--txt2);font-size:.8rem">›</span>
+    </a>
+    <a class="settings-link-row" href="/kullanim-kosullari" target="_blank">
+      <span>📄 Kullanım Koşulları</span><span style="color:var(--txt2);font-size:.8rem">›</span>
+    </a>
+    <div style="font-size:.72rem;color:var(--txt2);margin-top:12px;text-align:center">Kirpi v1.0 • 🦔</div>
+  </div>
+</div>
+
 </div><!-- /main -->
 </div><!-- /shell -->
 <div id="toast"></div>
@@ -2612,12 +2864,16 @@ var curYear=new Date().getFullYear(), curMonth=new Date().getMonth()+1;
 var curTab='gelir', summaryData={}, allTx=[], filteredTx=[];
 var sortCol='date', sortDir=-1;
 var CATS={gelir:[],gider:[],all:[]};
+var _todayDate=new Date().toISOString().split('T')[0];
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
 window.onload=function(){
-  document.getElementById('f-date').value=new Date().toISOString().split('T')[0];
+  var todayISO=new Date().toISOString().split('T')[0];
+  document.getElementById('f-date').value=todayISO;
+  var dpick=document.getElementById('today-date-pick');
+  if(dpick) dpick.value=todayISO;
+  _todayDate=todayISO;
   updateMonthLabel();
-  // Time-based greeting
   var h=new Date().getHours();
   var prefix=h<5?'İyi geceler':h<12?'Günaydın':h<18?'İyi günler':'İyi akşamlar';
   var gEl=document.getElementById('hero-greeting');
@@ -2671,6 +2927,7 @@ function goPage(id, el){
     if(id==='recurring') initRecurringPage();
     if(id==='invest') initInvestPage();
     if(id==='cards') loadCards();
+    if(id==='settings') initSettingsPage();
   }
 
   if(prev){
@@ -2685,53 +2942,107 @@ function goPage(id, el){
 
 // ── PROFILE SWITCHER ─────────────────────────────────────────────────────────
 var _profiles=[];
+var _curAvatar = '';
+
 function loadProfiles(){
   xhr('/api/me',null,function(me){
-    document.getElementById('profile-name-badge').textContent=me.profile_name||'Şahıs';
-    document.getElementById('profile-type-badge').textContent=me.profile_type==='sirket'?'🏢 Şirket Profili':'👤 Kişisel Profil';
+    _curAvatar = me.avatar || '';
+    if(me.profile_id) sessionStorage.setItem('cur_pid', me.profile_id);
+    setAvatarDisplay(me.avatar, me.display || me.username || '?');
+    // Update dropdown header
+    var n=document.getElementById('udrop-name');
+    var s=document.getElementById('udrop-sub');
+    if(n) n.textContent=me.display||me.username||'—';
+    if(s) s.textContent='@'+me.username+(me.email?' · '+me.email:'');
   });
   xhr('/api/profiles',null,function(list){
     _profiles=list;
+    renderDropdownProfiles();
+    renderSettingsProfiles();
   });
 }
-function toggleProfileMenu(){
-  var m=document.getElementById('profile-menu');
-  var f=document.getElementById('add-profile-form');
-  if(m.style.display==='none'){
-    renderProfileList();
-    m.style.display='block'; f.style.display='none';
-  } else {
-    m.style.display='none';
+
+function setAvatarDisplay(avatar, name){
+  var initials = (name||'?').slice(0,1).toUpperCase();
+  var btn = document.getElementById('avatar-btn-inner');
+  var avaDrop = document.getElementById('udrop-ava');
+  var avaSet = document.getElementById('settings-avatar-img');
+  function setAva(el){
+    if(!el) return;
+    if(avatar){
+      el.innerHTML='<img src="'+avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+    } else {
+      el.textContent = initials;
+    }
   }
+  if(btn){ if(avatar){btn.innerHTML='<img src="'+avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';} else {btn.textContent=initials;} }
+  setAva(avaDrop); setAva(avaSet);
 }
-function renderProfileList(){
-  var html='';
-  _profiles.forEach(function(p){
+
+function toggleUserMenu(e){
+  if(e) e.stopPropagation();
+  var d=document.getElementById('user-dropdown');
+  d.classList.toggle('open');
+}
+
+document.addEventListener('click',function(e){
+  var wrap=document.querySelector('.udrop-wrap');
+  if(wrap&&!wrap.contains(e.target)){
+    var d=document.getElementById('user-dropdown');
+    if(d) d.classList.remove('open');
+  }
+});
+
+function renderDropdownProfiles(){
+  var pid=parseInt(sessionStorage.getItem('cur_pid')||'0');
+  var el=document.getElementById('udrop-profiles');
+  if(!el) return;
+  el.innerHTML=_profiles.map(function(p){
     var icon=p.type==='sirket'?'🏢':'👤';
-    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 8px;border-radius:7px;cursor:pointer;transition:.15s" onmouseover="this.style.background=\'#1e2233\'" onmouseout="this.style.background=\'transparent\'" onclick="switchProfile('+p.id+')">'
-      +'<span style="font-size:.82rem;color:var(--txt)">'+icon+' '+p.name+'</span>'
+    var cur=(p.id===pid)?'cur':'';
+    return '<div class="udrop-prof-item '+cur+'" onclick="switchProfile('+p.id+')">'
+      +'<span class="udrop-prof-dot" style="background:'+(p.type==='sirket'?'var(--c)':'var(--b2)')+'"></span>'
+      +icon+' '+p.name
+      +(cur?' <span style="margin-left:auto;font-size:.65rem;color:var(--b2)">Aktif</span>':'')
       +'</div>';
-  });
-  document.getElementById('profile-list').innerHTML=html;
+  }).join('');
 }
+
+function renderSettingsProfiles(){
+  var el=document.getElementById('settings-profile-list');
+  if(!el) return;
+  var pid=parseInt(sessionStorage.getItem('cur_pid')||'0');
+  el.innerHTML=_profiles.map(function(p){
+    var icon=p.type==='sirket'?'🏢':'👤';
+    var isActive=p.id===pid;
+    return '<div class="settings-profile-item">'
+      +'<div><div class="sp-info">'+icon+' '+p.name+'</div>'
+      +'<div class="sp-type">'+(p.type==='sirket'?'Şirket':'Kişisel')+'</div></div>'
+      +(isActive?'<span class="sp-active">Aktif</span>':'<button onclick="switchProfile('+p.id+')" style="padding:5px 12px;background:var(--b);border:none;border-radius:8px;color:#fff;font-size:.75rem;cursor:pointer;font-weight:600">Geç</button>')
+      +'</div>';
+  }).join('');
+}
+
 function switchProfile(pid){
   xhr('/api/profiles/'+pid+'/switch','POST',function(d){
     if(!d.ok) return;
-    document.getElementById('profile-menu').style.display='none';
-    document.getElementById('profile-name-badge').textContent=d.name;
-    document.getElementById('profile-type-badge').textContent=d.type==='sirket'?'🏢 Şirket Profili':'👤 Kişisel Profil';
-    // Show toast
-    showToast('Profil değiştirildi: '+d.name,'#6366f1');
-    // Reload current page data
+    document.getElementById('user-dropdown').classList.remove('open');
+    sessionStorage.setItem('cur_pid', pid);
+    renderDropdownProfiles();
+    renderSettingsProfiles();
+    showToast('Profil: '+d.name,'#6366f1');
     loadDashboard(); renderLedger();
   });
 }
-function showAddProfile(){
-  document.getElementById('add-profile-form').style.display='block';
-  document.getElementById('profile-menu').style.display='none';
+
+function showAddProfile(){ showAddProfile2(); }
+function showAddProfile2(){
+  var f=document.getElementById('add-profile-form2');
+  if(f) f.style.display=f.style.display==='none'?'block':'none';
 }
 function cancelAddProfile(){
-  document.getElementById('add-profile-form').style.display='none';
+  var f=document.getElementById('add-profile-form2');
+  if(f) f.style.display='none';
 }
 function createProfile(){
   var name=document.getElementById('new-profile-name').value.trim();
@@ -2742,10 +3053,110 @@ function createProfile(){
     _profiles.push(d);
     switchProfile(d.id);
     document.getElementById('new-profile-name').value='';
-    document.getElementById('add-profile-form').style.display='none';
-    renderProfileList();
+    cancelAddProfile();
     showToast('Profil oluşturuldu: '+d.name,'#22c55e');
   });
+}
+function createProfileFromSettings(){
+  var name=document.getElementById('new-profile-name-s').value.trim();
+  var type=document.getElementById('new-profile-type-s').value;
+  if(!name){ showToast('İsim / Ünvan zorunlu','#ef4444'); return; }
+  xhr('/api/profiles',{name:name,type:type},function(d){
+    if(!d.ok){ showToast('Hata','#ef4444'); return; }
+    _profiles.push(d);
+    renderSettingsProfiles();
+    document.getElementById('add-profile-form-settings').style.display='none';
+    document.getElementById('new-profile-name-s').value='';
+    showToast('Profil oluşturuldu: '+d.name,'#22c55e');
+  });
+}
+
+// ── SETTINGS PAGE ────────────────────────────────────────────────────────────
+function initSettingsPage(){
+  xhr('/api/me',null,function(me){
+    var d=document.getElementById('settings-display');
+    var u=document.getElementById('settings-username');
+    var em=document.getElementById('settings-email');
+    var dn=document.getElementById('settings-display-name-show');
+    var un=document.getElementById('settings-username-show');
+    if(d) d.value=me.display||'';
+    if(u) u.value=me.username||'';
+    if(em) em.value=me.email||'';
+    if(dn) dn.textContent=me.display||me.username||'—';
+    if(un) un.textContent='@'+(me.username||'');
+    setAvatarDisplay(me.avatar, me.display||me.username||'?');
+  });
+  renderSettingsProfiles();
+}
+
+function saveAccountInfo(){
+  var display=document.getElementById('settings-display').value.trim();
+  if(!display){ showToast('Ad Soyad boş olamaz','#ef4444'); return; }
+  xhr('/api/me/update',{display_name:display},function(d){
+    if(d.ok){
+      document.getElementById('settings-display-name-show').textContent=display;
+      document.getElementById('udrop-name').textContent=display;
+      showToast('Bilgiler kaydedildi ✓','#22c55e');
+    }
+  });
+}
+
+function changePassword(){
+  var cur=document.getElementById('pw-current').value;
+  var nw=document.getElementById('pw-new').value;
+  var conf=document.getElementById('pw-confirm').value;
+  var msg=document.getElementById('pw-msg');
+  if(!cur||!nw||!conf){ msg.textContent='Tüm alanları doldurun'; msg.style.color='var(--r)'; return; }
+  xhr('/api/me/password',{current:cur,new:nw,confirm:conf},function(d){
+    if(d.ok){
+      msg.textContent='Şifre güncellendi ✓'; msg.style.color='var(--g)';
+      document.getElementById('pw-current').value='';
+      document.getElementById('pw-new').value='';
+      document.getElementById('pw-confirm').value='';
+    } else {
+      msg.textContent=d.error||'Hata'; msg.style.color='var(--r)';
+    }
+  });
+}
+
+function handleAvatarUpload(input){
+  if(!input.files||!input.files[0]) return;
+  var file=input.files[0];
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var cv=document.createElement('canvas');
+      cv.width=cv.height=128;
+      var ctx=cv.getContext('2d');
+      var s=Math.min(img.width,img.height);
+      var sx=(img.width-s)/2, sy=(img.height-s)/2;
+      ctx.drawImage(img,sx,sy,s,s,0,0,128,128);
+      var dataUrl=cv.toDataURL('image/jpeg',.85);
+      setAvatarDisplay(dataUrl,'');
+      xhr('/api/me/update',{avatar:dataUrl},function(d){
+        if(d.ok) showToast('Fotoğraf güncellendi ✓','#22c55e');
+      });
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+  input.value='';
+}
+
+// ── TODAY DATE PICKER ────────────────────────────────────────────────────────
+var _todayDate = new Date().toISOString().split('T')[0];
+function changeTodayDate(val){
+  _todayDate = val || new Date().toISOString().split('T')[0];
+  loadTodayWidgets();
+  // Update section label
+  var d = new Date(_todayDate+'T12:00:00');
+  var today = new Date().toISOString().split('T')[0];
+  var dateLabel = _todayDate===today?'Günün':d.toLocaleDateString('tr-TR',{day:'numeric',month:'long'});
+  var g1=document.getElementById('gelir-section-lbl');
+  var g2=document.getElementById('gider-section-lbl');
+  if(g1) g1.textContent=dateLabel+' Gelirleri';
+  if(g2) g2.textContent=dateLabel+' Giderleri';
 }
 function showToast(msg,color){
   var t=document.createElement('div');
@@ -2860,7 +3271,7 @@ function goToTx(id){
 }
 
 function loadTodayWidgets(){
-  xhr('/api/today',null,function(d){
+  xhr('/api/today?date='+_todayDate,null,function(d){
     // Gelir list
     renderTxList('today-gelir-list', d.gelir_list, 'gelir');
     var gb=document.getElementById('gelir-badge');
@@ -2962,34 +3373,58 @@ function filterLedgerTo(type){
   },200);
 }
 
-// Tutar inputlarını yazarken formatla (5000 → 5.000 anlık göster)
+// Tutar girişi: binlik nokta + kuruş virgülle (5.000,75)
 function setupNumInputs(){
   document.querySelectorAll('input[data-num]').forEach(function(el){
-    function formatLive(){
-      var pos=el.selectionStart;
-      var raw=el.value.replace(/[^\d,]/g,'').replace(',','.');
-      var num=parseFloat(raw);
-      el.dataset.raw=isNaN(num)?'':num;
-      if(!isNaN(num)&&el.value!==''){
-        var parts=num.toString().split('.');
-        parts[0]=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.');
-        var formatted=parts[0]+(parts[1]!==undefined?','+parts[1]:'');
-        if(el.value!==formatted){el.value=formatted;}
+    el.addEventListener('keydown',function(e){
+      // allow: backspace/del/tab/esc/enter/arrows, ctrl combos, digits, comma
+      if([8,9,13,27,35,36,37,38,39,40,46].indexOf(e.keyCode)!==-1) return;
+      if(e.ctrlKey||e.metaKey) return;
+      if((e.keyCode>=48&&e.keyCode<=57)||(e.keyCode>=96&&e.keyCode<=105)) return;
+      if(e.keyCode===188||e.keyCode===110) return; // comma / decimal
+      e.preventDefault();
+    });
+    el.addEventListener('input',function(){
+      var val=el.value;
+      var cursor=el.selectionStart;
+      var prevLen=val.length;
+      // Split on comma
+      var commaIdx=val.indexOf(',');
+      var intRaw, decRaw, hasComma;
+      if(commaIdx!==-1){
+        intRaw=val.substring(0,commaIdx).replace(/[^\d]/g,'');
+        decRaw=val.substring(commaIdx+1).replace(/[^\d]/g,'').slice(0,2);
+        hasComma=true;
+      } else {
+        intRaw=val.replace(/[^\d]/g,'');
+        decRaw='';
+        hasComma=false;
       }
-    }
-    el.addEventListener('input',formatLive);
+      el.dataset.raw=intRaw+(decRaw?'.'+decRaw:'');
+      var formatted=intRaw?intRaw.replace(/\B(?=(\d{3})+(?!\d))/g,'.'):'';
+      var newVal=hasComma?formatted+','+decRaw:formatted;
+      if(el.value!==newVal){
+        el.value=newVal;
+        var diff=newVal.length-prevLen;
+        var newCursor=Math.max(0,cursor+diff);
+        try{el.setSelectionRange(newCursor,newCursor);}catch(e){}
+      }
+    });
     el.addEventListener('blur',function(){
-      var raw=parseFloat(el.dataset.raw||'');
+      var raw=parseFloat((el.dataset.raw||'').replace(',','.'));
       if(!isNaN(raw)&&raw>0){
         var parts=raw.toFixed(2).split('.');
         parts[0]=parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.');
         el.value=parts[0]+','+parts[1];
+        el.dataset.raw=raw;
+      } else {
+        el.dataset.raw='';
       }
-      el.dataset.raw=isNaN(raw)?'':raw;
     });
     el.addEventListener('focus',function(){
-      if(el.dataset.raw) el.value=el.dataset.raw.replace('.',',');
-      else el.value='';
+      var raw=parseFloat(el.dataset.raw||'');
+      el.value=(!isNaN(raw)&&raw>0)?raw.toString().replace('.',','):'';
+      setTimeout(function(){el.select();},10);
     });
   });
 }
