@@ -848,6 +848,17 @@ def today_summary():
             "pct":     round(used/lim*100) if lim else 0,
         })
 
+    # Check for recurring income expected today
+    today_dt = date.fromisoformat(today_str)
+    recurring_gelir_today = False
+    recs = db.execute(
+        "SELECT * FROM recurring WHERE profile_id=? AND active=1 AND type='gelir'", (pid,)
+    ).fetchall()
+    for r in recs:
+        if r["day_of_month"] == today_dt.day:
+            recurring_gelir_today = True
+            break
+
     return jsonify({
         "today_gelir": round(today_gelir, 2),
         "today_gider": round(today_gider, 2),
@@ -858,7 +869,193 @@ def today_summary():
         "total_limit": round(total_limit, 2),
         "total_used":  round(total_used, 2),
         "total_avail": round(total_limit - total_used, 2),
+        "recurring_gelir_today": recurring_gelir_today,
     })
+
+def generate_notifications(pid, profile_type, db, today):
+    """Return list of notification dicts sorted by urgency."""
+    notifs = []
+
+    def days_until(target_date):
+        return (target_date - today).days
+
+    def urgency(d):
+        if d <= 0:   return "urgent"
+        if d <= 2:   return "urgent"
+        if d <= 5:   return "soon"
+        return "normal"
+
+    def add(icon, title, body, d, category=""):
+        notifs.append({
+            "icon": icon, "title": title, "body": body,
+            "days": d, "urgency": urgency(d), "category": category
+        })
+
+    # ── CREDIT CARD DUE DATES ──────────────────────────────────────────────
+    cards = db.execute("SELECT * FROM cards WHERE profile_id=?", (pid,)).fetchall()
+    for c in cards:
+        due_day = c["due_day"] or 1
+        used = c["used_"] or 0
+        if used <= 0:
+            continue
+        # compute next due date
+        if today.day <= due_day:
+            due_date = today.replace(day=due_day)
+        else:
+            # next month
+            if today.month == 12:
+                due_date = today.replace(year=today.year+1, month=1, day=due_day)
+            else:
+                due_date = today.replace(month=today.month+1, day=due_day)
+        d = days_until(due_date)
+        if -3 <= d <= 10:
+            min_pay = round(used * (c["min_pct"] or 25) / 100, 2)
+            name = c["bank_name"] + (" - " + c["card_name"] if c["card_name"] else "")
+            if d <= 0:
+                msg = f"Bugün son ödeme günü! 💳 {name} kartının asgari ödemesi ₺{min_pay:,.0f}"
+                ico = "🚨"
+            elif d == 1:
+                msg = f"Yarın son gün! 💳 {name} kartının asgari ödemesi ₺{min_pay:,.0f}"
+                ico = "⚠️"
+            else:
+                msg = f"{d} gün içinde: {name} kartının asgari ödemesi ₺{min_pay:,.0f}"
+                ico = "💳"
+            add(ico, "Kredi Kartı Ödemesi", msg, d, "kart")
+
+    # ── RECURRING PAYMENTS ────────────────────────────────────────────────
+    recurrings = db.execute(
+        "SELECT * FROM recurring WHERE profile_id=? AND active=1", (pid,)
+    ).fetchall()
+    for r in recurrings:
+        dom = r["day_of_month"] or 1
+        if today.day <= dom:
+            due_date = today.replace(day=dom)
+        else:
+            if today.month == 12:
+                due_date = today.replace(year=today.year+1, month=1, day=dom)
+            else:
+                due_date = today.replace(month=today.month+1, day=dom)
+        d = days_until(due_date)
+        if -1 <= d <= 7:
+            desc = r["description"] or r["category"]
+            amt  = float(r["amount"])
+            rtype = r["type"]
+            if rtype == "gelir":
+                if d <= 0:
+                    msg = f"Bugün beklenen gelir: {desc} — ₺{amt:,.0f} 🎉"
+                    ico = "🎉"
+                elif d == 1:
+                    msg = f"Yarın beklenen gelir: {desc} — ₺{amt:,.0f} 😊"
+                    ico = "😊"
+                else:
+                    msg = f"{d} gün içinde beklenen gelir: {desc} — ₺{amt:,.0f} 💰"
+                    ico = "💰"
+            else:
+                if d <= 0:
+                    msg = f"Bugün ödenmesi gereken: {desc} — ₺{amt:,.0f}"
+                    ico = "🔔"
+                elif d == 1:
+                    msg = f"Yarın ödenmesi gereken: {desc} — ₺{amt:,.0f}"
+                    ico = "⏰"
+                else:
+                    msg = f"{d} gün içinde: {desc} — ₺{amt:,.0f}"
+                    ico = "📅"
+            add(ico, "Düzenli Ödeme" if rtype=="gider" else "Beklenen Gelir", msg, d, "duzenli")
+
+    # ── BUDGET OVERRUN ─────────────────────────────────────────────────────
+    from calendar import monthrange as mr
+    _, last_day = mr(today.year, today.month)
+    m_start = today.replace(day=1).isoformat()
+    m_end   = today.replace(day=last_day).isoformat()
+    budgets = db.execute("SELECT * FROM budgets WHERE profile_id=?", (pid,)).fetchall()
+    for b in budgets:
+        limit = b["limit_"] or 0
+        if limit <= 0:
+            continue
+        spent_row = db.execute(
+            "SELECT COALESCE(SUM(amount),0) as s FROM transactions WHERE profile_id=? AND category=? AND type='gider' AND date BETWEEN ? AND ?",
+            (pid, b["category"], m_start, m_end)
+        ).fetchone()
+        spent = float(spent_row["s"] or 0)
+        if spent >= limit:
+            pct = round(spent / limit * 100)
+            msg = f"{b['category']} bütçesi aşıldı! Hedef ₺{limit:,.0f}, harcama ₺{spent:,.0f} (%{pct})"
+            add("🎯", "Bütçe Aşımı", msg, 0, "butce")
+
+    # ── ŞİRKET: TURKISH TAX CALENDAR ─────────────────────────────────────
+    if profile_type == "sirket":
+        year  = today.year
+        month = today.month
+
+        def tax(icon, title, body, due_date):
+            d = days_until(due_date)
+            if -3 <= d <= 14:
+                add(icon, title, body, d, "vergi")
+
+        # Monthly deadlines — due the 26th of current month
+        monthly_26 = today.replace(day=26) if today.day <= 26 else (
+            today.replace(month=month+1, day=26) if month < 12
+            else today.replace(year=year+1, month=1, day=26)
+        )
+        tax("📋", "SGK Primi",
+            f"SGK primi bildirimi ve ödemesi — son gün {monthly_26.strftime('%d %B')}",
+            monthly_26)
+        tax("📄", "Muhtasar Beyanname",
+            f"Aylık muhtasar beyanname — son gün {monthly_26.strftime('%d %B')}",
+            monthly_26)
+        tax("📊", "KDV Beyannamesi",
+            f"Aylık KDV beyannamesi — son gün {monthly_26.strftime('%d %B')}",
+            monthly_26)
+        tax("🪙", "Damga Vergisi",
+            f"Damga vergisi beyannamesi — son gün {monthly_26.strftime('%d %B')}",
+            monthly_26)
+
+        # Ba-Bs: 5th of each month (for 2 months prior)
+        monthly_5 = today.replace(day=5) if today.day <= 5 else (
+            today.replace(month=month+1, day=5) if month < 12
+            else today.replace(year=year+1, month=1, day=5)
+        )
+        tax("📑", "Ba-Bs Bildirimi",
+            f"Ba-Bs form bildirimi — son gün {monthly_5.strftime('%d %B')}",
+            monthly_5)
+
+        # Geçici Vergi: quarterly — 2nd month of each quarter, 14th
+        gecici_months = {2: "1. Çeyrek", 5: "2. Çeyrek", 8: "3. Çeyrek", 11: "4. Çeyrek"}
+        for gm, label in gecici_months.items():
+            gd = date(year, gm, 14)
+            tax("💹", f"Geçici Vergi ({label})",
+                f"{label} geçici vergi beyannamesi — son gün {gd.strftime('%d %B')}",
+                gd)
+
+        # Annual deadlines
+        annual = [
+            (date(year, 4, 30), "🏛️",  "Kurumlar Vergisi",
+             f"Yıllık kurumlar vergisi beyannamesi — son gün 30 Nisan"),
+            (date(year, 3, 31), "💼",  "Gelir Vergisi 1. Taksit",
+             f"Gelir vergisi 1. taksit ödemesi — son gün 31 Mart"),
+            (date(year, 7, 31), "💼",  "Gelir Vergisi 2. Taksit",
+             f"Gelir vergisi 2. taksit ödemesi — son gün 31 Temmuz"),
+        ]
+        for ad, aico, atitle, abody in annual:
+            tax(aico, atitle, abody, ad)
+
+    # Sort: urgent first, then by days
+    notifs.sort(key=lambda x: (0 if x["urgency"]=="urgent" else 1 if x["urgency"]=="soon" else 2, x["days"]))
+    return notifs
+
+
+@app.route("/api/notifications")
+@login_required
+def api_notifications():
+    db   = get_db()
+    pid  = get_pid()
+    uid  = session["user_id"]
+    prof = db.execute("SELECT type FROM profiles WHERE id=?", (pid,)).fetchone()
+    ptype = prof["type"] if prof else "sahis"
+    today_ = date.today()
+    notifs = generate_notifications(pid, ptype, db, today_)
+    return jsonify({"ok": True, "items": notifs, "count": len(notifs)})
+
 
 @app.route("/api/motivation")
 @login_required
@@ -1864,6 +2061,75 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .divider{height:1px;background:var(--border);margin:20px 0}
 .section-title{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt2);margin-bottom:14px}
 
+/* ── NOTIFICATION BELL ─────────────────────────────────────── */
+.notif-bell-wrap{position:relative}
+.notif-bell{
+  width:36px;height:36px;border-radius:50%;
+  background:var(--bg3);border:1px solid var(--border2);
+  color:var(--txt2);font-size:1.05rem;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:.15s;outline:none;flex-shrink:0;
+}
+.notif-bell:hover{background:var(--bg4);color:var(--txt);transform:scale(1.06)}
+.notif-badge{
+  position:absolute;top:-3px;right:-3px;
+  background:#ef4444;color:#fff;font-size:.58rem;font-weight:800;
+  min-width:16px;height:16px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;padding:0 3px;
+  border:2px solid var(--bg);line-height:1;
+}
+.notif-badge.hidden{display:none}
+
+/* ── NOTIFICATION PANEL ────────────────────────────────────── */
+.notif-overlay{
+  position:fixed;inset:0;z-index:490;background:rgba(0,0,0,.45);
+  opacity:0;pointer-events:none;transition:opacity .22s;
+}
+.notif-overlay.open{opacity:1;pointer-events:all}
+.notif-panel{
+  position:fixed;top:0;right:0;bottom:0;width:340px;max-width:100vw;
+  background:var(--bg2);border-left:1px solid var(--border2);
+  z-index:500;display:flex;flex-direction:column;
+  transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);
+  box-shadow:-20px 0 60px rgba(0,0,0,.6);
+}
+.notif-panel.open{transform:translateX(0)}
+.notif-panel-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.notif-panel-title{font-size:.95rem;font-weight:800;color:var(--txt)}
+.notif-close-btn{
+  width:30px;height:30px;border-radius:50%;border:1px solid var(--border2);
+  background:var(--bg3);color:var(--txt2);font-size:.9rem;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:.15s;
+}
+.notif-close-btn:hover{background:var(--bg4);color:var(--txt)}
+.notif-list{flex:1;overflow-y:auto;padding:10px 10px 80px}
+.notif-item{
+  display:flex;gap:11px;align-items:flex-start;
+  padding:12px 12px;border-radius:12px;margin-bottom:7px;
+  border:1px solid transparent;transition:.15s;cursor:default;
+}
+.notif-item.urgent{background:#ef444412;border-color:#ef444430}
+.notif-item.soon{background:#f59e0b10;border-color:#f59e0b28}
+.notif-item.normal{background:var(--bg3);border-color:var(--border)}
+.notif-item-ico{font-size:1.3rem;flex-shrink:0;margin-top:1px}
+.notif-item-body{flex:1;min-width:0}
+.notif-item-title{font-size:.78rem;font-weight:700;color:var(--txt);margin-bottom:3px}
+.notif-item.urgent .notif-item-title{color:#f87171}
+.notif-item.soon .notif-item-title{color:#fbbf24}
+.notif-item-msg{font-size:.74rem;color:var(--txt2);line-height:1.45}
+.notif-item-days{font-size:.67rem;font-weight:700;margin-top:4px;opacity:.7}
+.notif-item.urgent .notif-item-days{color:#f87171}
+.notif-item.soon .notif-item-days{color:#fbbf24}
+.notif-empty{text-align:center;padding:52px 20px;color:var(--txt2);font-size:.88rem}
+.notif-empty-ico{font-size:2.8rem;margin-bottom:12px;opacity:.5}
+.notif-section-lbl{
+  font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--txt2);padding:8px 12px 4px;opacity:.7;
+}
+
 /* ── TOP HEADER ─────────────────────────────────────────────── */
 .top-header{
   position:sticky;top:0;z-index:90;height:54px;
@@ -1979,7 +2245,11 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .hero-card{background:linear-gradient(135deg,#1a1f3a 0%,#0d1025 100%);border:1px solid #6366f128;border-radius:20px;padding:22px 20px 18px;margin-bottom:4px;position:relative;overflow:hidden}
 .hero-card::before{content:'';position:absolute;top:-50px;right:-40px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,#6366f120,transparent 70%)}
 .hero-card::after{content:'';position:absolute;bottom:-40px;left:-20px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,#22c55e12,transparent 70%)}
-.hero-greeting{font-size:.8rem;color:var(--txt2);margin-bottom:2px;font-weight:500;position:relative}
+.hero-top-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;position:relative}
+.hero-greeting{font-size:.8rem;color:var(--txt2);font-weight:500}
+.hero-kirpi{font-size:1.8rem;line-height:1;transition:transform .4s cubic-bezier(.34,1.56,.64,1),opacity .3s;user-select:none}
+.hero-kirpi.bounce{animation:kirpi-bounce .5s cubic-bezier(.34,1.56,.64,1)}
+@keyframes kirpi-bounce{0%{transform:scale(1)}40%{transform:scale(1.35)}100%{transform:scale(1)}}
 .hero-bal-lbl{font-size:.63rem;text-transform:uppercase;letter-spacing:.13em;color:#818cf8;margin-bottom:5px;font-weight:600;position:relative}
 .hero-balance{font-size:2.5rem;font-weight:900;letter-spacing:-.04em;line-height:1;margin-bottom:4px;color:#e2e8f0;position:relative}
 .hero-net-sub{font-size:.72rem;color:var(--txt2);margin-bottom:14px;min-height:14px;position:relative}
@@ -2160,6 +2430,10 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 <div class="top-header">
   <div class="top-header-logo">🦔 Kirpi</div>
   <div class="top-header-right">
+    <div class="notif-bell-wrap">
+      <button class="notif-bell" id="notif-bell" onclick="toggleNotifPanel()" title="Bildirimler">🔔</button>
+      <span class="notif-badge hidden" id="notif-badge">0</span>
+    </div>
     <div class="udrop-wrap">
       <button class="avatar-btn" id="avatar-btn" onclick="toggleUserMenu(event)">
         <span id="avatar-btn-inner">?</span>
@@ -2205,12 +2479,27 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   </div>
 </div>
 
+<!-- NOTIFICATION OVERLAY + PANEL -->
+<div class="notif-overlay" id="notif-overlay" onclick="closeNotifPanel()"></div>
+<div class="notif-panel" id="notif-panel">
+  <div class="notif-panel-head">
+    <span class="notif-panel-title">🔔 Bildirimler</span>
+    <button class="notif-close-btn" onclick="closeNotifPanel()">✕</button>
+  </div>
+  <div class="notif-list" id="notif-list">
+    <div class="notif-empty"><div class="notif-empty-ico">🦔</div>Yükleniyor…</div>
+  </div>
+</div>
+
 <!-- DASHBOARD -->
 <div class="page active" id="page-dashboard">
 
   <!-- ── HERO BALANCE ── -->
   <div class="hero-card">
-    <div class="hero-greeting" id="hero-greeting">Merhaba __USER_DISPLAY__ 👋</div>
+    <div class="hero-top-row">
+      <div class="hero-greeting" id="hero-greeting">Merhaba __USER_DISPLAY__ 👋</div>
+      <div class="hero-kirpi" id="hero-kirpi" title="Günün durumu">🦔</div>
+    </div>
     <div class="hero-bal-lbl">TOPLAM BİRİKİM</div>
     <div class="hero-balance" id="s-bal">—</div>
     <div class="hero-net-sub" id="s-net-sub"></div>
@@ -2886,6 +3175,8 @@ window.onload=function(){
   setupDrop();
   loadProfiles();
   setupNumInputs();
+  loadNotifications();
+  requestBrowserNotifPermission();
 };
 
 function updateMonthLabel(){
@@ -3069,6 +3360,121 @@ function createProfileFromSettings(){
     document.getElementById('new-profile-name-s').value='';
     showToast('Profil oluşturuldu: '+d.name,'#22c55e');
   });
+}
+
+// ── NOTIFICATIONS ────────────────────────────────────────────────────────────
+var _notifItems=[];
+
+function loadNotifications(){
+  xhr('/api/notifications',null,function(d){
+    if(!d.ok) return;
+    _notifItems=d.items||[];
+    updateNotifBadge();
+    renderNotifList();
+    sendUrgentBrowserNotifs();
+  });
+}
+
+function updateNotifBadge(){
+  var badge=document.getElementById('notif-badge');
+  if(!badge) return;
+  var urgent=_notifItems.filter(function(x){return x.urgency==='urgent';}).length;
+  var total=_notifItems.length;
+  if(total===0){ badge.classList.add('hidden'); }
+  else {
+    badge.classList.remove('hidden');
+    badge.textContent=total>9?'9+':total;
+    badge.style.background=urgent>0?'#ef4444':'#f59e0b';
+  }
+}
+
+function renderNotifList(){
+  var el=document.getElementById('notif-list');
+  if(!el) return;
+  if(_notifItems.length===0){
+    el.innerHTML='<div class="notif-empty"><div class="notif-empty-ico">✅</div>Harika! Yaklaşan bildirim yok.</div>';
+    return;
+  }
+  var sections={urgent:[],soon:[],normal:[]};
+  _notifItems.forEach(function(item){sections[item.urgency].push(item);});
+  var html='';
+  if(sections.urgent.length){
+    html+='<div class="notif-section-lbl">⚠️ Acil</div>';
+    html+=sections.urgent.map(renderNotifItem).join('');
+  }
+  if(sections.soon.length){
+    html+='<div class="notif-section-lbl">🕐 Yakında</div>';
+    html+=sections.soon.map(renderNotifItem).join('');
+  }
+  if(sections.normal.length){
+    html+='<div class="notif-section-lbl">📋 Planlanmış</div>';
+    html+=sections.normal.map(renderNotifItem).join('');
+  }
+  el.innerHTML=html;
+}
+
+function renderNotifItem(item){
+  var dayLabel='';
+  if(item.days<=0) dayLabel='<span class="notif-item-days">Bugün</span>';
+  else if(item.days===1) dayLabel='<span class="notif-item-days">Yarın</span>';
+  else dayLabel='<span class="notif-item-days">'+item.days+' gün sonra</span>';
+  return '<div class="notif-item '+item.urgency+'">'
+    +'<div class="notif-item-ico">'+item.icon+'</div>'
+    +'<div class="notif-item-body">'
+      +'<div class="notif-item-title">'+item.title+'</div>'
+      +'<div class="notif-item-msg">'+item.body+'</div>'
+      +dayLabel
+    +'</div>'
+    +'</div>';
+}
+
+function toggleNotifPanel(){
+  var panel=document.getElementById('notif-panel');
+  var overlay=document.getElementById('notif-overlay');
+  var isOpen=panel.classList.contains('open');
+  if(isOpen){ closeNotifPanel(); }
+  else {
+    panel.classList.add('open');
+    overlay.classList.add('open');
+    loadNotifications();
+  }
+}
+
+function closeNotifPanel(){
+  document.getElementById('notif-panel').classList.remove('open');
+  document.getElementById('notif-overlay').classList.remove('open');
+}
+
+function requestBrowserNotifPermission(){
+  if(!('Notification' in window)) return;
+  if(Notification.permission==='default'){
+    setTimeout(function(){
+      Notification.requestPermission();
+    },3000);
+  }
+}
+
+function sendUrgentBrowserNotifs(){
+  if(!('Notification' in window)) return;
+  if(Notification.permission!=='granted') return;
+  var urgent=_notifItems.filter(function(x){return x.urgency==='urgent';});
+  var sent=sessionStorage.getItem('notif_sent_'+new Date().toISOString().split('T')[0]);
+  if(sent) return;
+  if(urgent.length>0){
+    sessionStorage.setItem('notif_sent_'+new Date().toISOString().split('T')[0],'1');
+    urgent.slice(0,3).forEach(function(item,i){
+      setTimeout(function(){
+        try{
+          new Notification('🦔 Kirpi — '+item.title,{
+            body:item.body,
+            icon:'/icon-192.png',
+            tag:'kirpi-'+item.category+'-'+i,
+            badge:'/icon-192.png'
+          });
+        }catch(e){}
+      },i*800);
+    });
+  }
 }
 
 // ── SETTINGS PAGE ────────────────────────────────────────────────────────────
@@ -3308,6 +3714,30 @@ function loadTodayWidgets(){
       if(tn){tn.textContent=fmt(d.today_net);tn.style.color=d.today_net>=0?'var(--g)':'var(--r)';}
     } else if(nr){
       nr.style.display='none';
+    }
+
+    // Hedgehog mood on hero card
+    var kirpi=document.getElementById('hero-kirpi');
+    if(kirpi){
+      var prevMood=kirpi.dataset.mood||'';
+      var newMood,newEmoji;
+      if(d.gelir_list&&d.gelir_list.length>0){
+        // Has actual income today — happy 🦔
+        newMood='happy'; newEmoji='😊🦔';
+      } else if(d.recurring_gelir_today){
+        // Expected income today (not yet received) — excited 🦔
+        newMood='expected'; newEmoji='🤩🦔';
+      } else {
+        // No income today — sad 🦔
+        newMood='sad'; newEmoji='😢🦔';
+      }
+      if(prevMood!==newMood){
+        kirpi.dataset.mood=newMood;
+        kirpi.textContent=newEmoji;
+        kirpi.classList.remove('bounce');
+        void kirpi.offsetWidth; // force reflow
+        kirpi.classList.add('bounce');
+      }
     }
 
     // Credit cards
