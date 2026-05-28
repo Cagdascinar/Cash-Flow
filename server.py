@@ -40,6 +40,16 @@ def init_db():
             category TEXT UNIQUE NOT NULL,
             limit_   REAL NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS recurring (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            type        TEXT NOT NULL,
+            amount      REAL NOT NULL,
+            category    TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            day_of_month INTEGER NOT NULL DEFAULT 1,
+            active      INTEGER NOT NULL DEFAULT 1,
+            created_at  TEXT NOT NULL
+        );
         CREATE INDEX IF NOT EXISTS idx_date ON transactions(date);
         """)
 
@@ -312,6 +322,86 @@ def import_preview():
         parsed.append({"date":dt,"description":desc,"amount":round(amt,2),"type":ttype,"category":_guess_cat(desc,ttype)})
     return jsonify({"ok":True,"rows":parsed,"skipped":skipped,"headers":header})
 
+# ── RECURRING ────────────────────────────────────────────────────────────────
+
+@app.route("/api/recurring", methods=["GET"])
+def list_recurring():
+    rows = get_db().execute("SELECT * FROM recurring ORDER BY type DESC, day_of_month").fetchall()
+    return jsonify([row_to_dict(r) for r in rows])
+
+@app.route("/api/recurring", methods=["POST"])
+def add_recurring():
+    d = request.get_json(force=True)
+    ttype = d.get("type"); amount = float(d.get("amount", 0))
+    cat = d.get("category",""); desc = d.get("description","")
+    day = int(d.get("day_of_month", 1))
+    if ttype not in ("gelir","gider") or amount <= 0 or not cat or not (1 <= day <= 31):
+        return jsonify({"ok": False, "error": "Geçersiz veri"}), 400
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO recurring (type,amount,category,description,day_of_month,active,created_at) VALUES (?,?,?,?,?,1,?)",
+        (ttype, amount, cat, desc, day, datetime.now().isoformat()))
+    db.commit()
+    return jsonify({"ok": True, "id": cur.lastrowid})
+
+@app.route("/api/recurring/<int:rid>", methods=["DELETE"])
+def del_recurring(rid):
+    get_db().execute("DELETE FROM recurring WHERE id=?", (rid,)); get_db().commit()
+    return jsonify({"ok": True})
+
+@app.route("/api/recurring/<int:rid>", methods=["PUT"])
+def update_recurring(rid):
+    d = request.get_json(force=True)
+    fields, params = [], []
+    for col in ("type","amount","category","description","day_of_month","active"):
+        if col in d:
+            fields.append(f"{col}=?")
+            val = float(d[col]) if col == "amount" else int(d[col]) if col in ("day_of_month","active") else d[col]
+            params.append(val)
+    if not fields: return jsonify({"ok": False}), 400
+    params.append(rid)
+    get_db().execute(f"UPDATE recurring SET {','.join(fields)} WHERE id=?", params)
+    get_db().commit()
+    return jsonify({"ok": True})
+
+@app.route("/api/recurring/apply", methods=["POST"])
+def apply_recurring():
+    """Generate transactions from recurring templates for given year (or year+month)."""
+    d = request.get_json(force=True)
+    year   = int(d.get("year",  date.today().year))
+    month  = d.get("month")  # None = tüm yıl
+    months = [int(month)] if month else list(range(1, 13))
+
+    db       = get_db()
+    templates = db.execute("SELECT * FROM recurring WHERE active=1").fetchall()
+    created  = 0
+    skipped  = 0
+
+    from calendar import monthrange
+    for tpl in templates:
+        for m in months:
+            _, last_day = monthrange(year, m)
+            day = min(tpl["day_of_month"], last_day)
+            dt  = f"{year:04d}-{m:02d}-{day:02d}"
+
+            # çift kayıt önle: aynı recurring_id + tarih kombinasyonu
+            exists = db.execute(
+                "SELECT id FROM transactions WHERE type=? AND category=? AND description=? AND date=? AND amount=?",
+                (tpl["type"], tpl["category"], tpl["description"], dt, tpl["amount"])
+            ).fetchone()
+
+            if exists:
+                skipped += 1
+                continue
+
+            db.execute(
+                "INSERT INTO transactions (type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?)",
+                (tpl["type"], tpl["amount"], tpl["category"], tpl["description"], dt, datetime.now().isoformat()))
+            created += 1
+
+    db.commit()
+    return jsonify({"ok": True, "created": created, "skipped": skipped})
+
 @app.route("/api/import/confirm", methods=["POST"])
 def import_confirm():
     rows=request.get_json(force=True)
@@ -570,6 +660,9 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <div class="nl" data-page="import" onclick="goPage('import',this)">
       <span class="ico">📂</span>İçe Aktar
     </div>
+    <div class="nl" data-page="recurring" onclick="goPage('recurring',this)">
+      <span class="ico">🔁</span>Düzenli
+    </div>
     <div class="nl" data-page="budget" onclick="goPage('budget',this)">
       <span class="ico">🎯</span>Bütçe
     </div>
@@ -760,6 +853,88 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   </div>
 </div>
 
+<!-- RECURRING -->
+<div class="page" id="page-recurring">
+  <div class="page-title">Düzenli İşlemler</div>
+  <div class="page-sub">Tekrarlayan gelir ve giderleri bir kez gir — istediğin yıla tek tuşla uygula</div>
+
+  <div class="grid2">
+    <!-- FORM -->
+    <div class="card">
+      <div class="section-title">Yeni Şablon Ekle</div>
+      <div class="type-tabs">
+        <button class="type-tab tg" id="rec-tab-g" onclick="setRecTab('gelir')">📈 Gelir</button>
+        <button class="type-tab" id="rec-tab-r" onclick="setRecTab('gider')">📉 Gider</button>
+      </div>
+      <div class="form-row">
+        <div><label>Tutar (₺)</label><input class="f-input" type="number" id="rec-amount" placeholder="0.00" min="0" step="0.01"></div>
+        <div>
+          <label>Her ayın kaçında?</label>
+          <select class="f-input" id="rec-day">
+            <option value="1">1. günü</option>
+            <option value="2">2. günü</option>
+            <option value="3">3. günü</option>
+            <option value="4">4. günü</option>
+            <option value="5" selected>5. günü</option>
+            <option value="6">6. günü</option>
+            <option value="7">7. günü</option>
+            <option value="8">8. günü</option>
+            <option value="9">9. günü</option>
+            <option value="10">10. günü</option>
+            <option value="14">14. günü</option>
+            <option value="15">15. günü</option>
+            <option value="20">20. günü</option>
+            <option value="25">25. günü</option>
+            <option value="28">28. günü</option>
+            <option value="30">30. günü</option>
+            <option value="31">Son günü</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-bottom:12px"><label>Kategori</label><select class="f-input" id="rec-cat"></select></div>
+      <div style="margin-bottom:20px"><label>Açıklama</label><input class="f-input" type="text" id="rec-desc" placeholder="örn. Maaş, Kira, Elektrik"></div>
+      <button class="btn btn-green" id="rec-add-btn" style="width:100%;padding:13px" onclick="addRecurring()">Şablon Kaydet</button>
+    </div>
+
+    <!-- APPLY -->
+    <div class="card">
+      <div class="section-title">Yıla Uygula</div>
+      <p style="font-size:.84rem;color:var(--txt2);margin-bottom:16px;line-height:1.6">
+        Şablonları seçili yıl için toplu olarak işlemlere dönüştür.<br>
+        Zaten girilmiş olanlar atlanır, çift kayıt oluşmaz.
+      </p>
+      <div class="form-row" style="margin-bottom:16px">
+        <div>
+          <label>Yıl</label>
+          <select class="f-input" id="rec-apply-year"></select>
+        </div>
+        <div>
+          <label>Ay (opsiyonel)</label>
+          <select class="f-input" id="rec-apply-month">
+            <option value="">Tüm Yıl (12 ay)</option>
+            <option value="1">Ocak</option><option value="2">Şubat</option>
+            <option value="3">Mart</option><option value="4">Nisan</option>
+            <option value="5">Mayıs</option><option value="6">Haziran</option>
+            <option value="7">Temmuz</option><option value="8">Ağustos</option>
+            <option value="9">Eylül</option><option value="10">Ekim</option>
+            <option value="11">Kasım</option><option value="12">Aralık</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" style="width:100%;padding:13px" onclick="applyRecurring()">
+        🔁 Uygula
+      </button>
+      <div id="rec-apply-result" style="margin-top:14px;font-size:.84rem;color:var(--txt2)"></div>
+    </div>
+  </div>
+
+  <!-- LIST -->
+  <div class="card">
+    <div class="section-title">Kayıtlı Şablonlar</div>
+    <div id="rec-list"><div class="empty-state"><div class="icon">🔁</div>Henüz şablon yok</div></div>
+  </div>
+</div>
+
 <!-- BUDGET -->
 <div class="page" id="page-budget">
   <div class="page-title">Bütçe Hedefleri</div>
@@ -819,6 +994,7 @@ function goPage(id, el){
   if(el) el.classList.add('active');
   if(id==='ledger') renderLedger();
   if(id==='dashboard') loadDashboard();
+  if(id==='recurring') initRecurringPage();
 }
 
 // ── MONTH NAV ─────────────────────────────────────────────────────────────────
@@ -1157,6 +1333,100 @@ function exportCsv(){
   var a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,﻿'+encodeURIComponent(h+rows);
   a.download='cashflow.csv'; a.click();
+}
+
+// ── RECURRING ─────────────────────────────────────────────────────────────────
+var recTab = 'gelir';
+
+function initRecurringPage(){
+  fillSel('rec-cat', CATS[recTab]);
+  var ys = document.getElementById('rec-apply-year');
+  ys.innerHTML = '';
+  var now = new Date().getFullYear();
+  for(var y=now-1; y<=now+2; y++){
+    ys.innerHTML += '<option value="'+y+'"'+(y===now?' selected':'')+'>'+y+'</option>';
+  }
+  loadRecurring();
+}
+
+function setRecTab(t){
+  recTab = t;
+  document.getElementById('rec-tab-g').className = 'type-tab' + (t==='gelir' ? ' tg' : '');
+  document.getElementById('rec-tab-r').className = 'type-tab' + (t==='gider' ? ' tr' : '');
+  document.getElementById('rec-add-btn').className = 'btn ' + (t==='gelir' ? 'btn-green' : 'btn-danger');
+  fillSel('rec-cat', CATS[t]);
+}
+
+function loadRecurring(){
+  xhr('/api/recurring', null, function(list){
+    var el = document.getElementById('rec-list');
+    if(!list.length){
+      el.innerHTML = '<div class="empty-state"><div class="icon">🔁</div>Henüz şablon yok. Sol taraftan ekle.</div>';
+      return;
+    }
+    var gelirler = list.filter(function(r){return r.type==='gelir'});
+    var giderler = list.filter(function(r){return r.type==='gider'});
+    function renderGroup(items, label, color){
+      if(!items.length) return '';
+      return '<div style="margin-bottom:18px">'+
+        '<div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:'+color+';margin-bottom:10px">'+label+'</div>'+
+        '<div style="display:flex;flex-direction:column;gap:7px">'+
+        items.map(function(r){
+          return '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border)">'+
+            '<div style="width:36px;height:36px;border-radius:8px;background:'+(r.type==='gelir'?'#22c55e18':'#ef444418')+
+            ';display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">'+
+            (r.type==='gelir'?'📈':'📉')+'</div>'+
+            '<div style="flex:1;min-width:0">'+
+              '<div style="font-weight:600;font-size:.88rem">'+(r.description||r.category)+'</div>'+
+              '<div style="font-size:.75rem;color:var(--txt2)">'+r.category+' &middot; Her ayın <strong>'+r.day_of_month+'. günü</strong></div>'+
+            '</div>'+
+            '<div style="font-weight:800;font-size:.95rem;color:'+(r.type==='gelir'?'var(--g)':'var(--r)')+'">'+
+              (r.type==='gelir'?'+':'-')+fmt(r.amount)+'</div>'+
+            '<button onclick="delRecurring('+r.id+')" class="del-row">✕</button>'+
+          '</div>';
+        }).join('')+
+        '</div></div>';
+    }
+    el.innerHTML = renderGroup(gelirler,'Gelirler','var(--g)') + renderGroup(giderler,'Giderler','var(--r)');
+  });
+}
+
+function addRecurring(){
+  var amount = parseFloat(document.getElementById('rec-amount').value);
+  var cat    = document.getElementById('rec-cat').value;
+  var desc   = document.getElementById('rec-desc').value;
+  var day    = parseInt(document.getElementById('rec-day').value);
+  if(!amount || amount<=0){toast('Tutar giriniz'); return}
+  xhr('/api/recurring', {type:recTab, amount:amount, category:cat, description:desc, day_of_month:day}, function(r){
+    if(r.ok){
+      toast('Şablon kaydedildi ✓');
+      document.getElementById('rec-amount').value = '';
+      document.getElementById('rec-desc').value = '';
+      loadRecurring();
+    }
+  });
+}
+
+function delRecurring(id){
+  xhr('/api/recurring/'+id, null, function(){loadRecurring(); toast('Silindi')}, false, true);
+}
+
+function applyRecurring(){
+  var year  = parseInt(document.getElementById('rec-apply-year').value);
+  var month = document.getElementById('rec-apply-month').value;
+  var body  = {year: year};
+  if(month) body.month = month;
+  xhr('/api/recurring/apply', body, function(r){
+    var el = document.getElementById('rec-apply-result');
+    if(r.ok){
+      var msg = '';
+      if(r.created > 0) msg += '<span style="color:var(--g)">✓ '+r.created+' işlem oluşturuldu</span>';
+      if(r.skipped > 0) msg += (msg?' &nbsp;·&nbsp; ':'')+r.skipped+' zaten vardı, atlandı';
+      if(!r.created && !r.skipped) msg = 'Uygulanacak aktif şablon yok.';
+      el.innerHTML = msg;
+      if(r.created > 0){toast(r.created+' işlem oluşturuldu ✓'); loadAllTx(); loadDashboard();}
+    }
+  });
 }
 
 // ── CSV IMPORT ────────────────────────────────────────────────────────────────
