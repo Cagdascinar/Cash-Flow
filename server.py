@@ -762,14 +762,22 @@ def bulk_delete():
 def summary():
     pid   = get_pid()
     db    = get_db()
-    year  = request.args.get("year",  date.today().year,  type=int)
-    month = request.args.get("month", date.today().month, type=int)
+    today_d = date.today()
+    year  = request.args.get("year",  today_d.year,  type=int)
+    month = request.args.get("month", today_d.month, type=int)
+    period = request.args.get("period", "month")  # month | year | all
     rstart = request.args.get("start","")
     rend   = request.args.get("end","")
     if rstart and rend:
         start, end = rstart, rend
-    else:
-        start, end = month_range(year, month)
+    elif period == "year":
+        start = f"{today_d.year}-01-01"
+        end   = f"{today_d.year}-12-31"
+    elif period == "all":
+        start = "2000-01-01"
+        end   = "2100-12-31"
+    else:  # month (default)
+        start, end = month_range(today_d.year, today_d.month)
     rows = db.execute(
         "SELECT type,category,SUM(amount) as total FROM transactions "
         "WHERE profile_id=? AND date BETWEEN ? AND ? GROUP BY type,category", (pid, start, end)).fetchall()
@@ -780,7 +788,7 @@ def summary():
         else:                   gider_total+=r["total"]; gider_cats[r["category"]]=round(r["total"],2)
     bar = []
     for m in range(1,13):
-        s,e2 = month_range(year,m)
+        s,e2 = month_range(today_d.year, m)
         totals = db.execute("SELECT type,SUM(amount) as t FROM transactions WHERE profile_id=? AND date BETWEEN ? AND ? GROUP BY type",(pid,s,e2)).fetchall()
         g_val  = next((r["t"] for r in totals if r["type"]=="gelir"),0)
         ex_val = next((r["t"] for r in totals if r["type"]=="gider"),0)
@@ -789,7 +797,8 @@ def summary():
     budgets = {r["category"]:r["limit_"] for r in db.execute("SELECT * FROM budgets WHERE profile_id=?",(pid,)).fetchall()}
     return jsonify({"gelir":round(gelir_total,2),"gider":round(gider_total,2),
                     "net":round(gelir_total-gider_total,2),"balance":round(bal["b"] or 0,2),
-                    "gelir_cats":gelir_cats,"gider_cats":gider_cats,"bar":bar,"budgets":budgets})
+                    "gelir_cats":gelir_cats,"gider_cats":gider_cats,"bar":bar,"budgets":budgets,
+                    "period":period})
 
 @app.route("/api/budgets", methods=["POST"])
 @login_required
@@ -1562,42 +1571,42 @@ AUTH_HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#0a0c12">
+<meta name="theme-color" content="#1c1c1e">
 <title>Kirpi — __MODE_TITLE__</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#0a0c12;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;
+body{background:#1c1c1e;color:#f2f2f7;font-family:'Inter',system-ui,sans-serif;
   min-height:100vh;display:grid;grid-template-columns:1fr 1fr;align-items:stretch}
 @media(max-width:700px){body{grid-template-columns:1fr}}
-.hero{background:linear-gradient(145deg,#0f1525 0%,#161c35 50%,#0e1520 100%);
+.hero{background:linear-gradient(145deg,#2c2c2e 0%,#1c1c1e 100%);
   display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 40px;
   position:relative;overflow:hidden}
 @media(max-width:700px){.hero{display:none}}
 .hero-title{font-size:2rem;font-weight:900;letter-spacing:-.04em;margin-bottom:8px;
   background:linear-gradient(135deg,#818cf8,#a78bfa,#6ee7b7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.hero-sub{font-size:.9rem;color:#64748b;text-align:center;max-width:280px;line-height:1.6;margin-bottom:32px}
+.hero-sub{font-size:.9rem;color:#8e8e93;text-align:center;max-width:280px;line-height:1.6;margin-bottom:32px}
 .hero-pills{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:300px}
-.pill{background:#1e2233;border:1px solid #2a2f45;border-radius:20px;padding:6px 14px;
-  font-size:.75rem;color:#94a3b8;display:flex;align-items:center;gap:6px}
-.right{display:flex;align-items:center;justify-content:center;padding:40px 36px;background:#0d0f18}
-.box{background:#111318;border:1px solid #1e2233;border-radius:16px;padding:40px 36px;
-  width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.pill{background:#2c2c2e;border:1px solid #3a3a3c;border-radius:20px;padding:6px 14px;
+  font-size:.75rem;color:#aeaeb2;display:flex;align-items:center;gap:6px}
+.right{display:flex;align-items:center;justify-content:center;padding:40px 36px;background:#1c1c1e}
+.box{background:#2c2c2e;border:1px solid #3a3a3c;border-radius:20px;padding:40px 36px;
+  width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
 .logo{text-align:center;margin-bottom:32px}
 .logo img{width:64px;height:64px;border-radius:16px;margin-bottom:12px}
 .logo h1{font-size:1.4rem;font-weight:800;letter-spacing:-.02em}
-.logo p{font-size:.82rem;color:#64748b;margin-top:4px}
-label{display:block;font-size:.78rem;color:#94a3b8;margin-bottom:5px;font-weight:500}
-input{width:100%;background:#1a1d26;border:1px solid #2a2f45;color:#e2e8f0;
-  padding:12px 14px;border-radius:9px;font-size:.9rem;outline:none;margin-bottom:14px;
+.logo p{font-size:.82rem;color:#8e8e93;margin-top:4px}
+label{display:block;font-size:.78rem;color:#aeaeb2;margin-bottom:5px;font-weight:500}
+input{width:100%;background:#3a3a3c;border:1px solid #48484a;color:#f2f2f7;
+  padding:12px 14px;border-radius:10px;font-size:.9rem;outline:none;margin-bottom:14px;
   font-family:inherit;transition:.15s}
-input:focus{border-color:#6366f1}
-.btn{width:100%;padding:13px;background:#6366f1;color:#fff;border:none;border-radius:9px;
+input:focus{border-color:#6366f1;background:#404042}
+.btn{width:100%;padding:13px;background:#6366f1;color:#fff;border:none;border-radius:10px;
   font-size:.92rem;font-weight:700;cursor:pointer;transition:.2s;margin-top:4px}
 .btn:hover{background:#4f46e5}
-.msg{text-align:center;font-size:.82rem;padding:10px 14px;border-radius:8px;margin-bottom:16px}
-.msg.err{background:#ef444418;color:#ef4444;border:1px solid #ef444433}
-.msg.ok{background:#22c55e18;color:#22c55e;border:1px solid #22c55e33}
-.link{text-align:center;margin-top:18px;font-size:.82rem;color:#64748b}
+.msg{text-align:center;font-size:.82rem;padding:10px 14px;border-radius:10px;margin-bottom:16px}
+.msg.err{background:#ef444420;color:#ff453a;border:1px solid #ef444440}
+.msg.ok{background:#22c55e20;color:#30d158;border:1px solid #22c55e40}
+.link{text-align:center;margin-top:18px;font-size:.82rem;color:#8e8e93}
 .link a{color:#818cf8;text-decoration:none;font-weight:600}
 .link a:hover{color:#a5b4fc}
 </style>
@@ -1694,15 +1703,15 @@ def AUTH_HTML_render(mode, msg="", token=None):
     if mode == "register":
         form = (
     '''    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:24px">
-      <div id="reg-sahis" onclick="setRegType(this,'sahis')" style="border:2px solid #6366f1;border-radius:11px;padding:14px 10px;text-align:center;cursor:pointer;background:#1a1d26;transition:.2s">
+      <div id="reg-sahis" onclick="setRegType(this,'sahis')" style="border:2px solid #6366f1;border-radius:12px;padding:14px 10px;text-align:center;cursor:pointer;background:#3a3a3c;transition:.2s">
         <div style="font-size:1.6rem;margin-bottom:4px">&#128100;</div>
-        <div style="font-size:.82rem;font-weight:700;color:#e2e8f0">Bireysel</div>
-        <div style="font-size:.7rem;color:#94a3b8;margin-top:2px">Sahis hesabi</div>
+        <div style="font-size:.82rem;font-weight:700;color:#f2f2f7">Bireysel</div>
+        <div style="font-size:.7rem;color:#aeaeb2;margin-top:2px">Şahıs hesabı</div>
       </div>
-      <div id="reg-sirket" onclick="setRegType(this,'sirket')" style="border:2px solid #2a2f45;border-radius:11px;padding:14px 10px;text-align:center;cursor:pointer;background:#111318;transition:.2s">
+      <div id="reg-sirket" onclick="setRegType(this,'sirket')" style="border:2px solid #48484a;border-radius:12px;padding:14px 10px;text-align:center;cursor:pointer;background:#2c2c2e;transition:.2s">
         <div style="font-size:1.6rem;margin-bottom:4px">&#127970;</div>
-        <div style="font-size:.82rem;font-weight:700;color:#94a3b8">Ticari</div>
-        <div style="font-size:.7rem;color:#64748b;margin-top:2px">Şirket hesabı</div>
+        <div style="font-size:.82rem;font-weight:700;color:#aeaeb2">Ticari</div>
+        <div style="font-size:.7rem;color:#8e8e93;margin-top:2px">Şirket hesabı</div>
       </div>
     </div>''' + msg_html + '''
     <form method="POST" action="/register">
@@ -1732,9 +1741,9 @@ def AUTH_HTML_render(mode, msg="", token=None):
     function setRegType(el,t){
       document.getElementById("reg-type-val").value=t;
       document.getElementById("reg-sahis").style.borderColor=t==="sahis"?"#6366f1":"#2a2f45";
-      document.getElementById("reg-sahis").style.background=t==="sahis"?"#1a1d26":"#111318";
-      document.getElementById("reg-sirket").style.borderColor=t==="sirket"?"#6366f1":"#2a2f45";
-      document.getElementById("reg-sirket").style.background=t==="sirket"?"#1a1d26":"#111318";
+      document.getElementById("reg-sahis").style.background=t==="sahis"?"#3a3a3c":"#2c2c2e";
+      document.getElementById("reg-sirket").style.borderColor=t==="sirket"?"#6366f1":"#48484a";
+      document.getElementById("reg-sirket").style.background=t==="sirket"?"#3a3a3c":"#2c2c2e";
       if(t==="sahis"){
         document.getElementById("reg-name-label").textContent="Ad Soyad";
         document.getElementById("reg-name").placeholder="Ad Soyad";
@@ -1750,13 +1759,13 @@ def AUTH_HTML_render(mode, msg="", token=None):
     elif mode == "login":
         form = msg_html + '''
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:24px">
-      <div id="login-bir" onclick="setLoginType('bireysel')" style="border:2px solid #6366f1;border-radius:11px;padding:12px 10px;text-align:center;cursor:pointer;background:#1a1d26;transition:.2s">
+      <div id="login-bir" onclick="setLoginType('bireysel')" style="border:2px solid #6366f1;border-radius:12px;padding:12px 10px;text-align:center;cursor:pointer;background:#3a3a3c;transition:.2s">
         <div style="font-size:1.3rem;margin-bottom:3px">&#128100;</div>
-        <div id="login-bir-lbl" style="font-size:.82rem;font-weight:700;color:#e2e8f0">Bireysel</div>
+        <div id="login-bir-lbl" style="font-size:.82rem;font-weight:700;color:#f2f2f7">Bireysel</div>
       </div>
-      <div id="login-tic" onclick="setLoginType('ticari')" style="border:2px solid #2a2f45;border-radius:11px;padding:12px 10px;text-align:center;cursor:pointer;background:#111318;transition:.2s">
+      <div id="login-tic" onclick="setLoginType('ticari')" style="border:2px solid #48484a;border-radius:12px;padding:12px 10px;text-align:center;cursor:pointer;background:#2c2c2e;transition:.2s">
         <div style="font-size:1.3rem;margin-bottom:3px">&#127970;</div>
-        <div id="login-tic-lbl" style="font-size:.82rem;font-weight:700;color:#94a3b8">Ticari</div>
+        <div id="login-tic-lbl" style="font-size:.82rem;font-weight:700;color:#aeaeb2">Ticari</div>
       </div>
     </div>
     <form method="POST" action="/login">
@@ -1772,11 +1781,11 @@ def AUTH_HTML_render(mode, msg="", token=None):
     function setLoginType(t){
       var isBir=t==="bireysel";
       document.getElementById("login-bir").style.borderColor=isBir?"#6366f1":"#2a2f45";
-      document.getElementById("login-bir").style.background=isBir?"#1a1d26":"#111318";
-      document.getElementById("login-bir-lbl").style.color=isBir?"#e2e8f0":"#94a3b8";
-      document.getElementById("login-tic").style.borderColor=!isBir?"#6366f1":"#2a2f45";
-      document.getElementById("login-tic").style.background=!isBir?"#1a1d26":"#111318";
-      document.getElementById("login-tic-lbl").style.color=!isBir?"#e2e8f0":"#94a3b8";
+      document.getElementById("login-bir").style.background=isBir?"#3a3a3c":"#2c2c2e";
+      document.getElementById("login-bir-lbl").style.color=isBir?"#f2f2f7":"#aeaeb2";
+      document.getElementById("login-tic").style.borderColor=!isBir?"#6366f1":"#48484a";
+      document.getElementById("login-tic").style.background=!isBir?"#3a3a3c":"#2c2c2e";
+      document.getElementById("login-tic-lbl").style.color=!isBir?"#f2f2f7":"#aeaeb2";
       document.getElementById("login-btn").textContent=isBir?"Bireysel Giriş Yap":"Ticari Giriş Yap";
       document.getElementById("login-uname-label").textContent=isBir?"Kullanıcı Adı":"Kullanıcı Adı / Vergi No";
     }
@@ -1856,10 +1865,10 @@ HTML = r"""<!DOCTYPE html>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0a0c12;--bg2:#111318;--bg3:#1a1d26;--bg4:#21253a;
-  --g:#22c55e;--r:#ef4444;--b:#6366f1;--b2:#818cf8;--y:#f59e0b;--p:#a855f7;--c:#06b6d4;
-  --txt:#e2e8f0;--txt2:#94a3b8;--border:#1e2233;--border2:#2a2f45;
-  --radius:12px;--shadow:0 8px 32px rgba(0,0,0,.5);
+  --bg:#1c1c1e;--bg2:#2c2c2e;--bg3:#3a3a3c;--bg4:#48484a;
+  --g:#30d158;--r:#ff453a;--b:#6366f1;--b2:#818cf8;--y:#ffd60a;--p:#bf5af2;--c:#32d2ff;
+  --txt:#f2f2f7;--txt2:#aeaeb2;--border:#3a3a3c;--border2:#48484a;
+  --radius:14px;--shadow:0 4px 20px rgba(0,0,0,.3);
   --font:'Inter',system-ui,sans-serif;
 }
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
@@ -2133,8 +2142,9 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 /* ── TOP HEADER ─────────────────────────────────────────────── */
 .top-header{
   position:sticky;top:0;z-index:90;height:54px;
-  background:rgba(10,12,18,.88);backdrop-filter:blur(16px);
-  border-bottom:1px solid var(--border);
+  background:rgba(28,28,30,.92);backdrop-filter:blur(20px) saturate(180%);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);
+  border-bottom:1px solid rgba(255,255,255,.08);
   display:flex;align-items:center;justify-content:flex-end;
   padding:0 24px;flex-shrink:0;
 }
@@ -2157,9 +2167,10 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .udrop-wrap{position:relative}
 .user-dropdown{
   position:absolute;right:0;top:calc(100% + 10px);
-  width:286px;background:var(--bg2);border:1px solid var(--border2);
-  border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.7);
+  width:290px;background:rgba(44,44,46,.96);border:1px solid rgba(255,255,255,.1);
+  border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.6);
   z-index:500;overflow:hidden;
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
   opacity:0;transform:translateY(-8px) scale(.96);
   pointer-events:none;
   transition:opacity .2s,transform .2s cubic-bezier(.4,0,.2,1);
@@ -2167,8 +2178,8 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .user-dropdown.open{opacity:1;transform:translateY(0) scale(1);pointer-events:all}
 .udrop-head{
   padding:14px 14px 12px;
-  background:linear-gradient(135deg,#1a1f3a,#0d1025);
-  border-bottom:1px solid var(--border);
+  background:rgba(58,58,60,.6);
+  border-bottom:1px solid rgba(255,255,255,.07);
   display:flex;align-items:center;gap:12px;
 }
 .udrop-ava-lg{
@@ -2242,22 +2253,25 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .settings-profile-item .sp-active{font-size:.68rem;color:var(--g);font-weight:700;padding:2px 8px;background:#22c55e15;border-radius:8px;border:1px solid #22c55e25}
 
 /* ── HERO BALANCE CARD ────────────────────────────────────── */
-.hero-card{background:linear-gradient(135deg,#1a1f3a 0%,#0d1025 100%);border:1px solid #6366f128;border-radius:20px;padding:22px 20px 18px;margin-bottom:4px;position:relative;overflow:hidden}
-.hero-card::before{content:'';position:absolute;top:-50px;right:-40px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,#6366f120,transparent 70%)}
-.hero-card::after{content:'';position:absolute;bottom:-40px;left:-20px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,#22c55e12,transparent 70%)}
-.hero-top-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;position:relative}
-.hero-greeting{font-size:.8rem;color:var(--txt2);font-weight:500}
+.hero-card{background:linear-gradient(160deg,#2c2c2e 0%,#252526 60%,#1c1c1e 100%);border:1px solid #48484a;border-radius:22px;padding:22px 20px 18px;margin-bottom:4px;position:relative;overflow:hidden}
+.hero-card::before{content:'';position:absolute;top:-60px;right:-50px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,#6366f118,transparent 70%)}
+.hero-card::after{content:'';position:absolute;bottom:-50px;left:-30px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,#30d15810,transparent 70%)}
+.hero-top-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;position:relative}
+.hero-greeting{font-size:.82rem;color:var(--txt2);font-weight:500}
 .hero-kirpi{font-size:1.8rem;line-height:1;transition:transform .4s cubic-bezier(.34,1.56,.64,1),opacity .3s;user-select:none}
 .hero-kirpi.bounce{animation:kirpi-bounce .5s cubic-bezier(.34,1.56,.64,1)}
 @keyframes kirpi-bounce{0%{transform:scale(1)}40%{transform:scale(1.35)}100%{transform:scale(1)}}
-.hero-bal-lbl{font-size:.63rem;text-transform:uppercase;letter-spacing:.13em;color:#818cf8;margin-bottom:5px;font-weight:600;position:relative}
-.hero-balance{font-size:2.5rem;font-weight:900;letter-spacing:-.04em;line-height:1;margin-bottom:4px;color:#e2e8f0;position:relative}
+.hero-period-tabs{display:flex;gap:4px;background:#3a3a3c;border-radius:9px;padding:3px;margin-bottom:10px;position:relative;width:fit-content}
+.hero-period-tab{padding:4px 12px;border-radius:7px;font-size:.7rem;font-weight:600;color:var(--txt2);cursor:pointer;transition:.18s;border:none;background:transparent}
+.hero-period-tab.active{background:#48484a;color:var(--txt);box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.hero-bal-lbl{font-size:.63rem;text-transform:uppercase;letter-spacing:.13em;color:var(--b2);margin-bottom:5px;font-weight:700;position:relative}
+.hero-balance{font-size:2.5rem;font-weight:900;letter-spacing:-.04em;line-height:1;margin-bottom:4px;color:var(--txt);position:relative}
 .hero-net-sub{font-size:.72rem;color:var(--txt2);margin-bottom:14px;min-height:14px;position:relative}
 .hero-chips{display:flex;gap:7px;flex-wrap:wrap;position:relative}
-.hero-chip{display:flex;align-items:center;gap:4px;padding:5px 11px;border-radius:20px;font-size:.76rem;font-weight:600}
-.hero-chip.gn{background:#22c55e14;color:var(--g);border:1px solid #22c55e25}
-.hero-chip.rd{background:#ef444414;color:var(--r);border:1px solid #ef444425}
-.hero-chip.nt{background:#6366f114;color:var(--b2);border:1px solid #6366f125}
+.hero-chip{display:flex;align-items:center;gap:4px;padding:5px 12px;border-radius:20px;font-size:.76rem;font-weight:600}
+.hero-chip.gn{background:#30d15818;color:var(--g);border:1px solid #30d15830}
+.hero-chip.rd{background:#ff453a18;color:var(--r);border:1px solid #ff453a30}
+.hero-chip.nt{background:#6366f118;color:var(--b2);border:1px solid #6366f130}
 
 /* ── CLICKABLE CHIP ──────────────────────────────────────────── */
 .hero-chip{cursor:pointer;transition:.15s}
@@ -2307,11 +2321,11 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .today-card{border-radius:14px;padding:13px 12px}
 .today-card .tc-lbl{font-size:.63rem;text-transform:uppercase;letter-spacing:.09em;font-weight:700;margin-bottom:5px}
 .today-card .tc-val{font-size:1rem;font-weight:800;letter-spacing:-.02em;line-height:1}
-.today-card.gn{background:linear-gradient(135deg,#0d2118,#0a1a12);border:1px solid #22c55e20}
+.today-card.gn{background:linear-gradient(135deg,#1e3a28,#182e20);border:1px solid #30d15828}
 .today-card.gn .tc-lbl,.today-card.gn .tc-val{color:var(--g)}
-.today-card.rd{background:linear-gradient(135deg,#1f0e0e,#180a0a);border:1px solid #ef444420}
+.today-card.rd{background:linear-gradient(135deg,#3a1e1e,#2e1818);border:1px solid #ff453a28}
 .today-card.rd .tc-lbl,.today-card.rd .tc-val{color:var(--r)}
-.today-card.nt{background:linear-gradient(135deg,#14182a,#0f1220);border:1px solid #6366f120}
+.today-card.nt{background:linear-gradient(135deg,#252535,#1e1e2e);border:1px solid #6366f128}
 .today-card.nt .tc-lbl,.today-card.nt .tc-val{color:var(--b2)}
 
 /* ── UPCOMING PAYMENTS ─────────────────────────────────────── */
@@ -2500,7 +2514,12 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       <div class="hero-greeting" id="hero-greeting">Merhaba __USER_DISPLAY__ 👋</div>
       <div class="hero-kirpi" id="hero-kirpi" title="Günün durumu">🦔</div>
     </div>
-    <div class="hero-bal-lbl">TOPLAM BİRİKİM</div>
+    <div class="hero-period-tabs">
+      <button class="hero-period-tab active" id="htab-month" onclick="setHeroPeriod('month')">Bu Ay</button>
+      <button class="hero-period-tab" id="htab-year" onclick="setHeroPeriod('year')">Bu Yıl</button>
+      <button class="hero-period-tab" id="htab-all" onclick="setHeroPeriod('all')">Tümü</button>
+    </div>
+    <div class="hero-bal-lbl" id="hero-bal-lbl">BU AY NET</div>
     <div class="hero-balance" id="s-bal">—</div>
     <div class="hero-net-sub" id="s-net-sub"></div>
     <div class="hero-chips">
@@ -3771,12 +3790,25 @@ function loadTodayWidgets(){
   });
 }
 
+var _heroPeriod='month';
+
+function setHeroPeriod(p){
+  _heroPeriod=p;
+  ['month','year','all'].forEach(function(id){
+    var tab=document.getElementById('htab-'+id);
+    if(tab) tab.classList.toggle('active',id===p);
+  });
+  var lbl=document.getElementById('hero-bal-lbl');
+  if(lbl) lbl.textContent=p==='month'?'BU AY NET':p==='year'?'BU YIL NET':'TÜM ZAMANLAR';
+  loadDashboard();
+}
+
 function loadDashboard(){
   var url;
   if(_dateRangeActive){
     url='/api/summary?start='+_rangeStart+'&end='+_rangeEnd;
   } else {
-    url='/api/summary?year='+curYear+'&month='+curMonth;
+    url='/api/summary?period='+_heroPeriod;
   }
   xhr(url,null,function(d){
     summaryData=d;
@@ -3865,8 +3897,10 @@ function getNumVal(el){
 
 function renderStats(d){
   var b=document.getElementById('s-bal');
-  b.textContent=fmt(d.balance);
-  b.style.color=d.balance>=0?'#e2e8f0':'var(--r)';
+  // For all-time show cumulative balance, for period show net
+  var heroVal=(_heroPeriod==='all')?d.balance:d.net;
+  b.textContent=fmt(heroVal);
+  b.style.color=heroVal>=0?'var(--txt)':'var(--r)';
   document.getElementById('s-gelir').textContent=fmt(d.gelir);
   document.getElementById('s-gider').textContent=fmt(d.gider);
   var netEl=document.getElementById('s-net');
@@ -3902,18 +3936,18 @@ function drawBar(data){
   data.forEach(function(d){if(d.gelir>maxVal)maxVal=d.gelir;if(d.gider>maxVal)maxVal=d.gider});
   if(!maxVal)maxVal=1;
   var p={t:10,r:10,b:28,l:52}, cw=W-p.l-p.r, ch=H-p.t-p.b, gap=cw/12, bw=gap*0.28;
-  ctx.strokeStyle='#1e2233'; ctx.lineWidth=1;
+  ctx.strokeStyle='#3a3a3c'; ctx.lineWidth=1;
   [0,.25,.5,.75,1].forEach(function(f){
     var y=p.t+ch*(1-f);
     ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(W-p.r,y);ctx.stroke();
-    ctx.fillStyle='#475569';ctx.font='10px Inter,system-ui';ctx.textAlign='right';
+    ctx.fillStyle='#8e8e93';ctx.font='10px Inter,system-ui';ctx.textAlign='right';
     ctx.fillText(fmtK(maxVal*f),p.l-4,y+3);
   });
   data.forEach(function(d,i){
     var x=p.l+i*gap+gap/2;
     var gh=ch*(d.gelir/maxVal), eh=ch*(d.gider/maxVal);
-    if(d.gelir>0){ctx.fillStyle='#22c55e66';ctx.beginPath();rr(ctx,x-bw-2,p.t+ch-gh,bw,gh,3);ctx.fill()}
-    if(d.gider>0){ctx.fillStyle='#ef444466';ctx.beginPath();rr(ctx,x+2,p.t+ch-eh,bw,eh,3);ctx.fill()}
+    if(d.gelir>0){ctx.fillStyle='#30d15870';ctx.beginPath();rr(ctx,x-bw-2,p.t+ch-gh,bw,gh,3);ctx.fill()}
+    if(d.gider>0){ctx.fillStyle='#ff453a70';ctx.beginPath();rr(ctx,x+2,p.t+ch-eh,bw,eh,3);ctx.fill()}
     if(i+1===curMonth&&curYear===new Date().getFullYear()){
       ctx.strokeStyle='#6366f1';ctx.lineWidth=1.5;
       ctx.strokeRect(x-bw-4,p.t,bw*2+8,ch);
