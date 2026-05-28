@@ -3189,6 +3189,12 @@ def icon_512():
     import base64
     return base64.b64decode(ICON_512_B64), 200, {"Content-Type": "image/png"}
 
+# Digital Asset Links for TWA (Google Play) — set ASSETLINKS_JSON env var after PWABuilder
+@app.route("/.well-known/assetlinks.json")
+def assetlinks():
+    content = os.environ.get("ASSETLINKS_JSON", "[]")
+    return content, 200, {"Content-Type": "application/json"}
+
 @app.route("/")
 @login_required
 def index():
