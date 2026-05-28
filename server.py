@@ -298,6 +298,7 @@ def login():
         username = request.form.get("username","").strip().lower()
         password = request.form.get("password","")
         with sqlite3.connect(DB) as con:
+            con.row_factory = sqlite3.Row
             row = con.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
         if row and check_password_hash(row["password_hash"], password):
             session["user_id"]  = row["id"]
@@ -315,6 +316,7 @@ def forgot_password():
     if request.method == "POST":
         identifier = request.form.get("identifier","").strip().lower()
         with sqlite3.connect(DB) as con:
+            con.row_factory = sqlite3.Row
             row = con.execute(
                 "SELECT * FROM users WHERE username=? OR email=?", (identifier, identifier)
             ).fetchone()
@@ -335,6 +337,7 @@ def forgot_password():
 @app.route("/reset-password/<token>", methods=["GET", "POST"])
 def reset_password(token):
     with sqlite3.connect(DB) as con:
+        con.row_factory = sqlite3.Row
         tok = con.execute(
             "SELECT * FROM password_reset_tokens WHERE token=? AND used=0", (token,)
         ).fetchone()
