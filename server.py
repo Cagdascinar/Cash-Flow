@@ -1,4 +1,5 @@
-import sqlite3, json, os, csv, io, re, requests, secrets, smtplib, threading, time, logging
+import json, os, csv, io, re, requests, secrets, smtplib, threading, time, logging
+import psycopg2, psycopg2.extras
 from datetime import datetime, date, timedelta
 from functools import wraps
 from email.mime.multipart import MIMEMultipart
@@ -13,7 +14,58 @@ log = logging.getLogger("kirpi")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
-DB = os.environ.get("DB_PATH", "/data/kirpi.db")
+# ── DATABASE ──────────────────────────────────────────────────────────────────
+def _pg_url():
+    url = os.environ.get("DATABASE_URL", "")
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[11:]
+    return url
+
+class _PGCursor:
+    """Thin wrapper: makes psycopg2 DictCursor behave like sqlite3 cursor."""
+    def __init__(self, cur):
+        self._cur = cur
+        self.lastrowid = None
+
+    def execute(self, sql, params=()):
+        sql = sql.replace("?", "%s")
+        is_insert = sql.strip().upper().startswith("INSERT") and "RETURNING" not in sql.upper()
+        if is_insert:
+            sql = sql.rstrip("; ") + " RETURNING id"
+        self._cur.execute(sql, params)
+        if is_insert:
+            row = self._cur.fetchone()
+            self.lastrowid = row[0] if row else None
+        return self
+
+    def fetchone(self):  return self._cur.fetchone()
+    def fetchall(self): return self._cur.fetchall()
+
+class _PGConn:
+    """Wrapper that makes psycopg2 connection look like sqlite3 connection."""
+    def __init__(self):
+        self._conn = psycopg2.connect(_pg_url(),
+            cursor_factory=psycopg2.extras.DictCursor)
+        self._conn.autocommit = False
+
+    def execute(self, sql, params=()):
+        cur = self._conn.cursor()
+        c = _PGCursor(cur)
+        c.execute(sql, params)
+        return c
+
+    def commit(self):   self._conn.commit()
+    def rollback(self): self._conn.rollback()
+    def close(self):    self._conn.close()
+
+    def __enter__(self): return self
+    def __exit__(self, exc_type, *_):
+        if exc_type is None: self._conn.commit()
+        else: self._conn.rollback()
+        self._conn.close()
+        return False
+
+def pg_connect(): return _PGConn()
 
 # ── MAIL CONFIG ───────────────────────────────────────────────────────────────
 MAIL_FROM     = os.environ.get("MAIL_FROM", "")
@@ -30,20 +82,21 @@ ALL_CATS   = GELIR_CATS + GIDER_CATS
 
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(DB)
-        g.db.row_factory = sqlite3.Row
+        g.db = pg_connect()
     return g.db
 
 @app.teardown_appcontext
 def close_db(e=None):
     db = g.pop("db", None)
-    if db: db.close()
+    if db:
+        try: db.commit()
+        except Exception: pass
+        db.close()
 
 def init_db():
-    with sqlite3.connect(DB) as con:
-        con.executescript("""
-        CREATE TABLE IF NOT EXISTS users (
-            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    stmts = [
+        """CREATE TABLE IF NOT EXISTS users (
+            id             SERIAL PRIMARY KEY,
             username       TEXT UNIQUE NOT NULL,
             display_name   TEXT NOT NULL DEFAULT '',
             password_hash  TEXT NOT NULL,
@@ -51,119 +104,120 @@ def init_db():
             email_verified INTEGER NOT NULL DEFAULT 0,
             verify_token   TEXT,
             created_at     TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS password_reset_tokens (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        )""",
+        """CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id         SERIAL PRIMARY KEY,
             user_id    INTEGER NOT NULL,
             token      TEXT UNIQUE NOT NULL,
             expires_at TEXT NOT NULL,
             used       INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY(user_id) REFERENCES users(id)
-        );
-        CREATE TABLE IF NOT EXISTS profiles (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS profiles (
+            id         SERIAL PRIMARY KEY,
             user_id    INTEGER NOT NULL,
             name       TEXT NOT NULL,
             type       TEXT NOT NULL DEFAULT 'sahis',
-            created_at TEXT NOT NULL,
-            FOREIGN KEY(user_id) REFERENCES users(id)
-        );
-        CREATE TABLE IF NOT EXISTS transactions (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS transactions (
+            id          SERIAL PRIMARY KEY,
             user_id     INTEGER NOT NULL DEFAULT 1,
             profile_id  INTEGER NOT NULL DEFAULT 1,
             type        TEXT NOT NULL,
-            amount      REAL NOT NULL,
+            amount      DOUBLE PRECISION NOT NULL,
             category    TEXT NOT NULL,
             description TEXT DEFAULT '',
             date        TEXT NOT NULL,
             created_at  TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS budgets (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        )""",
+        """CREATE TABLE IF NOT EXISTS budgets (
+            id         SERIAL PRIMARY KEY,
             user_id    INTEGER NOT NULL DEFAULT 1,
             profile_id INTEGER NOT NULL DEFAULT 1,
             category   TEXT NOT NULL,
-            limit_     REAL NOT NULL,
+            limit_     DOUBLE PRECISION NOT NULL,
             UNIQUE(profile_id, category)
-        );
-        CREATE TABLE IF NOT EXISTS cards (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id         INTEGER NOT NULL DEFAULT 1,
-            profile_id      INTEGER NOT NULL DEFAULT 1,
-            bank_name       TEXT NOT NULL,
-            card_name       TEXT NOT NULL DEFAULT '',
-            owner           TEXT NOT NULL DEFAULT '',
-            limit_          REAL NOT NULL DEFAULT 0,
-            used_           REAL NOT NULL DEFAULT 0,
-            due_day         INTEGER NOT NULL DEFAULT 1,
-            min_pct         REAL NOT NULL DEFAULT 25,
-            statement_day   INTEGER NOT NULL DEFAULT 20,
-            created_at      TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS investments (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        )""",
+        """CREATE TABLE IF NOT EXISTS cards (
+            id            SERIAL PRIMARY KEY,
+            user_id       INTEGER NOT NULL DEFAULT 1,
+            profile_id    INTEGER NOT NULL DEFAULT 1,
+            bank_name     TEXT NOT NULL,
+            card_name     TEXT NOT NULL DEFAULT '',
+            owner         TEXT NOT NULL DEFAULT '',
+            limit_        DOUBLE PRECISION NOT NULL DEFAULT 0,
+            used_         DOUBLE PRECISION NOT NULL DEFAULT 0,
+            due_day       INTEGER NOT NULL DEFAULT 1,
+            min_pct       DOUBLE PRECISION NOT NULL DEFAULT 25,
+            statement_day INTEGER NOT NULL DEFAULT 20,
+            created_at    TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS investments (
+            id          SERIAL PRIMARY KEY,
             user_id     INTEGER NOT NULL DEFAULT 1,
             profile_id  INTEGER NOT NULL DEFAULT 1,
             name        TEXT NOT NULL,
             itype       TEXT NOT NULL,
             symbol      TEXT NOT NULL DEFAULT '',
-            quantity    REAL NOT NULL DEFAULT 0,
-            buy_price   REAL NOT NULL DEFAULT 0,
+            quantity    DOUBLE PRECISION NOT NULL DEFAULT 0,
+            buy_price   DOUBLE PRECISION NOT NULL DEFAULT 0,
             buy_date    TEXT NOT NULL,
             note        TEXT DEFAULT '',
             created_at  TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS recurring (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        )""",
+        """CREATE TABLE IF NOT EXISTS recurring (
+            id           SERIAL PRIMARY KEY,
             user_id      INTEGER NOT NULL DEFAULT 1,
             profile_id   INTEGER NOT NULL DEFAULT 1,
             type         TEXT NOT NULL,
-            amount       REAL NOT NULL,
+            amount       DOUBLE PRECISION NOT NULL,
             category     TEXT NOT NULL,
             description  TEXT DEFAULT '',
             day_of_month INTEGER NOT NULL DEFAULT 1,
             active       INTEGER NOT NULL DEFAULT 1,
             created_at   TEXT NOT NULL
-        );
-        CREATE INDEX IF NOT EXISTS idx_txn_profile_date ON transactions(profile_id, date);
-        """)
-        # Migration: add missing columns to existing databases
-        migrations = [
-            ("users",        "email",      "TEXT NOT NULL DEFAULT ''"),
-            ("transactions", "user_id",    "INTEGER NOT NULL DEFAULT 1"),
-            ("transactions", "profile_id", "INTEGER NOT NULL DEFAULT 1"),
-            ("budgets",      "user_id",    "INTEGER NOT NULL DEFAULT 1"),
-            ("budgets",      "profile_id", "INTEGER NOT NULL DEFAULT 1"),
-            ("cards",        "user_id",    "INTEGER NOT NULL DEFAULT 1"),
-            ("cards",        "profile_id", "INTEGER NOT NULL DEFAULT 1"),
-            ("investments",  "user_id",    "INTEGER NOT NULL DEFAULT 1"),
-            ("investments",  "profile_id", "INTEGER NOT NULL DEFAULT 1"),
-            ("recurring",    "user_id",    "INTEGER NOT NULL DEFAULT 1"),
-            ("recurring",    "profile_id", "INTEGER NOT NULL DEFAULT 1"),
-        ]
-        migrations += [
-            ("users", "email_verified", "INTEGER NOT NULL DEFAULT 0"),
-            ("users", "verify_token",   "TEXT"),
-        ]
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_txn_profile_date ON transactions(profile_id, date)",
+    ]
+    migrations = [
+        ("users",        "email",          "TEXT NOT NULL DEFAULT ''"),
+        ("users",        "email_verified",  "INTEGER NOT NULL DEFAULT 0"),
+        ("users",        "verify_token",    "TEXT"),
+        ("transactions", "user_id",         "INTEGER NOT NULL DEFAULT 1"),
+        ("transactions", "profile_id",      "INTEGER NOT NULL DEFAULT 1"),
+        ("budgets",      "user_id",         "INTEGER NOT NULL DEFAULT 1"),
+        ("budgets",      "profile_id",      "INTEGER NOT NULL DEFAULT 1"),
+        ("cards",        "user_id",         "INTEGER NOT NULL DEFAULT 1"),
+        ("cards",        "profile_id",      "INTEGER NOT NULL DEFAULT 1"),
+        ("investments",  "user_id",         "INTEGER NOT NULL DEFAULT 1"),
+        ("investments",  "profile_id",      "INTEGER NOT NULL DEFAULT 1"),
+        ("recurring",    "user_id",         "INTEGER NOT NULL DEFAULT 1"),
+        ("recurring",    "profile_id",      "INTEGER NOT NULL DEFAULT 1"),
+    ]
+    with pg_connect() as con:
+        for stmt in stmts:
+            con.execute(stmt)
         for table, col, col_def in migrations:
-            try:
-                con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
-                log.info("Migration: added %s.%s", table, col)
-            except sqlite3.OperationalError:
-                pass  # column already exists
-        # Ensure every user has at least a default "Şahıs" profile
+            exists = con.execute(
+                "SELECT 1 FROM information_schema.columns WHERE table_name=%s AND column_name=%s",
+                (table, col)
+            ).fetchone()
+            if not exists:
+                try:
+                    con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
+                    log.info("Migration: added %s.%s", table, col)
+                except Exception as exc:
+                    log.warning("Migration skip %s.%s: %s", table, col, exc)
         users = con.execute("SELECT id FROM users").fetchall()
         for u in users:
-            uid = u[0]
-            has_profile = con.execute("SELECT id FROM profiles WHERE user_id=?", (uid,)).fetchone()
+            uid = u["id"]
+            has_profile = con.execute("SELECT id FROM profiles WHERE user_id=%s", (uid,)).fetchone()
             if not has_profile:
                 con.execute(
-                    "INSERT INTO profiles (user_id,name,type,created_at) VALUES (?,?,?,?)",
+                    "INSERT INTO profiles (user_id,name,type,created_at) VALUES (%s,%s,%s,%s)",
                     (uid, "Şahıs", "sahis", datetime.now().isoformat())
                 )
-        con.commit()
 
 def row_to_dict(r): return dict(r)
 def today_str():    return date.today().isoformat()
@@ -286,11 +340,28 @@ def send_reset_email(to_email, username, token):
     msg.attach(MIMEText(html,  "html",  "utf-8"))
     return _smtp_send(msg)
 
+def _pg_dump_csv():
+    """Export all tables as CSV and return as a combined text string."""
+    tables = ["users","profiles","transactions","budgets","cards","investments","recurring"]
+    out = io.StringIO()
+    with pg_connect() as con:
+        for t in tables:
+            rows = con.execute(f"SELECT * FROM {t}").fetchall()
+            if not rows:
+                continue
+            cols = list(rows[0].keys())
+            out.write(f"-- TABLE: {t} --\n")
+            w = csv.writer(out)
+            w.writerow(cols)
+            for r in rows:
+                w.writerow([r[c] for c in cols])
+            out.write("\n")
+    return out.getvalue()
+
 def send_backup_email(to_email):
-    """Attach the SQLite DB as a .sql dump and email it."""
+    """Attach DB export as CSV and email it."""
     try:
-        with sqlite3.connect(DB) as con:
-            dump = "\n".join(con.iterdump())
+        dump = _pg_dump_csv()
         dump_bytes = dump.encode("utf-8")
     except Exception as exc:
         log.error("Backup dump failed: %s", exc)
@@ -364,8 +435,7 @@ def register():
             return AUTH_HTML_render("register", error)
         try:
             vtok = secrets.token_urlsafe(32)
-            with sqlite3.connect(DB) as con:
-                con.row_factory = sqlite3.Row
+            with pg_connect() as con:
                 cur = con.execute(
                     "INSERT INTO users (username,display_name,password_hash,email,email_verified,verify_token,created_at) VALUES (?,?,?,?,0,?,?)",
                     (username, display or username, generate_password_hash(password), email, vtok, datetime.now().isoformat())
@@ -375,7 +445,7 @@ def register():
                     "INSERT INTO profiles (user_id,name,type,created_at) VALUES (?,?,?,?)",
                     (uid, "Şahıs", "sahis", datetime.now().isoformat())
                 )
-        except sqlite3.IntegrityError:
+        except psycopg2.IntegrityError:
             return AUTH_HTML_render("register", "Bu kullanıcı adı veya email zaten kullanımda")
         send_verify_email(email, display or username, vtok)
         return redirect("/login?verify_sent=1")
@@ -388,8 +458,7 @@ def login():
     if request.method == "POST":
         username = request.form.get("username","").strip().lower()
         password = request.form.get("password","")
-        with sqlite3.connect(DB) as con:
-            con.row_factory = sqlite3.Row
+        with pg_connect() as con:
             row = con.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
         if row and check_password_hash(row["password_hash"], password):
             if not row["email_verified"]:
@@ -397,8 +466,7 @@ def login():
             session["user_id"]  = row["id"]
             session["username"] = row["username"]
             session["display"]  = row["display_name"]
-            with sqlite3.connect(DB) as con2:
-                con2.row_factory = sqlite3.Row
+            with pg_connect() as con2:
                 prof = con2.execute("SELECT * FROM profiles WHERE user_id=? ORDER BY id LIMIT 1",(row["id"],)).fetchone()
                 if prof:
                     session["profile_id"]   = prof["id"]
@@ -419,15 +487,14 @@ def login():
 def forgot_password():
     if request.method == "POST":
         identifier = request.form.get("identifier","").strip().lower()
-        with sqlite3.connect(DB) as con:
-            con.row_factory = sqlite3.Row
+        with pg_connect() as con:
             row = con.execute(
                 "SELECT * FROM users WHERE username=? OR email=?", (identifier, identifier)
             ).fetchone()
         if row:
             token = secrets.token_urlsafe(32)
             expires = (datetime.now() + timedelta(hours=1)).isoformat()
-            with sqlite3.connect(DB) as con:
+            with pg_connect() as con:
                 con.execute(
                     "INSERT INTO password_reset_tokens (user_id,token,expires_at,created_at) VALUES (?,?,?,?)",
                     (row["id"], token, expires, datetime.now().isoformat())
@@ -440,8 +507,7 @@ def forgot_password():
 
 @app.route("/reset-password/<token>", methods=["GET", "POST"])
 def reset_password(token):
-    with sqlite3.connect(DB) as con:
-        con.row_factory = sqlite3.Row
+    with pg_connect() as con:
         tok = con.execute(
             "SELECT * FROM password_reset_tokens WHERE token=? AND used=0", (token,)
         ).fetchone()
@@ -454,7 +520,7 @@ def reset_password(token):
             return AUTH_HTML_render("reset", "Şifre en az 6 karakter olmalı", token=token)
         if password != confirm:
             return AUTH_HTML_render("reset", "Şifreler eşleşmiyor", token=token)
-        with sqlite3.connect(DB) as con:
+        with pg_connect() as con:
             con.execute("UPDATE users SET password_hash=? WHERE id=?",
                         (generate_password_hash(password), tok["user_id"]))
             con.execute("UPDATE password_reset_tokens SET used=1 WHERE token=?", (token,))
@@ -463,12 +529,11 @@ def reset_password(token):
 
 @app.route("/verify-email/<token>")
 def verify_email(token):
-    with sqlite3.connect(DB) as con:
-        con.row_factory = sqlite3.Row
+    with pg_connect() as con:
         row = con.execute("SELECT * FROM users WHERE verify_token=? AND email_verified=0", (token,)).fetchone()
     if not row:
         return AUTH_HTML_render("reset_invalid", "Bu doğrulama linki geçersiz veya zaten kullanılmış.")
-    with sqlite3.connect(DB) as con:
+    with pg_connect() as con:
         con.execute("UPDATE users SET email_verified=1, verify_token=NULL WHERE id=?", (row["id"],))
     return redirect("/login?verified=1")
 
@@ -476,12 +541,11 @@ def verify_email(token):
 def resend_verify():
     if request.method == "POST":
         email = request.form.get("email","").strip().lower()
-        with sqlite3.connect(DB) as con:
-            con.row_factory = sqlite3.Row
+        with pg_connect() as con:
             row = con.execute("SELECT * FROM users WHERE email=? AND email_verified=0", (email,)).fetchone()
         if row:
             vtok = secrets.token_urlsafe(32)
-            with sqlite3.connect(DB) as con:
+            with pg_connect() as con:
                 con.execute("UPDATE users SET verify_token=? WHERE id=?", (vtok, row["id"]))
             send_verify_email(email, row["display_name"] or row["username"], vtok)
         return AUTH_HTML_render("forgot_sent", "Eğer bu email doğrulanmamış bir hesaba aitse, yeni doğrulama linki gönderildi.")
@@ -508,9 +572,9 @@ def get_pid():
     pid = session.get("profile_id")
     if not pid:
         uid = session.get("user_id")
-        with sqlite3.connect(DB) as con:
+        with pg_connect() as con:
             row = con.execute("SELECT id FROM profiles WHERE user_id=? ORDER BY id LIMIT 1",(uid,)).fetchone()
-            if row: pid = row[0]; session["profile_id"] = pid
+            if row: pid = row["id"]; session["profile_id"] = pid
     return pid
 
 # ── PROFILES API ──────────────────────────────────────────────────────────────
@@ -555,7 +619,7 @@ def switch_profile(pid):
 def del_profile(pid):
     uid = session["user_id"]
     db  = get_db()
-    count = db.execute("SELECT COUNT(*) FROM profiles WHERE user_id=?",(uid,)).fetchone()[0]
+    count = db.execute("SELECT COUNT(*) AS n FROM profiles WHERE user_id=?",(uid,)).fetchone()["n"]
     if count <= 1: return jsonify({"ok":False,"error":"En az bir profil olmalı"}),400
     db.execute("DELETE FROM profiles WHERE id=? AND user_id=?",(pid,uid))
     db.commit()
@@ -1159,10 +1223,9 @@ def apply_recurring():
 def backup_download():
     """Download the full DB as a SQL dump."""
     try:
-        with sqlite3.connect(DB) as con:
-            dump = "\n".join(con.iterdump())
+        dump = _pg_dump_csv()
         now_str  = datetime.now().strftime("%Y-%m-%d_%H-%M")
-        filename = f"kirpi_backup_{now_str}.sql"
+        filename = f"kirpi_backup_{now_str}.csv"
         return dump, 200, {
             "Content-Type":        "application/octet-stream",
             "Content-Disposition": f'attachment; filename="{filename}"',
@@ -3466,9 +3529,9 @@ def admin_required(f):
         if ADMIN_USER and session.get("username") != ADMIN_USER:
             return "Yetkisiz erişim", 403
         if not ADMIN_USER:
-            with sqlite3.connect(DB) as con:
+            with pg_connect() as con:
                 first = con.execute("SELECT username FROM users ORDER BY id LIMIT 1").fetchone()
-                if first and session.get("username") != first[0]:
+                if first and session.get("username") != first["username"]:
                     return "Yetkisiz erişim", 403
         return f(*args, **kwargs)
     return decorated
@@ -3477,17 +3540,17 @@ def admin_required(f):
 @admin_required
 def admin_panel():
     db = get_db()
-    total_users    = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    total_profiles = db.execute("SELECT COUNT(*) FROM profiles").fetchone()[0]
-    sahis_count    = db.execute("SELECT COUNT(*) FROM profiles WHERE type='sahis'").fetchone()[0]
-    sirket_count   = db.execute("SELECT COUNT(*) FROM profiles WHERE type='sirket'").fetchone()[0]
-    total_txn      = db.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
-    total_cards    = db.execute("SELECT COUNT(*) FROM cards").fetchone()[0]
-    total_invest   = db.execute("SELECT COUNT(*) FROM investments").fetchone()[0]
+    total_users    = db.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"]
+    total_profiles = db.execute("SELECT COUNT(*) AS n FROM profiles").fetchone()["n"]
+    sahis_count    = db.execute("SELECT COUNT(*) AS n FROM profiles WHERE type='sahis'").fetchone()["n"]
+    sirket_count   = db.execute("SELECT COUNT(*) AS n FROM profiles WHERE type='sirket'").fetchone()["n"]
+    total_txn      = db.execute("SELECT COUNT(*) AS n FROM transactions").fetchone()["n"]
+    total_cards    = db.execute("SELECT COUNT(*) AS n FROM cards").fetchone()["n"]
+    total_invest   = db.execute("SELECT COUNT(*) AS n FROM investments").fetchone()["n"]
     recent_users   = db.execute("SELECT username,display_name,email,created_at FROM users ORDER BY id DESC LIMIT 20").fetchall()
-    txn_by_day     = db.execute("SELECT DATE(created_at) as d, COUNT(*) as c FROM transactions GROUP BY d ORDER BY d DESC LIMIT 14").fetchall()
-    new_users_week = db.execute("SELECT COUNT(*) FROM users WHERE created_at >= DATE('now','-7 days')").fetchone()[0]
-    new_users_month= db.execute("SELECT COUNT(*) FROM users WHERE created_at >= DATE('now','-30 days')").fetchone()[0]
+    txn_by_day     = db.execute("SELECT LEFT(created_at, 10) as d, COUNT(*) as c FROM transactions GROUP BY d ORDER BY d DESC LIMIT 14").fetchall()
+    new_users_week = db.execute("SELECT COUNT(*) AS n FROM users WHERE created_at >= (NOW() - INTERVAL '7 days')::TEXT").fetchone()["n"]
+    new_users_month= db.execute("SELECT COUNT(*) AS n FROM users WHERE created_at >= (NOW() - INTERVAL '30 days')::TEXT").fetchone()["n"]
 
     rows_html = ""
     for u in recent_users:
