@@ -465,7 +465,7 @@ def login():
             row = con.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
         if row and check_password_hash(row["password_hash"], password):
             if not row["email_verified"]:
-                return AUTH_HTML_render("login", "⚠️ Email adresinizi henüz doğrulamadınız. Kayıt emailinizdeki linke tıklayın veya <a href='/resend-verify' style='color:#818cf8'>yeni doğrulama maili al</a>.")
+                return AUTH_HTML_render("login", "✉️ Email adresiniz doğrulanmamış. Şifreyi biliyorsanız <a href='/forgot-password' style='color:#818cf8'>şifre sıfırla</a> yaparak hem şifreyi sıfırlayın hem de emailinizi doğrulatın. Ya da <a href='/resend-verify' style='color:#818cf8'>yeni doğrulama maili al</a>.")
             session["user_id"]  = row["id"]
             session["username"] = row["username"]
             session["display"]  = row["display_name"]
@@ -524,8 +524,10 @@ def reset_password(token):
         if password != confirm:
             return AUTH_HTML_render("reset", "Şifreler eşleşmiyor", token=token)
         with pg_connect() as con:
-            con.execute("UPDATE users SET password_hash=? WHERE id=?",
-                        (generate_password_hash(password), tok["user_id"]))
+            con.execute(
+                "UPDATE users SET password_hash=?, email_verified=1, verify_token=NULL WHERE id=?",
+                (generate_password_hash(password), tok["user_id"])
+            )
             con.execute("UPDATE password_reset_tokens SET used=1 WHERE token=?", (token,))
         return redirect("/login?reset=1")
     return AUTH_HTML_render("reset", token=token)
