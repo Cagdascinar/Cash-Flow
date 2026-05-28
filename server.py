@@ -1,4 +1,4 @@
-import sqlite3, json, os, csv, io, re
+import sqlite3, json, os, csv, io, re, requests
 from datetime import datetime, date
 from flask import Flask, request, jsonify, g
 
@@ -39,6 +39,29 @@ def init_db():
             id       INTEGER PRIMARY KEY AUTOINCREMENT,
             category TEXT UNIQUE NOT NULL,
             limit_   REAL NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS cards (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            bank_name       TEXT NOT NULL,
+            card_name       TEXT NOT NULL DEFAULT '',
+            owner           TEXT NOT NULL DEFAULT '',
+            limit_          REAL NOT NULL DEFAULT 0,
+            used_           REAL NOT NULL DEFAULT 0,
+            due_day         INTEGER NOT NULL DEFAULT 1,
+            min_pct         REAL NOT NULL DEFAULT 25,
+            statement_day   INTEGER NOT NULL DEFAULT 20,
+            created_at      TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS investments (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT NOT NULL,
+            itype       TEXT NOT NULL,
+            symbol      TEXT NOT NULL DEFAULT '',
+            quantity    REAL NOT NULL DEFAULT 0,
+            buy_price   REAL NOT NULL DEFAULT 0,
+            buy_date    TEXT NOT NULL,
+            note        TEXT DEFAULT '',
+            created_at  TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS recurring (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -321,6 +344,208 @@ def import_preview():
         else: skipped+=1; continue
         parsed.append({"date":dt,"description":desc,"amount":round(amt,2),"type":ttype,"category":_guess_cat(desc,ttype)})
     return jsonify({"ok":True,"rows":parsed,"skipped":skipped,"headers":header})
+
+# ── CARDS ─────────────────────────────────────────────────────────────────────
+
+@app.route("/api/cards", methods=["GET"])
+def list_cards():
+    return jsonify([row_to_dict(r) for r in get_db().execute("SELECT * FROM cards ORDER BY bank_name").fetchall()])
+
+@app.route("/api/cards", methods=["POST"])
+def add_card():
+    d = request.get_json(force=True)
+    bank = d.get("bank_name","").strip(); card = d.get("card_name","").strip()
+    owner = d.get("owner","").strip()
+    limit = float(d.get("limit_",0)); used = float(d.get("used_",0))
+    due_day = int(d.get("due_day",1)); min_pct = float(d.get("min_pct",25))
+    stmt_day = int(d.get("statement_day",20))
+    if not bank or limit <= 0: return jsonify({"ok":False}), 400
+    db = get_db()
+    cur = db.execute("INSERT INTO cards (bank_name,card_name,owner,limit_,used_,due_day,min_pct,statement_day,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                     (bank,card,owner,limit,used,due_day,min_pct,stmt_day,datetime.now().isoformat()))
+    db.commit(); return jsonify({"ok":True,"id":cur.lastrowid})
+
+@app.route("/api/cards/<int:cid>", methods=["PUT"])
+def update_card(cid):
+    d = request.get_json(force=True); fields=[]; params=[]
+    for col in ("bank_name","card_name","limit_","used_","due_day","min_pct","statement_day"):
+        if col in d:
+            fields.append(f"{col}=?")
+            params.append(float(d[col]) if col in ("limit_","used_","min_pct") else int(d[col]) if col in ("due_day","statement_day") else d[col])
+    if not fields: return jsonify({"ok":False}),400
+    params.append(cid)
+    get_db().execute(f"UPDATE cards SET {','.join(fields)} WHERE id=?",params); get_db().commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/cards/<int:cid>", methods=["DELETE"])
+def del_card(cid):
+    get_db().execute("DELETE FROM cards WHERE id=?",(cid,)); get_db().commit()
+    return jsonify({"ok":True})
+
+# ── RATES & INVESTMENTS ───────────────────────────────────────────────────────
+
+import threading, time as _time
+_rates_cache = {"data": None, "ts": 0}
+_rates_lock  = threading.Lock()
+
+def _fetch_rates():
+    """Fetch USD/TRY, EUR/TRY, Gold/g TRY from free APIs."""
+    try:
+        # Exchange rates: 1 TRY = X of each
+        r = requests.get("https://open.er-api.com/v6/latest/TRY", timeout=8).json()
+        rates = r.get("rates", {})
+        usd_try = round(1 / rates["USD"], 4) if rates.get("USD") else None
+        eur_try = round(1 / rates["EUR"], 4) if rates.get("EUR") else None
+        gbp_try = round(1 / rates["GBP"], 4) if rates.get("GBP") else None
+    except Exception:
+        usd_try = eur_try = gbp_try = None
+
+    gold_try = None
+    try:
+        # Gold spot in USD/oz → convert to TRY/gram
+        g = requests.get("https://api.metals.live/v1/spot/gold", timeout=8).json()
+        gold_usd_oz = float(g[0]["price"]) if isinstance(g, list) and g else None
+        if gold_usd_oz and usd_try:
+            gold_try = round(gold_usd_oz / 31.1035 * usd_try, 2)
+    except Exception:
+        pass
+
+    return {
+        "usd_try": usd_try,
+        "eur_try": eur_try,
+        "gbp_try": gbp_try,
+        "gold_try": gold_try,   # TRY per gram
+        "updated": datetime.now().strftime("%H:%M")
+    }
+
+def get_rates():
+    with _rates_lock:
+        if _time.time() - _rates_cache["ts"] > 300 or not _rates_cache["data"]:
+            _rates_cache["data"] = _fetch_rates()
+            _rates_cache["ts"]   = _time.time()
+        return _rates_cache["data"]
+
+@app.route("/api/rates")
+def api_rates():
+    return jsonify(get_rates())
+
+@app.route("/api/investments", methods=["GET"])
+def list_investments():
+    rows = get_db().execute("SELECT * FROM investments ORDER BY buy_date DESC").fetchall()
+    return jsonify([row_to_dict(r) for r in rows])
+
+@app.route("/api/investments", methods=["POST"])
+def add_investment():
+    d = request.get_json(force=True)
+    name     = d.get("name","").strip()
+    itype    = d.get("itype","")       # doviz | altin | fon | hisse
+    symbol   = d.get("symbol","").strip().upper()
+    quantity = float(d.get("quantity", 0))
+    buy_price= float(d.get("buy_price", 0))
+    buy_date = d.get("buy_date", today_str())
+    note     = d.get("note","")
+    if not name or itype not in ("doviz","altin","fon","hisse") or quantity <= 0 or buy_price <= 0:
+        return jsonify({"ok": False, "error": "Geçersiz veri"}), 400
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO investments (name,itype,symbol,quantity,buy_price,buy_date,note,created_at) VALUES (?,?,?,?,?,?,?,?)",
+        (name, itype, symbol, quantity, buy_price, buy_date, note, datetime.now().isoformat()))
+    db.commit()
+    return jsonify({"ok": True, "id": cur.lastrowid})
+
+@app.route("/api/investments/<int:iid>", methods=["DELETE"])
+def del_investment(iid):
+    get_db().execute("DELETE FROM investments WHERE id=?", (iid,)); get_db().commit()
+    return jsonify({"ok": True})
+
+@app.route("/api/investments/value", methods=["GET"])
+def investment_values():
+    """Return all investments with current TRY value and profit/loss."""
+    rows  = get_db().execute("SELECT * FROM investments").fetchall()
+    rates = get_rates()
+    result = []
+    for row in rows:
+        r = row_to_dict(row)
+        cur_price = None
+        cur_try   = None
+
+        if r["itype"] == "doviz":
+            sym = r["symbol"].upper()
+            key = f"{sym.lower()}_try"
+            rate = rates.get(key)
+            if rate:
+                cur_price = rate
+                cur_try   = round(r["quantity"] * rate, 2)
+
+        elif r["itype"] == "altin":
+            if rates.get("gold_try"):
+                cur_price = rates["gold_try"]
+                cur_try   = round(r["quantity"] * rates["gold_try"], 2)
+
+        elif r["itype"] in ("fon", "hisse"):
+            # manual price: user must provide current_price via query
+            cp = request.args.get(f"price_{r['id']}", type=float)
+            if cp:
+                cur_price = cp
+                cur_try   = round(r["quantity"] * cp, 2)
+
+        buy_try    = round(r["quantity"] * r["buy_price"], 2)
+        profit_try = round(cur_try - buy_try, 2) if cur_try is not None else None
+        profit_pct = round((cur_try - buy_try) / buy_try * 100, 2) if cur_try and buy_try else None
+
+        r.update({
+            "cur_price":  cur_price,
+            "cur_try":    cur_try,
+            "buy_try":    buy_try,
+            "profit_try": profit_try,
+            "profit_pct": profit_pct,
+        })
+        result.append(r)
+    return jsonify(result)
+
+@app.route("/api/investments/<int:iid>/book-income", methods=["POST"])
+def book_investment_income(iid):
+    """Add investment profit as a gelir transaction for this month."""
+    d = request.get_json(force=True)
+    amount = float(d.get("amount", 0))
+    cat    = d.get("category", "Yatırım / Temettü")
+    desc   = d.get("description", "Yatırım Getirisi")
+    dt     = d.get("date", today_str())
+    if amount <= 0: return jsonify({"ok": False}), 400
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO transactions (type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?)",
+        ("gelir", amount, cat, desc, dt, datetime.now().isoformat()))
+    db.commit()
+    return jsonify({"ok": True, "id": cur.lastrowid})
+
+@app.route("/api/tefas/<fon_kod>")
+def tefas_fon(fon_kod):
+    """Fetch latest NAV for a TEFAS fund code."""
+    try:
+        today_s = date.today().strftime("%d.%m.%Y")
+        resp = requests.post(
+            "https://www.tefas.gov.tr/api/DB/BindHistoryInfo",
+            data={"fontip":"YAT","sfonkod":fon_kod.upper(),"bastarih":today_s,"bittarih":today_s},
+            headers={"Referer":"https://www.tefas.gov.tr/"},
+            timeout=8)
+        data = resp.json().get("data", [])
+        if not data:
+            # try yesterday
+            from datetime import timedelta
+            yday = (date.today() - timedelta(days=1)).strftime("%d.%m.%Y")
+            resp = requests.post(
+                "https://www.tefas.gov.tr/api/DB/BindHistoryInfo",
+                data={"fontip":"YAT","sfonkod":fon_kod.upper(),"bastarih":yday,"bittarih":yday},
+                headers={"Referer":"https://www.tefas.gov.tr/"},
+                timeout=8)
+            data = resp.json().get("data", [])
+        if data:
+            row = data[0]
+            return jsonify({"ok":True,"fiyat":float(row.get("FIYAT",0)),"tarih":row.get("TARIH",""),"fon":fon_kod.upper()})
+        return jsonify({"ok":False,"error":"Fon bulunamadı"})
+    except Exception as e:
+        return jsonify({"ok":False,"error":str(e)})
 
 # ── RECURRING ────────────────────────────────────────────────────────────────
 
@@ -660,8 +885,14 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <div class="nl" data-page="import" onclick="goPage('import',this)">
       <span class="ico">📂</span>İçe Aktar
     </div>
+    <div class="nl" data-page="invest" onclick="goPage('invest',this)">
+      <span class="ico">📈</span>Yatırım
+    </div>
     <div class="nl" data-page="recurring" onclick="goPage('recurring',this)">
       <span class="ico">🔁</span>Düzenli
+    </div>
+    <div class="nl" data-page="cards" onclick="goPage('cards',this)">
+      <span class="ico">💳</span>Kartlar
     </div>
     <div class="nl" data-page="budget" onclick="goPage('budget',this)">
       <span class="ico">🎯</span>Bütçe
@@ -680,10 +911,23 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       <div class="page-title">Dashboard</div>
       <div class="page-sub" id="db-sub">Aylık özet</div>
     </div>
-    <div class="mnav">
-      <button onclick="changeMonth(-1)">‹</button>
-      <div class="ml" id="mlabel"></div>
-      <button onclick="changeMonth(1)">›</button>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="display:flex;background:var(--bg3);border:1px solid var(--border2);border-radius:9px;overflow:hidden">
+        <button id="view-month-btn" onclick="setDbView('month')"
+          style="padding:7px 16px;border:none;font-size:.82rem;font-weight:600;cursor:pointer;background:var(--b);color:#fff;transition:.15s">Aylık</button>
+        <button id="view-year-btn" onclick="setDbView('year')"
+          style="padding:7px 16px;border:none;font-size:.82rem;font-weight:600;cursor:pointer;background:transparent;color:var(--txt2);transition:.15s">Yıllık</button>
+      </div>
+      <div class="mnav" id="month-nav">
+        <button onclick="changeMonth(-1)">‹</button>
+        <div class="ml" id="mlabel"></div>
+        <button onclick="changeMonth(1)">›</button>
+      </div>
+      <div class="mnav" id="year-nav" style="display:none">
+        <button onclick="changeYear(-1)">‹</button>
+        <div class="ml" id="ylabel"></div>
+        <button onclick="changeYear(1)">›</button>
+      </div>
     </div>
   </div>
 
@@ -853,6 +1097,137 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   </div>
 </div>
 
+<!-- INVESTMENT -->
+<div class="page" id="page-invest">
+  <div class="page-title">Yatırım Takibi</div>
+  <div class="page-sub">Döviz · Altın · Fon — canlı kur, gerçek zamanlı kâr/zarar ve gelir yazma</div>
+
+  <!-- LIVE RATES -->
+  <div class="grid4" style="margin-bottom:20px">
+    <div class="stat" style="background:linear-gradient(135deg,#1e3a5f,#162a47);border-color:#3b82f633">
+      <div class="glow" style="background:#3b82f6"></div>
+      <div class="lbl">🇺🇸 USD/TRY</div>
+      <div class="val" id="rate-usd">—</div>
+      <div class="sub" id="rate-updated"></div>
+    </div>
+    <div class="stat" style="background:linear-gradient(135deg,#1a2f1a,#122012);border-color:#22c55e33">
+      <div class="glow" style="background:#22c55e"></div>
+      <div class="lbl">🇪🇺 EUR/TRY</div>
+      <div class="val" id="rate-eur">—</div>
+      <div class="sub"></div>
+    </div>
+    <div class="stat" style="background:linear-gradient(135deg,#2a2010,#1c1508);border-color:#f59e0b33">
+      <div class="glow" style="background:#f59e0b"></div>
+      <div class="lbl">🇬🇧 GBP/TRY</div>
+      <div class="val" id="rate-gbp">—</div>
+      <div class="sub"></div>
+    </div>
+    <div class="stat" style="background:linear-gradient(135deg,#271a08,#1c1205);border-color:#f59e0b55">
+      <div class="glow" style="background:#f59e0b"></div>
+      <div class="lbl">🥇 Altın (g/TRY)</div>
+      <div class="val" id="rate-gold">—</div>
+      <div class="sub"></div>
+    </div>
+  </div>
+
+  <!-- CALCULATOR -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="section-title">Hesaplayıcı — X TL yatırsaydım ne olurdu?</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+      <div style="flex:1;min-width:120px">
+        <label>Yatırdığım TL</label>
+        <input class="f-input" type="number" id="calc-tl" placeholder="50000" oninput="calcInvest()">
+      </div>
+      <div style="flex:1;min-width:120px">
+        <label>O gündeki kur</label>
+        <input class="f-input" type="number" id="calc-buy" placeholder="32.50" step="0.01" oninput="calcInvest()">
+      </div>
+      <div style="flex:1;min-width:140px">
+        <label>Araç</label>
+        <select class="f-input" id="calc-type" onchange="calcInvest()">
+          <option value="usd">Dolar (USD)</option>
+          <option value="eur">Euro (EUR)</option>
+          <option value="gbp">Sterlin (GBP)</option>
+          <option value="gold">Altın (gram)</option>
+        </select>
+      </div>
+    </div>
+    <div id="calc-result" style="margin-top:16px;display:none">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:4px">
+        <div style="background:var(--bg3);padding:14px;border-radius:10px;border:1px solid var(--border2);text-align:center">
+          <div style="font-size:.72rem;color:var(--txt2);margin-bottom:4px">Aldığın miktar</div>
+          <div style="font-weight:700" id="calc-qty">—</div>
+        </div>
+        <div style="background:var(--bg3);padding:14px;border-radius:10px;border:1px solid var(--border2);text-align:center">
+          <div style="font-size:.72rem;color:var(--txt2);margin-bottom:4px">Şu anki değer</div>
+          <div style="font-weight:700" id="calc-now">—</div>
+        </div>
+        <div style="padding:14px;border-radius:10px;border:1px solid;text-align:center" id="calc-profit-box">
+          <div style="font-size:.72rem;color:var(--txt2);margin-bottom:4px">Kâr / Zarar</div>
+          <div style="font-weight:700" id="calc-profit">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <!-- ADD INVESTMENT FORM -->
+    <div class="card">
+      <div class="section-title">Portföye Ekle</div>
+      <div style="margin-bottom:12px">
+        <label>Yatırım Türü</label>
+        <select class="f-input" id="inv-type" onchange="updateInvForm()">
+          <option value="doviz">Döviz (USD/EUR/GBP)</option>
+          <option value="altin">Altın</option>
+          <option value="fon">Yatırım Fonu (TEFAS)</option>
+          <option value="hisse">Hisse / Diğer</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div><label id="inv-name-lbl">İsim</label><input class="f-input" type="text" id="inv-name" placeholder="ör. Dolar Birikimim"></div>
+        <div><label id="inv-sym-lbl">Sembol / Fon Kodu</label><input class="f-input" type="text" id="inv-sym" placeholder="USD"></div>
+      </div>
+      <div class="form-row">
+        <div><label id="inv-qty-lbl">Miktar</label><input class="f-input" type="number" id="inv-qty" placeholder="1000" step="0.001"></div>
+        <div><label id="inv-price-lbl">Alış Fiyatı (TRY)</label><input class="f-input" type="number" id="inv-price" placeholder="32.50" step="0.01"></div>
+      </div>
+      <div class="form-row">
+        <div><label>Alış Tarihi</label><input class="f-input" type="date" id="inv-date"></div>
+        <div><label>Not (opsiyonel)</label><input class="f-input" type="text" id="inv-note" placeholder="ör. Acil fon"></div>
+      </div>
+      <!-- Fon lookup -->
+      <div id="fon-lookup" style="display:none;margin-bottom:12px">
+        <div style="display:flex;gap:8px">
+          <input class="f-input" type="text" id="fon-kod" placeholder="Fon kodu ör. MAC, TI2, AFT" style="flex:1;text-transform:uppercase">
+          <button class="btn btn-ghost" onclick="lookupFon()">Sorgula</button>
+        </div>
+        <div id="fon-result" style="font-size:.82rem;margin-top:8px;color:var(--txt2)"></div>
+      </div>
+      <button class="btn btn-primary" style="width:100%;padding:12px" onclick="addInvestment()">Portföye Ekle</button>
+    </div>
+
+    <!-- PORTFOLIO -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div class="section-title" style="margin:0">Portföyüm</div>
+        <button class="btn btn-ghost" style="font-size:.75rem;padding:6px 12px" onclick="loadInvestments()">↻ Güncelle</button>
+      </div>
+      <div id="inv-list"><div class="empty-state"><div class="icon">📈</div>Henüz yatırım yok</div></div>
+      <div id="inv-total" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:none">
+        <div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:6px">
+          <span style="color:var(--txt2)">Toplam Maliyet</span><span id="inv-total-cost" style="font-weight:600"></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:6px">
+          <span style="color:var(--txt2)">Güncel Değer</span><span id="inv-total-val" style="font-weight:600"></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.9rem">
+          <span style="color:var(--txt2)">Toplam K/Z</span><span id="inv-total-pnl" style="font-weight:800"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- RECURRING -->
 <div class="page" id="page-recurring">
   <div class="page-title">Düzenli İşlemler</div>
@@ -935,6 +1310,87 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   </div>
 </div>
 
+<!-- CARDS -->
+<div class="page" id="page-cards">
+  <div class="page-title">Kredi Kartları</div>
+  <div class="page-sub">Limit, kullanım, son ödeme tarihi ve asgari ödeme takibi</div>
+
+  <div class="grid2">
+    <!-- ADD CARD FORM -->
+    <div class="card">
+      <div class="section-title">Kart Ekle / Güncelle</div>
+      <div style="margin-bottom:12px"><label>Kart Sahibi</label><input class="f-input" type="text" id="card-owner" placeholder="ör. Çağdaş, Eşim, Annem"></div>
+      <div class="form-row">
+        <div>
+          <label>Banka Adı</label>
+          <select class="f-input" id="card-bank">
+            <option>Garanti BBVA</option><option>İş Bankası</option><option>Akbank</option>
+            <option>Yapı Kredi</option><option>Ziraat Bankası</option><option>Halkbank</option>
+            <option>Vakıfbank</option><option>QNB Finansbank</option><option>Denizbank</option>
+            <option>ING</option><option>TEB</option><option>HSBC</option><option>Diğer</option>
+          </select>
+        </div>
+        <div><label>Kart Adı / Türü</label><input class="f-input" type="text" id="card-name" placeholder="ör. Miles&Smiles, Bonus"></div>
+      </div>
+      <div class="form-row">
+        <div><label>Toplam Limit (₺)</label><input class="f-input" type="number" id="card-limit" placeholder="50000"></div>
+        <div><label>Mevcut Borç (₺)</label><input class="f-input" type="number" id="card-used" placeholder="12000"></div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>Son Ödeme Günü</label>
+          <select class="f-input" id="card-due">
+            <option value="1">1. günü</option><option value="5">5. günü</option>
+            <option value="7">7. günü</option><option value="10">10. günü</option>
+            <option value="12">12. günü</option><option value="14">14. günü</option>
+            <option value="15">15. günü</option><option value="18">18. günü</option>
+            <option value="20">20. günü</option><option value="22">22. günü</option>
+            <option value="25">25. günü</option><option value="28">28. günü</option>
+          </select>
+        </div>
+        <div>
+          <label>Ekstre Günü</label>
+          <select class="f-input" id="card-stmt">
+            <option value="1">1. günü</option><option value="5">5. günü</option>
+            <option value="8">8. günü</option><option value="10">10. günü</option>
+            <option value="12">12. günü</option><option value="15">15. günü</option>
+            <option value="18">18. günü</option><option value="20" selected>20. günü</option>
+            <option value="22">22. günü</option><option value="25">25. günü</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-bottom:16px">
+        <label>Asgari Ödeme Oranı</label>
+        <select class="f-input" id="card-minpct">
+          <option value="20">%20</option>
+          <option value="25" selected>%25</option>
+          <option value="30">%30</option>
+          <option value="40">%40</option>
+          <option value="100">Tamamı (%100)</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" style="width:100%;padding:12px" onclick="addCard()">Kartı Kaydet</button>
+    </div>
+
+    <!-- CARDS LIST -->
+    <div class="card">
+      <div class="section-title">Kartlarım</div>
+      <div id="card-list"><div class="empty-state"><div class="icon">💳</div>Henüz kart eklenmedi</div></div>
+      <div id="card-totals" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:5px">
+          <span style="color:var(--txt2)">Toplam Limit</span><span id="ct-limit" style="font-weight:600"></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:5px">
+          <span style="color:var(--txt2)">Toplam Borç</span><span id="ct-used" style="font-weight:600;color:var(--r)"></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.9rem">
+          <span style="color:var(--txt2)">Kullanılabilir</span><span id="ct-avail" style="font-weight:800;color:var(--g)"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- BUDGET -->
 <div class="page" id="page-budget">
   <div class="page-title">Bütçe Hedefleri</div>
@@ -995,6 +1451,8 @@ function goPage(id, el){
   if(id==='ledger') renderLedger();
   if(id==='dashboard') loadDashboard();
   if(id==='recurring') initRecurringPage();
+  if(id==='invest') initInvestPage();
+  if(id==='cards') loadCards();
 }
 
 // ── MONTH NAV ─────────────────────────────────────────────────────────────────
@@ -1335,6 +1793,213 @@ function exportCsv(){
   a.download='cashflow.csv'; a.click();
 }
 
+// ── DASHBOARD YEARLY VIEW ────────────────────────────────────────────────────
+var dbView = 'month';  // 'month' | 'year'
+
+function setDbView(v){
+  dbView = v;
+  document.getElementById('view-month-btn').style.background = v==='month' ? 'var(--b)' : 'transparent';
+  document.getElementById('view-month-btn').style.color      = v==='month' ? '#fff' : 'var(--txt2)';
+  document.getElementById('view-year-btn').style.background  = v==='year'  ? 'var(--b)' : 'transparent';
+  document.getElementById('view-year-btn').style.color       = v==='year'  ? '#fff' : 'var(--txt2)';
+  document.getElementById('month-nav').style.display = v==='month' ? '' : 'none';
+  document.getElementById('year-nav').style.display  = v==='year'  ? '' : 'none';
+  loadDashboard();
+}
+function changeYear(d){ curYear+=d; document.getElementById('ylabel').textContent=curYear+' Yılı'; loadDashboard(); }
+
+var _origLoadDashboard = loadDashboard;
+loadDashboard = function(){
+  if(dbView==='year'){
+    // Fetch all 12 months aggregated
+    xhr('/api/summary?year='+curYear,null,function(d){
+      summaryData=d;
+      // For yearly: sum all months
+      var totalG=0,totalE=0;
+      var allGcats={},allEcats={};
+      d.bar.forEach(function(m){totalG+=m.gelir;totalE+=m.gider});
+      // gelir/gider cats already returned for year if no month filter
+      renderStats({gelir:totalG,gider:totalE,net:totalG-totalE,balance:d.balance,
+                   gelir_cats:d.gelir_cats,gider_cats:d.gider_cats,budgets:d.budgets});
+      drawBar(d.bar);
+      drawDonut(d.gider_cats);
+      renderBudgetPage(d.gider_cats,d.budgets);
+      document.getElementById('db-sub').textContent=curYear+' Yılı özeti';
+    });
+    xhr('/api/motivation',null,renderMotivation);
+    return;
+  }
+  xhr('/api/summary?year='+curYear+'&month='+curMonth,null,function(d){
+    summaryData=d;
+    renderStats(d);
+    drawBar(d.bar);
+    drawDonut(d.gider_cats);
+    renderBudgetPage(d.gider_cats,d.budgets);
+  });
+  xhr('/api/motivation',null,renderMotivation);
+};
+
+// ── INVESTMENT ────────────────────────────────────────────────────────────────
+var liveRates = {};
+
+function initInvestPage(){
+  document.getElementById('inv-date').value = new Date().toISOString().split('T')[0];
+  loadRates();
+  loadInvestments();
+  updateInvForm();
+  setInterval(loadRates, 60000);
+}
+
+function loadRates(){
+  xhr('/api/rates',null,function(d){
+    liveRates = d;
+    var fmtR = function(v){ return v ? '₺'+Number(v).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—' };
+    document.getElementById('rate-usd').textContent  = fmtR(d.usd_try);
+    document.getElementById('rate-eur').textContent  = fmtR(d.eur_try);
+    document.getElementById('rate-gbp').textContent  = fmtR(d.gbp_try);
+    document.getElementById('rate-gold').textContent = fmtR(d.gold_try);
+    document.getElementById('rate-updated').textContent = d.updated ? 'Son: '+d.updated : '';
+    calcInvest();
+  });
+}
+
+function calcInvest(){
+  var tl   = parseFloat(document.getElementById('calc-tl').value);
+  var buy  = parseFloat(document.getElementById('calc-buy').value);
+  var type = document.getElementById('calc-type').value;
+  if(!tl || !buy || tl<=0 || buy<=0){ document.getElementById('calc-result').style.display='none'; return; }
+  var curRate = type==='usd' ? liveRates.usd_try :
+                type==='eur' ? liveRates.eur_try :
+                type==='gbp' ? liveRates.gbp_try :
+                               liveRates.gold_try;
+  if(!curRate){ document.getElementById('calc-result').style.display='none'; return; }
+  var qty     = tl / buy;
+  var curVal  = qty * curRate;
+  var profit  = curVal - tl;
+  var pct     = profit / tl * 100;
+  var unit    = type==='gold' ? 'gram' : type.toUpperCase();
+  document.getElementById('calc-qty').textContent    = qty.toFixed(4) + ' ' + unit;
+  document.getElementById('calc-now').textContent    = fmt(curVal);
+  document.getElementById('calc-profit').textContent = (profit>=0?'+':'')+fmt(profit)+' (%'+pct.toFixed(1)+')';
+  var box = document.getElementById('calc-profit-box');
+  box.style.borderColor = profit>=0 ? 'var(--g)' : 'var(--r)';
+  box.style.background  = profit>=0 ? '#22c55e10' : '#ef444410';
+  document.getElementById('calc-profit').style.color = profit>=0 ? 'var(--g)' : 'var(--r)';
+  document.getElementById('calc-result').style.display = 'block';
+}
+
+function updateInvForm(){
+  var t = document.getElementById('inv-type').value;
+  var symLbl   = document.getElementById('inv-sym-lbl');
+  var symInp   = document.getElementById('inv-sym');
+  var qtyLbl   = document.getElementById('inv-qty-lbl');
+  var priceLbl = document.getElementById('inv-price-lbl');
+  var fonDiv   = document.getElementById('fon-lookup');
+  if(t==='doviz'){ symLbl.textContent='Sembol'; symInp.placeholder='USD, EUR, GBP'; qtyLbl.textContent='Miktar (adet)'; priceLbl.textContent='Alış Kuru (TRY)'; fonDiv.style.display='none'; }
+  else if(t==='altin'){ symLbl.textContent='Tür'; symInp.placeholder='ALTIN'; qtyLbl.textContent='Miktar (gram)'; priceLbl.textContent='Alış Fiyatı (TRY/gram)'; fonDiv.style.display='none'; }
+  else if(t==='fon'){ symLbl.textContent='Fon Kodu'; symInp.placeholder='ör. MAC, TI2'; qtyLbl.textContent='Adet (pay)'; priceLbl.textContent='Alış Fiyatı (TRY/pay)'; fonDiv.style.display=''; }
+  else { symLbl.textContent='Ticker'; symInp.placeholder='ör. THYAO'; qtyLbl.textContent='Adet'; priceLbl.textContent='Alış Fiyatı (TRY)'; fonDiv.style.display='none'; }
+}
+
+function lookupFon(){
+  var kod = document.getElementById('fon-kod').value.trim().toUpperCase();
+  if(!kod){ return; }
+  var el = document.getElementById('fon-result');
+  el.textContent = 'Sorgulanıyor…';
+  xhr('/api/tefas/'+kod, null, function(d){
+    if(d.ok){
+      el.innerHTML = '<span style="color:var(--g)">✓ '+d.fon+' — Güncel fiyat: <strong>'+d.fiyat.toFixed(4)+'₺</strong> ('+d.tarih+')</span>';
+      document.getElementById('inv-sym').value   = d.fon;
+      document.getElementById('inv-price').value = d.fiyat.toFixed(4);
+    } else {
+      el.innerHTML = '<span style="color:var(--r)">Fon bulunamadı. Fon kodu doğru mu? (ör. MAC)</span>';
+    }
+  });
+}
+
+function addInvestment(){
+  var body = {
+    name:      document.getElementById('inv-name').value.trim(),
+    itype:     document.getElementById('inv-type').value,
+    symbol:    document.getElementById('inv-sym').value.trim().toUpperCase(),
+    quantity:  parseFloat(document.getElementById('inv-qty').value),
+    buy_price: parseFloat(document.getElementById('inv-price').value),
+    buy_date:  document.getElementById('inv-date').value,
+    note:      document.getElementById('inv-note').value,
+  };
+  if(!body.name || !body.quantity || !body.buy_price){ toast('İsim, miktar ve fiyat zorunlu'); return; }
+  xhr('/api/investments', body, function(r){
+    if(r.ok){ toast('Portföye eklendi ✓'); loadInvestments();
+      document.getElementById('inv-name').value='';
+      document.getElementById('inv-qty').value='';
+      document.getElementById('inv-price').value='';
+    }
+  });
+}
+
+function loadInvestments(){
+  xhr('/api/investments/value', null, function(list){
+    var el = document.getElementById('inv-list');
+    if(!list.length){ el.innerHTML='<div class="empty-state"><div class="icon">📈</div>Portföy boş</div>'; document.getElementById('inv-total').style.display='none'; return; }
+    var totalCost=0, totalVal=0;
+    el.innerHTML = list.map(function(inv){
+      var hasVal = inv.cur_try !== null;
+      var profit = inv.profit_try;
+      var pct    = inv.profit_pct;
+      totalCost += inv.buy_try;
+      if(hasVal) totalVal += inv.cur_try;
+      var typeIcon = inv.itype==='doviz'?'💵':inv.itype==='altin'?'🥇':inv.itype==='fon'?'📊':'📈';
+      var priceLabel = inv.itype==='fon'||inv.itype==='hisse' ?
+        '<input type="number" placeholder="Güncel fiyat" step="0.0001" style="background:var(--bg4);border:1px solid var(--border2);color:var(--txt);padding:4px 8px;border-radius:6px;font-size:.75rem;width:120px" onchange="updateInvPrice('+inv.id+',this.value)">' : '';
+      return '<div style="background:var(--bg3);border-radius:10px;border:1px solid var(--border);padding:12px 14px;margin-bottom:8px">'+
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'+
+          '<span style="font-size:1.2rem">'+typeIcon+'</span>'+
+          '<div style="flex:1">'+
+            '<div style="font-weight:600;font-size:.88rem">'+inv.name+'</div>'+
+            '<div style="font-size:.72rem;color:var(--txt2)">'+inv.symbol+' · '+inv.buy_date+'</div>'+
+          '</div>'+
+          '<button class="del-row" onclick="delInv('+inv.id+')">✕</button>'+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:.78rem">'+
+          '<div><div style="color:var(--txt2)">Maliyet</div><div style="font-weight:600">'+fmt(inv.buy_try)+'</div></div>'+
+          '<div><div style="color:var(--txt2)">Şu an</div><div style="font-weight:600">'+(hasVal?fmt(inv.cur_try):priceLabel||'—')+'</div></div>'+
+          '<div><div style="color:var(--txt2)">K/Z</div>'+
+            '<div style="font-weight:700;color:'+(profit>0?'var(--g)':profit<0?'var(--r)':'var(--txt2)')+'">'+
+              (profit!==null?(profit>=0?'+':'')+fmt(profit)+' ('+pct+'%)':'—')+'</div></div>'+
+        '</div>'+
+        (hasVal && profit > 0 ? '<button class="btn btn-green" style="width:100%;margin-top:10px;padding:7px;font-size:.78rem" onclick="bookIncome('+inv.id+','+inv.profit_try+',\''+inv.name+'\')">+ Kâr olarak gelire yaz ('+fmt(profit)+')</button>' : '')+
+      '</div>';
+    }).join('');
+    document.getElementById('inv-total').style.display = 'block';
+    document.getElementById('inv-total-cost').textContent = fmt(totalCost);
+    document.getElementById('inv-total-val').textContent  = totalVal ? fmt(totalVal) : '—';
+    var totalPnl = totalVal - totalCost;
+    document.getElementById('inv-total-pnl').textContent = totalVal ? (totalPnl>=0?'+':'')+fmt(totalPnl) : '—';
+    document.getElementById('inv-total-pnl').style.color = totalPnl>=0?'var(--g)':'var(--r)';
+  });
+}
+
+function updateInvPrice(id, price){
+  // refresh with manual price for fon/hisse
+  xhr('/api/investments/value?price_'+id+'='+price, null, function(list){
+    var inv = list.find(function(i){return i.id===id});
+    if(!inv) return;
+    // update just that row's display without full reload
+    loadInvestments();
+  });
+}
+
+function delInv(id){
+  xhr('/api/investments/'+id, null, function(){ loadInvestments(); toast('Silindi'); }, false, true);
+}
+
+function bookIncome(invId, amount, name){
+  var today = new Date().toISOString().split('T')[0];
+  xhr('/api/investments/'+invId+'/book-income',
+    {amount: amount, description: name+' — Yatırım Getirisi', category: 'Yatırım / Temettü', date: today},
+    function(r){ if(r.ok){ toast('Gelir hanesine yazıldı ✓'); loadDashboard(); loadAllTx(); }});
+}
+
 // ── RECURRING ─────────────────────────────────────────────────────────────────
 var recTab = 'gelir';
 
@@ -1495,6 +2160,89 @@ function xhr(url,body,cb,isPut,isDel){
   if(body){r.setRequestHeader('Content-Type','application/json')}
   r.onload=function(){try{cb&&cb(JSON.parse(r.responseText))}catch(e){}};
   r.send(body?JSON.stringify(body):null);
+}
+
+// ── CARDS ────────────────────────────────────────────────────────────────────
+function addCard(){
+  var body = {
+    bank_name:    document.getElementById('card-bank').value,
+    card_name:    document.getElementById('card-name').value,
+    owner:        document.getElementById('card-owner').value,
+    limit_:       parseFloat(document.getElementById('card-limit').value)||0,
+    used_:        parseFloat(document.getElementById('card-used').value)||0,
+    due_day:      parseInt(document.getElementById('card-due').value),
+    statement_day:parseInt(document.getElementById('card-stmt').value),
+    min_pct:      parseFloat(document.getElementById('card-minpct').value),
+  };
+  if(!body.limit_){ toast('Limit giriniz'); return; }
+  xhr('/api/cards', body, function(r){ if(r.ok){ toast('Kart kaydedildi ✓'); loadCards();
+    ['card-name','card-limit','card-used','card-owner'].forEach(function(id){document.getElementById(id).value=''});
+  }});
+}
+
+function loadCards(){
+  xhr('/api/cards', null, function(list){
+    var el = document.getElementById('card-list');
+    if(!list.length){ el.innerHTML='<div class="empty-state"><div class="icon">💳</div>Henüz kart eklenmedi</div>'; document.getElementById('card-totals').style.display='none'; return; }
+    var totalLimit=0, totalUsed=0;
+    var today = new Date().getDate();
+    el.innerHTML = list.map(function(c){
+      var avail   = c.limit_ - c.used_;
+      var usePct  = Math.min(100, Math.round(c.used_ / c.limit_ * 100));
+      var minPay  = Math.round(c.used_ * c.min_pct / 100);
+      var color   = usePct>80 ? 'var(--r)' : usePct>50 ? 'var(--y)' : 'var(--g)';
+      var daysLeft = c.due_day >= today ? c.due_day - today : 30 - today + c.due_day;
+      totalLimit += c.limit_; totalUsed += c.used_;
+      return '<div style="background:var(--bg3);border-radius:12px;border:1px solid var(--border);padding:16px;margin-bottom:10px">'+
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">'+
+          '<div>'+
+            '<div style="font-weight:700;font-size:.92rem">'+c.bank_name+(c.card_name?' · '+c.card_name:'')+'</div>'+
+            (c.owner ? '<div style="font-size:.74rem;color:var(--b2);margin-top:2px">👤 '+c.owner+'</div>' : '')+
+          '</div>'+
+          '<button class="del-row" onclick="delCard('+c.id+')">✕</button>'+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:.78rem;margin-bottom:12px">'+
+          '<div><div style="color:var(--txt2)">Limit</div><div style="font-weight:700">'+fmt(c.limit_)+'</div></div>'+
+          '<div><div style="color:var(--txt2)">Borç</div><div style="font-weight:700;color:var(--r)">'+fmt(c.used_)+'</div></div>'+
+          '<div><div style="color:var(--txt2)">Kullanılabilir</div><div style="font-weight:700;color:var(--g)">'+fmt(avail)+'</div></div>'+
+        '</div>'+
+        '<div class="prog-bg" style="margin-bottom:10px"><div class="prog-fill" style="width:'+usePct+'%;background:'+color+'"></div></div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:.75rem">'+
+          '<div style="background:var(--bg4);padding:8px;border-radius:8px;text-align:center">'+
+            '<div style="color:var(--txt2)">Son Ödeme</div><div style="font-weight:600">'+c.due_day+'. gün</div>'+
+            '<div style="color:'+(daysLeft<=3?'var(--r)':'var(--txt2)')+'">'+daysLeft+' gün kaldı</div>'+
+          '</div>'+
+          '<div style="background:var(--bg4);padding:8px;border-radius:8px;text-align:center">'+
+            '<div style="color:var(--txt2)">Asgari (%'+c.min_pct+')</div>'+
+            '<div style="font-weight:700;color:var(--y)">'+fmt(minPay)+'</div>'+
+          '</div>'+
+          '<div style="background:var(--bg4);padding:8px;border-radius:8px;text-align:center">'+
+            '<div style="color:var(--txt2)">Ekstre Günü</div>'+
+            '<div style="font-weight:600">'+c.statement_day+'. gün</div>'+
+          '</div>'+
+        '</div>'+
+        '<div style="margin-top:10px">'+
+          '<label style="font-size:.72rem">Borcu Güncelle (₺)</label>'+
+          '<div style="display:flex;gap:8px;margin-top:4px">'+
+            '<input type="number" id="upd-used-'+c.id+'" value="'+c.used_+'" class="f-input" style="flex:1" placeholder="Güncel borç">'+
+            '<button class="btn btn-ghost" style="padding:8px 14px;font-size:.78rem" onclick="updateCardUsed('+c.id+')">Kaydet</button>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+    document.getElementById('card-totals').style.display='block';
+    document.getElementById('ct-limit').textContent = fmt(totalLimit);
+    document.getElementById('ct-used').textContent  = fmt(totalUsed);
+    document.getElementById('ct-avail').textContent = fmt(totalLimit-totalUsed);
+  });
+}
+
+function updateCardUsed(id){
+  var val = parseFloat(document.getElementById('upd-used-'+id).value)||0;
+  xhr('/api/cards/'+id, {used_: val}, function(r){ if(r.ok){ toast('Güncellendi ✓'); loadCards(); }}, true);
+}
+function delCard(id){
+  xhr('/api/cards/'+id, null, function(){ loadCards(); toast('Silindi'); }, false, true);
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────────────
