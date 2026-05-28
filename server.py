@@ -13,7 +13,7 @@ log = logging.getLogger("kirpi")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
-DB = os.path.join(os.path.dirname(__file__), "cashflow.db")
+DB = os.environ.get("DB_PATH", "/data/cashflow.db")
 
 # ── MAIL CONFIG ───────────────────────────────────────────────────────────────
 MAIL_FROM     = os.environ.get("MAIL_FROM", "")
@@ -43,12 +43,14 @@ def init_db():
     with sqlite3.connect(DB) as con:
         con.executescript("""
         CREATE TABLE IF NOT EXISTS users (
-            id            INTEGER PRIMARY KEY AUTOINCREMENT,
-            username      TEXT UNIQUE NOT NULL,
-            display_name  TEXT NOT NULL DEFAULT '',
-            password_hash TEXT NOT NULL,
-            email         TEXT NOT NULL DEFAULT '',
-            created_at    TEXT NOT NULL
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            username       TEXT UNIQUE NOT NULL,
+            display_name   TEXT NOT NULL DEFAULT '',
+            password_hash  TEXT NOT NULL,
+            email          TEXT NOT NULL DEFAULT '',
+            email_verified INTEGER NOT NULL DEFAULT 0,
+            verify_token   TEXT,
+            created_at     TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS password_reset_tokens (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -141,6 +143,10 @@ def init_db():
             ("recurring",    "user_id",    "INTEGER NOT NULL DEFAULT 1"),
             ("recurring",    "profile_id", "INTEGER NOT NULL DEFAULT 1"),
         ]
+        migrations += [
+            ("users", "email_verified", "INTEGER NOT NULL DEFAULT 0"),
+            ("users", "verify_token",   "TEXT"),
+        ]
         for table, col, col_def in migrations:
             try:
                 con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_def}")
@@ -179,6 +185,54 @@ def _smtp_send(msg):
     except Exception as exc:
         log.error("Email send failed: %s", exc)
         return False
+
+def send_verify_email(to_email, username, token):
+    verify_url = f"{APP_URL}/verify-email/{token}"
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = "🦔 Kirpi — Email Adresinizi Doğrulayın"
+    msg["From"]    = f"Kirpi Nakit Akışı <{MAIL_FROM}>"
+    msg["To"]      = to_email
+    text = f"Merhaba {username},\n\nKirpi'ye hoş geldiniz! Hesabınızı aktif etmek için aşağıdaki bağlantıya tıklayın:\n{verify_url}\n\nBu bağlantı 24 saat geçerlidir."
+    html = f"""<!DOCTYPE html>
+<html lang="tr"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#0a0c12;font-family:'Inter',system-ui,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0a0c12;padding:40px 20px">
+  <tr><td align="center">
+    <table width="520" cellpadding="0" cellspacing="0" style="background:#111318;border:1px solid #1e2233;border-radius:16px;overflow:hidden">
+      <tr><td style="background:linear-gradient(135deg,#6366f1,#a855f7);padding:32px;text-align:center">
+        <div style="font-size:40px;margin-bottom:8px">🦔</div>
+        <h1 style="color:#fff;font-size:1.4rem;font-weight:800;margin:0">Kirpi'ye Hoş Geldiniz!</h1>
+        <p style="color:rgba(255,255,255,.7);font-size:.85rem;margin:4px 0 0">Nakit Akışı Takibi</p>
+      </td></tr>
+      <tr><td style="padding:36px 40px">
+        <h2 style="color:#e2e8f0;font-size:1.1rem;font-weight:700;margin:0 0 12px">Merhaba, {username} 👋</h2>
+        <p style="color:#94a3b8;font-size:.9rem;line-height:1.7;margin:0 0 28px">
+          Kayıt olduğunuz için teşekkürler! Hesabınızı aktif etmek için<br>
+          aşağıdaki butona tıklayarak email adresinizi doğrulayın.
+        </p>
+        <table cellpadding="0" cellspacing="0" style="margin:0 auto 28px">
+          <tr><td style="background:#6366f1;border-radius:10px;text-align:center">
+            <a href="{verify_url}" style="display:block;padding:14px 36px;color:#fff;font-size:.95rem;font-weight:700;text-decoration:none">Email Adresimi Doğrula</a>
+          </td></tr>
+        </table>
+        <div style="background:#1a1d26;border:1px solid #2a2f45;border-radius:8px;padding:14px 16px;margin-bottom:24px">
+          <p style="color:#64748b;font-size:.78rem;margin:0 0 6px">Ya da bu bağlantıyı tarayıcınıza yapıştırın:</p>
+          <p style="color:#818cf8;font-size:.76rem;word-break:break-all;margin:0">{verify_url}</p>
+        </div>
+        <p style="color:#64748b;font-size:.78rem;line-height:1.6;margin:0">
+          ⏰ Bu bağlantı <strong style="color:#94a3b8">24 saat</strong> geçerlidir.
+        </p>
+      </td></tr>
+      <tr><td style="background:#0d0f18;border-top:1px solid #1e2233;padding:20px 40px;text-align:center">
+        <p style="color:#475569;font-size:.75rem;margin:0">🦔 Kirpi Nakit Akışı • Otomatik mesaj, lütfen yanıtlamayın.</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"""
+    msg.attach(MIMEText(text, "plain", "utf-8"))
+    msg.attach(MIMEText(html,  "html",  "utf-8"))
+    return _smtp_send(msg)
 
 def send_reset_email(to_email, username, token):
     reset_url = f"{APP_URL}/reset-password/{token}"
@@ -309,11 +363,12 @@ def register():
         if error:
             return AUTH_HTML_render("register", error)
         try:
+            vtok = secrets.token_urlsafe(32)
             with sqlite3.connect(DB) as con:
                 con.row_factory = sqlite3.Row
                 cur = con.execute(
-                    "INSERT INTO users (username,display_name,password_hash,email,created_at) VALUES (?,?,?,?,?)",
-                    (username, display or username, generate_password_hash(password), email, datetime.now().isoformat())
+                    "INSERT INTO users (username,display_name,password_hash,email,email_verified,verify_token,created_at) VALUES (?,?,?,?,0,?,?)",
+                    (username, display or username, generate_password_hash(password), email, vtok, datetime.now().isoformat())
                 )
                 uid = cur.lastrowid
                 con.execute(
@@ -321,8 +376,9 @@ def register():
                     (uid, "Şahıs", "sahis", datetime.now().isoformat())
                 )
         except sqlite3.IntegrityError:
-            return AUTH_HTML_render("register", "Bu kullanıcı adı zaten alınmış")
-        return redirect("/login?registered=1")
+            return AUTH_HTML_render("register", "Bu kullanıcı adı veya email zaten kullanımda")
+        send_verify_email(email, display or username, vtok)
+        return redirect("/login?verify_sent=1")
     return AUTH_HTML_render("register")
 
 @app.route("/login", methods=["GET", "POST"])
@@ -336,6 +392,8 @@ def login():
             con.row_factory = sqlite3.Row
             row = con.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
         if row and check_password_hash(row["password_hash"], password):
+            if not row["email_verified"]:
+                return AUTH_HTML_render("login", "⚠️ Email adresinizi henüz doğrulamadınız. Kayıt emailinizdeki linke tıklayın veya <a href='/resend-verify' style='color:#818cf8'>yeni doğrulama maili al</a>.")
             session["user_id"]  = row["id"]
             session["username"] = row["username"]
             session["display"]  = row["display_name"]
@@ -348,8 +406,12 @@ def login():
                     session["profile_type"] = prof["type"]
             return redirect("/")
         return AUTH_HTML_render("login", "Kullanıcı adı veya şifre hatalı")
-    msg = "Kayıt başarılı! Şimdi giriş yapabilirsiniz." if request.args.get("registered") else ""
-    if request.args.get("reset"):
+    msg = ""
+    if request.args.get("verify_sent"):
+        msg = "✅ Doğrulama linki email adresinize gönderildi. Lütfen emailinizi kontrol edin."
+    elif request.args.get("verified"):
+        msg = "✅ Email doğrulandı! Giriş yapabilirsiniz."
+    elif request.args.get("reset"):
         msg = "Şifreniz başarıyla güncellendi. Giriş yapabilirsiniz."
     return AUTH_HTML_render("login", msg)
 
@@ -398,6 +460,32 @@ def reset_password(token):
             con.execute("UPDATE password_reset_tokens SET used=1 WHERE token=?", (token,))
         return redirect("/login?reset=1")
     return AUTH_HTML_render("reset", token=token)
+
+@app.route("/verify-email/<token>")
+def verify_email(token):
+    with sqlite3.connect(DB) as con:
+        con.row_factory = sqlite3.Row
+        row = con.execute("SELECT * FROM users WHERE verify_token=? AND email_verified=0", (token,)).fetchone()
+    if not row:
+        return AUTH_HTML_render("reset_invalid", "Bu doğrulama linki geçersiz veya zaten kullanılmış.")
+    with sqlite3.connect(DB) as con:
+        con.execute("UPDATE users SET email_verified=1, verify_token=NULL WHERE id=?", (row["id"],))
+    return redirect("/login?verified=1")
+
+@app.route("/resend-verify", methods=["GET", "POST"])
+def resend_verify():
+    if request.method == "POST":
+        email = request.form.get("email","").strip().lower()
+        with sqlite3.connect(DB) as con:
+            con.row_factory = sqlite3.Row
+            row = con.execute("SELECT * FROM users WHERE email=? AND email_verified=0", (email,)).fetchone()
+        if row:
+            vtok = secrets.token_urlsafe(32)
+            with sqlite3.connect(DB) as con:
+                con.execute("UPDATE users SET verify_token=? WHERE id=?", (vtok, row["id"]))
+            send_verify_email(email, row["display_name"] or row["username"], vtok)
+        return AUTH_HTML_render("forgot_sent", "Eğer bu email doğrulanmamış bir hesaba aitse, yeni doğrulama linki gönderildi.")
+    return AUTH_HTML_render("resend_verify")
 
 @app.route("/logout")
 def logout():
@@ -1218,16 +1306,17 @@ input:focus{border-color:#6366f1}
 
 def AUTH_HTML_render(mode, msg="", token=None):
     ok_modes  = {"forgot_sent", "reset_invalid"}
-    is_ok     = msg and (mode in ok_modes or msg.startswith("Kayıt") or msg.startswith("Şifreniz"))
+    is_ok     = msg and (mode in ok_modes or msg.startswith("Kayıt") or msg.startswith("Şifreniz") or msg.startswith("✅"))
     msg_html  = f'<div class="msg {"ok" if is_ok else "err"}">{msg}</div>' if msg else ""
 
     titles = {
-        "register":    "Hesap Oluştur",
-        "login":       "Giriş Yap",
-        "forgot":      "Şifremi Unuttum",
-        "forgot_sent": "Mail Gönderildi",
-        "reset":       "Yeni Şifre Belirle",
+        "register":      "Hesap Oluştur",
+        "login":         "Giriş Yap",
+        "forgot":        "Şifremi Unuttum",
+        "forgot_sent":   "Mail Gönderildi",
+        "reset":         "Yeni Şifre Belirle",
         "reset_invalid": "Link Geçersiz",
+        "resend_verify": "Doğrulama Maili",
     }
     page_title = titles.get(mode, "Kirpi")
 
@@ -1306,12 +1395,24 @@ def AUTH_HTML_render(mode, msg="", token=None):
       <button class="btn" type="submit">Şifremi Güncelle</button>
     </form>"""
 
+    elif mode == "resend_verify":
+        form = f"""
+    <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:8px;text-align:center">Doğrulama Maili Gönder</h2>
+    <p style="text-align:center;color:#64748b;font-size:.82rem;margin-bottom:20px">Kayıt emailini girerek yeni doğrulama linki alabilirsin.</p>
+    {{msg_html}}
+    <form method="POST" action="/resend-verify">
+      <label>Email Adresi</label>
+      <input type="email" name="email" required placeholder="ornek@gmail.com" autocomplete="email">
+      <button class="btn" type="submit">Doğrulama Maili Gönder</button>
+    </form>
+    <div class="link"><a href="/login">← Giriş ekranına dön</a></div>"""
+
     else:  # reset_invalid
         form = f"""
     <div style="text-align:center;padding:20px 0">
       <div style="font-size:3rem;margin-bottom:16px">⚠️</div>
       <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:12px">Link Geçersiz</h2>
-      {msg_html}
+      {{msg_html}}
     </div>
     <div class="link"><a href="/forgot-password">Yeni link al →</a></div>"""
 
