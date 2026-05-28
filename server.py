@@ -1246,6 +1246,14 @@ def AUTH_HTML_render(mode, msg="", token=None):
       <input type="password" name="password" required autocomplete="new-password">
       <label>Şifre Tekrar</label>
       <input type="password" name="confirm" required autocomplete="new-password">
+      <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:14px">
+        <input type="checkbox" id="kvkk-check" required style="width:auto;margin:3px 0 0;flex-shrink:0">
+        <label for="kvkk-check" style="font-size:.75rem;color:#64748b;cursor:pointer">
+          <a href="/kvkk" target="_blank" style="color:#818cf8">KVKK Aydınlatma Metni</a>'ni,
+          <a href="/gizlilik" target="_blank" style="color:#818cf8">Gizlilik Politikası</a>'nı ve
+          <a href="/kullanim-kosullari" target="_blank" style="color:#818cf8">Kullanım Koşulları</a>'nı okudum, kabul ediyorum.
+        </label>
+      </div>
       <button class="btn" type="submit">Kayıt Ol</button>
     </form>
     <div class="link">Zaten hesabın var mı? <a href="/login">Giriş Yap</a></div>"""
@@ -1368,7 +1376,7 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
 @media(max-width:768px){.nav-bottom{display:none}}
 
 /* ── PAGE ── */
-.page{display:none;padding:28px 28px;max-width:1280px}
+.page{display:none;padding:28px 28px;max-width:1280px;will-change:opacity,transform}
 .page.active{display:block}
 @media(max-width:600px){.page{padding:16px}}
 .page-title{font-size:1.4rem;font-weight:800;margin-bottom:4px;letter-spacing:-.02em}
@@ -1569,8 +1577,38 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     </div>
   </div>
   <div class="nav-bottom">
-    <div style="font-weight:600;color:var(--txt);margin-bottom:5px">👤 __USER_DISPLAY__</div>
-    <a href="/logout" style="color:#ef4444;font-size:.75rem;text-decoration:none;display:inline-flex;align-items:center;gap:4px">↩ Çıkış Yap</a>
+    <!-- Profil göstergesi ve geçiş -->
+    <div id="profile-badge" onclick="toggleProfileMenu()" style="cursor:pointer;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;margin-bottom:10px;transition:.2s" onmouseover="this.style.borderColor='var(--b)'" onmouseout="this.style.borderColor='var(--border2)'">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div id="profile-name-badge" style="font-size:.82rem;font-weight:700;color:var(--txt)">Şahıs</div>
+          <div id="profile-type-badge" style="font-size:.7rem;color:var(--txt2)">Kişisel Profil</div>
+        </div>
+        <span style="color:var(--txt2);font-size:.85rem">⇅</span>
+      </div>
+    </div>
+    <div id="profile-menu" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:8px;margin-bottom:10px">
+      <div id="profile-list"></div>
+      <button onclick="showAddProfile()" style="width:100%;margin-top:6px;padding:7px;background:transparent;border:1px dashed var(--border2);border-radius:7px;color:var(--txt2);font-size:.75rem;cursor:pointer">+ Yeni Profil Ekle</button>
+    </div>
+    <div id="add-profile-form" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px;margin-bottom:10px">
+      <input id="new-profile-name" placeholder="Profil adı (ör. Şirket)" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--txt);padding:7px 10px;border-radius:7px;font-size:.8rem;margin-bottom:6px;outline:none">
+      <select id="new-profile-type" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--txt);padding:7px 10px;border-radius:7px;font-size:.8rem;margin-bottom:8px">
+        <option value="sahis">👤 Şahıs</option>
+        <option value="sirket">🏢 Şirket</option>
+      </select>
+      <div style="display:flex;gap:6px">
+        <button onclick="createProfile()" style="flex:1;padding:7px;background:var(--b);border:none;border-radius:7px;color:#fff;font-size:.78rem;cursor:pointer;font-weight:600">Oluştur</button>
+        <button onclick="cancelAddProfile()" style="padding:7px 10px;background:transparent;border:1px solid var(--border2);border-radius:7px;color:var(--txt2);font-size:.78rem;cursor:pointer">İptal</button>
+      </div>
+    </div>
+    <div style="font-size:.75rem;color:var(--txt2);margin-bottom:8px">👤 <strong style="color:var(--txt)">__USER_DISPLAY__</strong></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a href="/logout" style="color:#ef4444;font-size:.72rem;text-decoration:none">↩ Çıkış</a>
+      <a href="/kvkk" style="color:#475569;font-size:.72rem;text-decoration:none">KVKK</a>
+      <a href="/gizlilik" style="color:#475569;font-size:.72rem;text-decoration:none">Gizlilik</a>
+      <a href="/kullanim-kosullari" style="color:#475569;font-size:.72rem;text-decoration:none">Koşullar</a>
+    </div>
   </div>
 </nav>
 
@@ -2108,6 +2146,8 @@ window.onload=function(){
     populateYearFilter();
   });
   setupDrop();
+  loadProfiles();
+  setupNumInputs();
 };
 
 function updateMonthLabel(){
@@ -2117,15 +2157,111 @@ function updateMonthLabel(){
 
 // ── NAVIGATION ───────────────────────────────────────────────────────────────
 function goPage(id, el){
-  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});
+  var prev = document.querySelector('.page.active');
+  var next = document.getElementById('page-'+id);
+  if(prev && prev === next) return;
+
+  // Exit animation
+  if(prev){
+    prev.style.transition='opacity .18s ease,transform .18s ease';
+    prev.style.opacity='0';
+    prev.style.transform='translateY(10px)';
+  }
+
   document.querySelectorAll('.nl').forEach(function(n){n.classList.remove('active')});
-  document.getElementById('page-'+id).classList.add('active');
   if(el) el.classList.add('active');
-  if(id==='ledger') renderLedger();
-  if(id==='dashboard') loadDashboard();
-  if(id==='recurring') initRecurringPage();
-  if(id==='invest') initInvestPage();
-  if(id==='cards') loadCards();
+
+  setTimeout(function(){
+    document.querySelectorAll('.page').forEach(function(p){
+      p.classList.remove('active');
+      p.style.opacity=''; p.style.transform='';
+    });
+    next.classList.add('active');
+    next.style.opacity='0'; next.style.transform='translateY(12px)';
+    next.style.transition='opacity .22s ease,transform .22s ease';
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){
+        next.style.opacity='1'; next.style.transform='translateY(0)';
+      });
+    });
+    if(id==='ledger') renderLedger();
+    if(id==='dashboard') loadDashboard();
+    if(id==='recurring') initRecurringPage();
+    if(id==='invest') initInvestPage();
+    if(id==='cards') loadCards();
+  }, prev ? 160 : 0);
+}
+
+// ── PROFILE SWITCHER ─────────────────────────────────────────────────────────
+var _profiles=[];
+function loadProfiles(){
+  xhr('/api/me',null,function(me){
+    document.getElementById('profile-name-badge').textContent=me.profile_name||'Şahıs';
+    document.getElementById('profile-type-badge').textContent=me.profile_type==='sirket'?'🏢 Şirket Profili':'👤 Kişisel Profil';
+  });
+  xhr('/api/profiles',null,function(list){
+    _profiles=list;
+  });
+}
+function toggleProfileMenu(){
+  var m=document.getElementById('profile-menu');
+  var f=document.getElementById('add-profile-form');
+  if(m.style.display==='none'){
+    renderProfileList();
+    m.style.display='block'; f.style.display='none';
+  } else {
+    m.style.display='none';
+  }
+}
+function renderProfileList(){
+  var html='';
+  _profiles.forEach(function(p){
+    var icon=p.type==='sirket'?'🏢':'👤';
+    html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 8px;border-radius:7px;cursor:pointer;transition:.15s" onmouseover="this.style.background=\'#1e2233\'" onmouseout="this.style.background=\'transparent\'" onclick="switchProfile('+p.id+')">'
+      +'<span style="font-size:.82rem;color:var(--txt)">'+icon+' '+p.name+'</span>'
+      +'</div>';
+  });
+  document.getElementById('profile-list').innerHTML=html;
+}
+function switchProfile(pid){
+  xhr('/api/profiles/'+pid+'/switch','POST',function(d){
+    if(!d.ok) return;
+    document.getElementById('profile-menu').style.display='none';
+    document.getElementById('profile-name-badge').textContent=d.name;
+    document.getElementById('profile-type-badge').textContent=d.type==='sirket'?'🏢 Şirket Profili':'👤 Kişisel Profil';
+    // Show toast
+    showToast('Profil değiştirildi: '+d.name,'#6366f1');
+    // Reload current page data
+    loadDashboard(); renderLedger();
+  });
+}
+function showAddProfile(){
+  document.getElementById('add-profile-form').style.display='block';
+  document.getElementById('profile-menu').style.display='none';
+}
+function cancelAddProfile(){
+  document.getElementById('add-profile-form').style.display='none';
+}
+function createProfile(){
+  var name=document.getElementById('new-profile-name').value.trim();
+  var type=document.getElementById('new-profile-type').value;
+  if(!name) return;
+  xhr('/api/profiles','POST',function(d){
+    if(!d.ok){ showToast('Hata: '+d.error,'#ef4444'); return; }
+    _profiles.push(d);
+    switchProfile(d.id);
+    document.getElementById('new-profile-name').value='';
+    document.getElementById('add-profile-form').style.display='none';
+    showToast('Profil oluşturuldu: '+d.name,'#22c55e');
+  },{name:name,type:type});
+}
+function showToast(msg,color){
+  var t=document.createElement('div');
+  t.textContent=msg;
+  t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:'+color+';color:#fff;padding:10px 20px;border-radius:20px;font-size:.85rem;font-weight:600;z-index:9999;opacity:0;transition:opacity .3s';
+  document.body.appendChild(t);
+  requestAnimationFrame(function(){ t.style.opacity='1'; });
+  setTimeout(function(){ t.style.opacity='0'; setTimeout(function(){ t.remove(); },300); },2500);
 }
 
 // ── MONTH NAV ─────────────────────────────────────────────────────────────────
@@ -2995,17 +3131,26 @@ ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
 MANIFEST = json.dumps({
     "name": "Kirpi — Nakit Akışı",
     "short_name": "Kirpi",
-    "description": "Kişisel gelir-gider takip uygulaması",
+    "description": "Gelir, gider, yatırım ve kartlarını tek ekranda yönet. Şahıs ve şirket profillerini ayrı tut.",
     "start_url": "/",
+    "scope": "/",
     "display": "standalone",
+    "display_override": ["standalone", "minimal-ui"],
     "background_color": "#0a0c12",
     "theme_color": "#6366f1",
-    "orientation": "portrait",
+    "orientation": "portrait-primary",
+    "lang": "tr",
+    "categories": ["finance", "productivity"],
+    "screenshots": [],
+    "shortcuts": [
+        {"name": "Dashboard", "url": "/", "description": "Ana sayfa"},
+    ],
     "icons": [
         {"src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"},
-        {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
-        {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"},
-    ]
+        {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+        {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+    ],
+    "prefer_related_applications": False,
 }, ensure_ascii=False)
 
 SW_JS = """
@@ -3039,6 +3184,291 @@ def icon_png():
 def index():
     display = session.get("display","")
     return HTML.replace("__USER_DISPLAY__", display)
+
+# ── LEGAL PAGES ───────────────────────────────────────────────────────────────
+
+LEGAL_CSS = """
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0c12;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;padding:40px 20px;line-height:1.8}
+.wrap{max-width:760px;margin:0 auto}
+.back{display:inline-flex;align-items:center;gap:8px;color:#818cf8;text-decoration:none;font-size:.85rem;margin-bottom:32px}
+.back:hover{color:#a5b4fc}
+h1{font-size:1.8rem;font-weight:900;margin-bottom:8px;background:linear-gradient(135deg,#818cf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.meta{color:#64748b;font-size:.82rem;margin-bottom:40px}
+h2{font-size:1.05rem;font-weight:700;color:#c7d2fe;margin:32px 0 12px;padding-bottom:8px;border-bottom:1px solid #1e2233}
+p{color:#94a3b8;margin-bottom:12px;font-size:.9rem}
+ul{color:#94a3b8;margin:0 0 12px 20px;font-size:.9rem}
+li{margin-bottom:6px}
+.box{background:#111318;border:1px solid #1e2233;border-radius:12px;padding:20px 24px;margin-bottom:16px}
+strong{color:#e2e8f0}
+a{color:#818cf8}
+"""
+
+def legal_page(title, body):
+    return f"""<!DOCTYPE html>
+<html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{title} — Kirpi</title><style>{LEGAL_CSS}</style></head>
+<body><div class="wrap">
+<a class="back" href="/">← Uygulamaya Dön</a>
+<h1>{title}</h1>
+<p class="meta">Son güncelleme: {date.today().strftime('%d.%m.%Y')} · Kirpi Nakit Akışı</p>
+{body}
+</div></body></html>"""
+
+@app.route("/kvkk")
+def kvkk():
+    body = """
+<h2>1. Veri Sorumlusu</h2>
+<p>Bu aydınlatma metni, 6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) kapsamında Kirpi Nakit Akışı uygulaması tarafından hazırlanmıştır.</p>
+
+<h2>2. İşlenen Kişisel Veriler</h2>
+<div class="box">
+<ul>
+<li><strong>Kimlik verileri:</strong> Ad soyad, kullanıcı adı</li>
+<li><strong>İletişim verileri:</strong> E-posta adresi</li>
+<li><strong>Finansal veriler:</strong> Kullanıcının bizzat girdiği gelir, gider, yatırım ve kart bilgileri</li>
+<li><strong>Teknik veriler:</strong> Giriş tarihleri, IP adresi (sunucu logları)</li>
+</ul>
+</div>
+
+<h2>3. Kişisel Verilerin İşlenme Amaçları</h2>
+<ul>
+<li>Kullanıcı hesabının oluşturulması ve yönetimi</li>
+<li>Şifre sıfırlama hizmetinin sunulması</li>
+<li>Uygulama güvenliğinin sağlanması</li>
+<li>Yasal yükümlülüklerin yerine getirilmesi</li>
+</ul>
+
+<h2>4. Kişisel Verilerin Aktarılması</h2>
+<p>Kişisel verileriniz <strong>üçüncü şahıslarla paylaşılmamakta</strong>, satılmamakta veya kiralanmamaktadır. Yalnızca yasal zorunluluk halinde yetkili kamu kurumlarıyla paylaşılabilir.</p>
+
+<h2>5. Kişisel Verilerin Saklanma Süresi</h2>
+<p>Verileriniz hesabınızın aktif olduğu süre boyunca saklanır. Hesap silme talebinde bulunduğunuzda tüm verileriniz kalıcı olarak silinir.</p>
+
+<h2>6. KVKK Kapsamındaki Haklarınız</h2>
+<ul>
+<li>Kişisel verilerinizin işlenip işlenmediğini öğrenme</li>
+<li>İşlenmişse bilgi talep etme</li>
+<li>İşlenme amacını ve amacına uygun kullanılıp kullanılmadığını öğrenme</li>
+<li>Yurt içinde veya yurt dışında aktarıldığı üçüncü kişileri bilme</li>
+<li>Eksik veya yanlış işlenmişse düzeltilmesini isteme</li>
+<li>Silinmesini veya yok edilmesini isteme</li>
+<li>İşlemenin otomatik sistemler vasıtasıyla gerçekleştirilmesi halinde aleyhine bir sonucun ortaya çıkmasına itiraz etme</li>
+</ul>
+<p>Başvurularınız için: <strong>kvkk@kirpiapp.com</strong></p>
+"""
+    return legal_page("KVKK Aydınlatma Metni", body)
+
+@app.route("/gizlilik")
+def gizlilik():
+    body = """
+<h2>1. Gizlilik Taahhüdümüz</h2>
+<p>Kirpi, kullanıcılarının gizliliğini en üst düzeyde korumayı taahhüt eder. Bu politika, hangi verileri topladığımızı ve nasıl kullandığımızı açıklar.</p>
+
+<h2>2. Topladığımız Veriler</h2>
+<div class="box">
+<ul>
+<li><strong>Hesap bilgileri:</strong> Kullanıcı adı, ad soyad, e-posta</li>
+<li><strong>Finansal içerik:</strong> Yalnızca siz tarafından girilen işlem, bütçe ve yatırım verileri</li>
+<li><strong>Teknik veriler:</strong> Sunucu erişim logları (güvenlik amaçlı)</li>
+</ul>
+</div>
+
+<h2>3. Verilerinizi Nasıl Kullanıyoruz</h2>
+<ul>
+<li>Hizmeti size sunmak ve hesabınızı yönetmek</li>
+<li>Şifre sıfırlama e-postası göndermek</li>
+<li>Uygulama güvenliğini sağlamak</li>
+</ul>
+
+<h2>4. Veri Güvenliği</h2>
+<p>Şifreleriniz <strong>bcrypt</strong> algoritmasıyla hashlenerek saklanır. Ham şifreniz hiçbir zaman kaydedilmez. Verileriniz şifreli bağlantı (HTTPS) üzerinden iletilir.</p>
+
+<h2>5. Çerezler</h2>
+<p>Uygulama yalnızca oturum yönetimi için zorunlu bir oturum çerezi kullanır. Reklam veya takip çerezi kullanılmaz.</p>
+
+<h2>6. Üçüncü Taraf Hizmetler</h2>
+<ul>
+<li><strong>Railway.app:</strong> Uygulama barındırma (ABD merkezli)</li>
+<li><strong>Gmail SMTP:</strong> E-posta bildirimleri</li>
+<li><strong>open.er-api.com:</strong> Döviz kurları (anonim)</li>
+<li><strong>tefas.gov.tr:</strong> Fon fiyatları (anonim)</li>
+</ul>
+
+<h2>7. İletişim</h2>
+<p>Gizlilik konularındaki sorularınız için: <strong>gizlilik@kirpiapp.com</strong></p>
+"""
+    return legal_page("Gizlilik Politikası", body)
+
+@app.route("/kullanim-kosullari")
+def kullanim_kosullari():
+    body = """
+<h2>1. Kabul</h2>
+<p>Kirpi uygulamasını kullanarak bu kullanım koşullarını kabul etmiş sayılırsınız.</p>
+
+<h2>2. Hizmet Tanımı</h2>
+<p>Kirpi, kişisel ve kurumsal nakit akışı takibi için tasarlanmış bir web uygulamasıdır. Uygulama yalnızca bilgi amaçlıdır; <strong>finansal tavsiye niteliği taşımaz.</strong></p>
+
+<h2>3. Kullanıcı Sorumlulukları</h2>
+<ul>
+<li>Hesap güvenliğinizi korumak sizin sorumluluğunuzdadır</li>
+<li>Şifrenizi kimseyle paylaşmayınız</li>
+<li>Uygulamayı yasalara aykırı amaçlarla kullanamazsınız</li>
+<li>Başkalarının hesaplarına erişmeye çalışamazsınız</li>
+</ul>
+
+<h2>4. Hizmet Sürekliliği</h2>
+<p>Kirpi, hizmet kesintisi yaşanmayacağını garanti etmez. Verilerinizi düzenli olarak yedeklemenizi öneririz. Uygulama içinden veri yedeği alabilirsiniz.</p>
+
+<h2>5. Sorumluluk Sınırlaması</h2>
+<p>Kirpi, kullanıcı tarafından girilen verilerin doğruluğundan sorumlu değildir. Uygulama finansal kararlarınız için kullanılan tek kaynak olmamalıdır.</p>
+
+<h2>6. Hesap Sonlandırma</h2>
+<p>Koşulları ihlal eden hesaplar önceden bildirim yapılmaksızın askıya alınabilir veya silinebilir.</p>
+
+<h2>7. Değişiklikler</h2>
+<p>Bu koşullar zaman zaman güncellenebilir. Önemli değişiklikler e-posta ile bildirilir.</p>
+
+<h2>8. Uygulanacak Hukuk</h2>
+<p>Bu sözleşme <strong>Türkiye Cumhuriyeti hukuku</strong> kapsamında yorumlanır. Uyuşmazlıklarda İstanbul Mahkemeleri yetkilidir.</p>
+
+<h2>9. İletişim</h2>
+<p>Sorularınız için: <strong>destek@kirpiapp.com</strong></p>
+"""
+    return legal_page("Kullanım Koşulları", body)
+
+# ── ADMIN PANEL ───────────────────────────────────────────────────────────────
+
+ADMIN_USER = os.environ.get("ADMIN_USERNAME", "")
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("user_id"):
+            return redirect("/login")
+        if ADMIN_USER and session.get("username") != ADMIN_USER:
+            return "Yetkisiz erişim", 403
+        if not ADMIN_USER:
+            with sqlite3.connect(DB) as con:
+                first = con.execute("SELECT username FROM users ORDER BY id LIMIT 1").fetchone()
+                if first and session.get("username") != first[0]:
+                    return "Yetkisiz erişim", 403
+        return f(*args, **kwargs)
+    return decorated
+
+@app.route("/admin")
+@admin_required
+def admin_panel():
+    db = get_db()
+    total_users    = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    total_profiles = db.execute("SELECT COUNT(*) FROM profiles").fetchone()[0]
+    sahis_count    = db.execute("SELECT COUNT(*) FROM profiles WHERE type='sahis'").fetchone()[0]
+    sirket_count   = db.execute("SELECT COUNT(*) FROM profiles WHERE type='sirket'").fetchone()[0]
+    total_txn      = db.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
+    total_cards    = db.execute("SELECT COUNT(*) FROM cards").fetchone()[0]
+    total_invest   = db.execute("SELECT COUNT(*) FROM investments").fetchone()[0]
+    recent_users   = db.execute("SELECT username,display_name,email,created_at FROM users ORDER BY id DESC LIMIT 20").fetchall()
+    txn_by_day     = db.execute("SELECT DATE(created_at) as d, COUNT(*) as c FROM transactions GROUP BY d ORDER BY d DESC LIMIT 14").fetchall()
+    new_users_week = db.execute("SELECT COUNT(*) FROM users WHERE created_at >= DATE('now','-7 days')").fetchone()[0]
+    new_users_month= db.execute("SELECT COUNT(*) FROM users WHERE created_at >= DATE('now','-30 days')").fetchone()[0]
+
+    rows_html = ""
+    for u in recent_users:
+        rows_html += f"""<tr>
+        <td>{u['username']}</td>
+        <td>{u['display_name']}</td>
+        <td>{u['email']}</td>
+        <td style="color:#64748b;font-size:.8rem">{u['created_at'][:10]}</td>
+        </tr>"""
+
+    chart_labels = [r['d'] for r in reversed(list(txn_by_day))]
+    chart_data   = [r['c'] for r in reversed(list(txn_by_day))]
+
+    return f"""<!DOCTYPE html>
+<html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin — Kirpi</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{background:#0a0c12;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;padding:32px 20px}}
+.wrap{{max-width:1100px;margin:0 auto}}
+.back{{display:inline-flex;align-items:center;gap:8px;color:#818cf8;text-decoration:none;font-size:.85rem;margin-bottom:28px}}
+h1{{font-size:1.6rem;font-weight:900;margin-bottom:28px;background:linear-gradient(135deg,#818cf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}}
+.stats{{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:32px}}
+.stat{{background:#111318;border:1px solid #1e2233;border-radius:12px;padding:20px;text-align:center}}
+.stat-val{{font-size:2rem;font-weight:900;color:#818cf8}}
+.stat-lbl{{font-size:.78rem;color:#64748b;margin-top:4px}}
+.stat-sub{{font-size:.72rem;color:#22c55e;margin-top:2px}}
+.card{{background:#111318;border:1px solid #1e2233;border-radius:12px;padding:24px;margin-bottom:24px}}
+h2{{font-size:1rem;font-weight:700;margin-bottom:16px;color:#c7d2fe}}
+table{{width:100%;border-collapse:collapse;font-size:.85rem}}
+th{{text-align:left;color:#64748b;font-weight:500;padding:8px 12px;border-bottom:1px solid #1e2233}}
+td{{padding:10px 12px;border-bottom:1px solid #0d0f18;color:#cbd5e1}}
+tr:hover td{{background:#13161f}}
+canvas{{width:100%!important;height:200px!important}}
+</style></head>
+<body><div class="wrap">
+<a class="back" href="/">← Uygulamaya Dön</a>
+<h1>🛡️ Admin Paneli</h1>
+
+<div class="stats">
+  <div class="stat"><div class="stat-val">{total_users}</div><div class="stat-lbl">Toplam Kullanıcı</div>
+    <div class="stat-sub">+{new_users_week} bu hafta · +{new_users_month} bu ay</div></div>
+  <div class="stat"><div class="stat-val">{total_profiles}</div><div class="stat-lbl">Profil</div>
+    <div class="stat-sub">👤 {sahis_count} şahıs · 🏢 {sirket_count} şirket</div></div>
+  <div class="stat"><div class="stat-val">{total_txn}</div><div class="stat-lbl">Toplam İşlem</div></div>
+  <div class="stat"><div class="stat-val">{total_cards}</div><div class="stat-lbl">Kayıtlı Kart</div></div>
+  <div class="stat"><div class="stat-val">{total_invest}</div><div class="stat-lbl">Yatırım Kaydı</div></div>
+</div>
+
+<div class="card">
+  <h2>📈 Son 14 Gün — Günlük İşlem</h2>
+  <canvas id="chart"></canvas>
+</div>
+
+<div class="card">
+  <h2>👥 Son Kayıt Olan Kullanıcılar</h2>
+  <table>
+    <thead><tr><th>Kullanıcı Adı</th><th>Ad Soyad</th><th>Email</th><th>Kayıt Tarihi</th></tr></thead>
+    <tbody>{rows_html}</tbody>
+  </table>
+</div>
+
+</div>
+<script>
+var labels={chart_labels};
+var data={chart_data};
+var canvas=document.getElementById('chart');
+var ctx=canvas.getContext('2d');
+canvas.width=canvas.offsetWidth; canvas.height=200;
+var max=Math.max(...data,1);
+var pad={{l:40,r:20,t:20,b:30}};
+var W=canvas.width,H=canvas.height;
+var bw=(W-pad.l-pad.r)/Math.max(labels.length,1);
+ctx.fillStyle='#0a0c12'; ctx.fillRect(0,0,W,H);
+[0.25,0.5,0.75,1].forEach(function(f){{
+  var y=pad.t+(H-pad.t-pad.b)*(1-f);
+  ctx.strokeStyle='#1e2233'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke();
+  ctx.fillStyle='#475569'; ctx.font='10px system-ui'; ctx.textAlign='right';
+  ctx.fillText(Math.round(max*f),pad.l-4,y+4);
+}});
+data.forEach(function(v,i){{
+  var x=pad.l+i*bw+bw*0.1;
+  var bh=(v/max)*(H-pad.t-pad.b);
+  var y=H-pad.b-bh;
+  var grd=ctx.createLinearGradient(0,y,0,H-pad.b);
+  grd.addColorStop(0,'#6366f1'); grd.addColorStop(1,'#4338ca44');
+  ctx.fillStyle=grd;
+  ctx.beginPath();
+  ctx.roundRect(x,y,bw*0.8,bh,4);
+  ctx.fill();
+  if(i%3===0){{
+    ctx.fillStyle='#64748b'; ctx.font='9px system-ui'; ctx.textAlign='center';
+    ctx.fillText(labels[i]?labels[i].slice(5):'',x+bw*0.4,H-pad.b+14);
+  }}
+}});
+</script>
+</body></html>"""
 
 if __name__ == "__main__":
     init_db()
