@@ -781,8 +781,8 @@ def summary():
     if rstart and rend:
         start, end = rstart, rend
     elif period == "year":
-        start = f"{today_d.year}-01-01"
-        end   = f"{today_d.year}-12-31"
+        start = (today_d - timedelta(days=365)).isoformat()
+        end   = today_d.isoformat()
     elif period == "all":
         start = "2000-01-01"
         end   = "2100-12-31"
@@ -2698,7 +2698,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     </div>
     <div class="hero-period-tabs">
       <button class="hero-period-tab active" id="htab-month" onclick="setHeroPeriod('month')">Bu Ay</button>
-      <button class="hero-period-tab" id="htab-year" onclick="setHeroPeriod('year')">Bu Yıl</button>
+      <button class="hero-period-tab" id="htab-year" onclick="setHeroPeriod('year')">Son 12 Ay</button>
       <button class="hero-period-tab" id="htab-all" onclick="setHeroPeriod('all')">Tümü</button>
     </div>
     <div class="hero-bal-lbl" id="hero-bal-lbl">BU AY NET</div>
@@ -4037,7 +4037,7 @@ function setHeroPeriod(p){
     if(tab) tab.classList.toggle('active',id===p);
   });
   var lbl=document.getElementById('hero-bal-lbl');
-  if(lbl) lbl.textContent=p==='month'?'BU AY NET':p==='year'?'BU YIL NET':'TÜM ZAMANLAR';
+  if(lbl) lbl.textContent=p==='month'?'BU AY NET':p==='year'?'SON 12 AY NET':'TÜM ZAMANLAR';
   loadDashboard();
 }
 
