@@ -141,9 +141,7 @@ def _smtp_send(msg):
         log.warning("Mail credentials not configured — skipping email send")
         return False
     try:
-        smtp_host = os.environ.get("MAIL_SMTP_HOST", "smtp-mail.outlook.com")
-        smtp_port = int(os.environ.get("MAIL_SMTP_PORT", "587"))
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as s:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as s:
             s.ehlo(); s.starttls(); s.ehlo()
             s.login(MAIL_FROM, MAIL_PASSWORD)
             s.sendmail(MAIL_FROM, msg["To"], msg.as_string())
