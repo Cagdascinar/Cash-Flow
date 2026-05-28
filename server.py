@@ -331,7 +331,13 @@ HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Cash Flow</title>
+<meta name="theme-color" content="#0a0c12">
+<meta name="description" content="Kirpi — Kişisel nakit akışı takip uygulaması">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kirpi">
+<link rel="manifest" href="/manifest.json">
+<title>Kirpi — Nakit Akışı</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -546,7 +552,9 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 <!-- ── SIDEBAR NAV ── -->
 <nav>
   <div class="nav-logo">
-    <div class="brand"><div class="dot"></div>Cash Flow</div>
+    <div class="brand">
+      <img src="/icon.svg" style="width:32px;height:32px;border-radius:8px"> Kirpi
+    </div>
     <div class="sub">Nakit Akışı Takibi</div>
   </div>
   <div class="nav-links">
@@ -566,7 +574,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       <span class="ico">🎯</span>Bütçe
     </div>
   </div>
-  <div class="nav-bottom">Tüm veriler cihazınızda saklanır.</div>
+  <div class="nav-bottom">🦔 Kirpi v1.0 — Verileriniz güvende.</div>
 </nav>
 
 <!-- ── MAIN ── -->
@@ -649,7 +657,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       <option value="gelir">Gelir</option>
       <option value="gider">Gider</option>
     </select>
-    <select class="filter-sel" id="f-cat" onchange="filterLedger()"><option value="">Tüm Kategoriler</option></select>
+    <select class="filter-sel" id="ledger-f-cat" onchange="filterLedger()"><option value="">Tüm Kategoriler</option></select>
     <select class="filter-sel" id="f-year" onchange="filterLedger()"></select>
     <button class="btn btn-ghost" onclick="exportCsv()">⬇ CSV</button>
   </div>
@@ -828,10 +836,12 @@ function loadCats(cb){
     CATS=d;
     fillSel('f-cat',CATS[curTab]);
     fillSel('b-cat',CATS.gider);
-    // ledger filter
-    var fc=document.getElementById('f-cat');
-    fc.innerHTML='<option value="">Tüm Kategoriler</option>';
-    CATS.all.forEach(function(c){fc.innerHTML+='<option>'+c+'</option>'});
+    // ledger filter (ayrı id)
+    var fc=document.getElementById('ledger-f-cat');
+    if(fc){
+      fc.innerHTML='<option value="">Tüm Kategoriler</option>';
+      CATS.all.forEach(function(c){fc.innerHTML+='<option>'+c+'</option>'});
+    }
     if(cb)cb();
   });
 }
@@ -1027,7 +1037,7 @@ function sortBy(col){
 function filterLedger(){
   var q=(document.getElementById('ledger-search').value||'').toLowerCase();
   var ft=document.getElementById('f-type').value;
-  var fc=document.getElementById('f-cat').value;
+  var fc=document.getElementById('ledger-f-cat').value;
   var fy=document.getElementById('f-year').value;
   filteredTx=allTx.filter(function(t){
     if(fy&&!t.date.startsWith(fy))return false;
@@ -1227,9 +1237,88 @@ function toast(msg){
 window.addEventListener('resize',function(){
   if(summaryData.bar){drawBar(summaryData.bar);drawDonut(summaryData.gider_cats||{})}
 });
+
+// ── PWA SERVICE WORKER ────────────────────────────────────────────────────────
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').catch(function(){});
+}
 </script>
 </body>
 </html>"""
+
+ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="22" fill="#1a1d26"/>
+  <!-- spines -->
+  <g fill="#a78bfa">
+    <polygon points="50,8 46,22 54,22"/>
+    <polygon points="62,10 56,23 65,25"/>
+    <polygon points="73,16 65,27 74,31"/>
+    <polygon points="81,26 71,34 79,40"/>
+    <polygon points="85,38 74,43 80,50"/>
+    <polygon points="38,10 44,23 35,25"/>
+    <polygon points="27,16 35,27 26,31"/>
+  </g>
+  <!-- body -->
+  <ellipse cx="50" cy="62" rx="32" ry="24" fill="#7c3aed"/>
+  <!-- face -->
+  <ellipse cx="32" cy="60" rx="16" ry="14" fill="#c4b5fd"/>
+  <!-- eye -->
+  <circle cx="27" cy="57" r="3.5" fill="#1a1d26"/>
+  <circle cx="26" cy="56" r="1" fill="white"/>
+  <!-- nose -->
+  <ellipse cx="20" cy="62" rx="4" ry="3" fill="#7c3aed"/>
+  <circle cx="19" cy="62" r="2" fill="#4c1d95"/>
+  <!-- smile -->
+  <path d="M22 66 Q26 70 30 66" stroke="#4c1d95" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <!-- feet -->
+  <ellipse cx="38" cy="83" rx="8" ry="5" fill="#6d28d9"/>
+  <ellipse cx="56" cy="84" rx="8" ry="5" fill="#6d28d9"/>
+  <ellipse cx="70" cy="82" rx="7" ry="4" fill="#6d28d9"/>
+  <!-- belly stripe -->
+  <ellipse cx="50" cy="65" rx="15" ry="10" fill="#ede9fe" opacity="0.2"/>
+</svg>"""
+
+MANIFEST = json.dumps({
+    "name": "Kirpi — Nakit Akışı",
+    "short_name": "Kirpi",
+    "description": "Kişisel gelir-gider takip uygulaması",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0a0c12",
+    "theme_color": "#6366f1",
+    "orientation": "portrait",
+    "icons": [
+        {"src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"},
+        {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
+        {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    ]
+}, ensure_ascii=False)
+
+SW_JS = """
+const CACHE='kirpi-v1';
+const ASSETS=['/','/manifest.json','/icon.svg'];
+self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
+self.addEventListener('fetch',e=>{
+  if(e.request.method!=='GET')return;
+  e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)));
+});
+"""
+
+@app.route("/sw.js")
+def sw(): return SW_JS, 200, {"Content-Type": "application/javascript"}
+
+@app.route("/manifest.json")
+def manifest(): return MANIFEST, 200, {"Content-Type": "application/manifest+json"}
+
+@app.route("/icon.svg")
+def icon_svg(): return ICON_SVG, 200, {"Content-Type": "image/svg+xml"}
+
+@app.route("/icon-192.png")
+@app.route("/icon-512.png")
+def icon_png():
+    # redirect to svg for now — works for PWA install
+    from flask import redirect
+    return redirect("/icon.svg")
 
 @app.route("/")
 def index(): return HTML
