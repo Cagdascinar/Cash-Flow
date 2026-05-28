@@ -2,6 +2,6 @@
 builder = "NIXPACKS"
 
 [deploy]
-startCommand = "gunicorn server:app --workers 2 --timeout 120"
+startCommand = "mkdir -p /data && gunicorn server:app --workers 2 --timeout 120"
 healthcheckPath = "/"
 restartPolicyType = "ON_FAILURE"

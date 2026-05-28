@@ -13,7 +13,7 @@ log = logging.getLogger("kirpi")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
-DB = os.environ.get("DB_PATH", "/data/cashflow.db")
+DB = os.environ.get("DB_PATH", "/data/kirpi.db")
 
 # ── MAIL CONFIG ───────────────────────────────────────────────────────────────
 MAIL_FROM     = os.environ.get("MAIL_FROM", "")
