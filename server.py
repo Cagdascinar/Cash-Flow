@@ -1,8 +1,11 @@
-import sqlite3, json, os, csv, io, re, requests
+import sqlite3, json, os, csv, io, re, requests, secrets
 from datetime import datetime, date
-from flask import Flask, request, jsonify, g
+from functools import wraps
+from flask import Flask, request, jsonify, g, session, redirect, url_for
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 DB = os.path.join(os.path.dirname(__file__), "cashflow.db")
 
 GELIR_CATS = ["Maaş", "Serbest Meslek", "Kira Geliri", "Yatırım / Temettü", "Hediye / İkramiye", "Diğer Gelir"]
@@ -39,6 +42,13 @@ def init_db():
             id       INTEGER PRIMARY KEY AUTOINCREMENT,
             category TEXT UNIQUE NOT NULL,
             limit_   REAL NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS users (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            username      TEXT UNIQUE NOT NULL,
+            display_name  TEXT NOT NULL DEFAULT '',
+            password_hash TEXT NOT NULL,
+            created_at    TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS cards (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,6 +89,76 @@ def init_db():
 def row_to_dict(r): return dict(r)
 def today_str():    return date.today().isoformat()
 
+# ── AUTH ──────────────────────────────────────────────────────────────────────
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("user_id"):
+            if request.path.startswith("/api/"):
+                return jsonify({"ok": False, "error": "Giriş gerekli", "auth": False}), 401
+            return redirect("/login")
+        return f(*args, **kwargs)
+    return decorated
+
+def has_users():
+    with sqlite3.connect(DB) as con:
+        return con.execute("SELECT COUNT(*) FROM users").fetchone()[0] > 0
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    # Only allow registration if no users exist yet
+    if has_users():
+        return redirect("/login")
+    if request.method == "POST":
+        username = request.form.get("username","").strip().lower()
+        display  = request.form.get("display_name","").strip()
+        password = request.form.get("password","")
+        confirm  = request.form.get("confirm","")
+        error = None
+        if not username or not password:
+            error = "Kullanıcı adı ve şifre zorunlu"
+        elif len(password) < 6:
+            error = "Şifre en az 6 karakter olmalı"
+        elif password != confirm:
+            error = "Şifreler eşleşmiyor"
+        if error:
+            return AUTH_HTML_render("register", error)
+        with sqlite3.connect(DB) as con:
+            con.execute("INSERT INTO users (username,display_name,password_hash,created_at) VALUES (?,?,?,?)",
+                        (username, display or username, generate_password_hash(password), datetime.now().isoformat()))
+        return redirect("/login?registered=1")
+    return AUTH_HTML_render("register")
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    # If no users at all, go to register
+    if not has_users():
+        return redirect("/register")
+    if request.method == "POST":
+        username = request.form.get("username","").strip().lower()
+        password = request.form.get("password","")
+        with sqlite3.connect(DB) as con:
+            row = con.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+        if row and check_password_hash(row[3], password):
+            session["user_id"]   = row[0]
+            session["username"]  = row[1]
+            session["display"]   = row[2]
+            return redirect("/")
+        return AUTH_HTML_render("login", "Kullanıcı adı veya şifre hatalı")
+    msg = "Kayıt başarılı! Şimdi giriş yapabilirsiniz." if request.args.get("registered") else ""
+    return AUTH_HTML_render("login", msg)
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+@app.route("/api/me")
+@login_required
+def api_me():
+    return jsonify({"username": session.get("username"), "display": session.get("display")})
+
 def month_range(year, month):
     from calendar import monthrange
     _, last = monthrange(year, month)
@@ -87,6 +167,7 @@ def month_range(year, month):
 # ── CRUD ──────────────────────────────────────────────────────────────────────
 
 @app.route("/api/transactions", methods=["GET"])
+@login_required
 def list_transactions():
     db    = get_db()
     year  = request.args.get("year",  type=int)
@@ -102,6 +183,7 @@ def list_transactions():
     return jsonify([row_to_dict(r) for r in db.execute(q, params).fetchall()])
 
 @app.route("/api/transactions", methods=["POST"])
+@login_required
 def add_transaction():
     d = request.get_json(force=True)
     ttype = d.get("type"); amount = float(d.get("amount", 0))
@@ -116,6 +198,7 @@ def add_transaction():
     return jsonify({"ok": True, "id": cur.lastrowid})
 
 @app.route("/api/transactions/<int:tid>", methods=["PUT"])
+@login_required
 def update_transaction(tid):
     d = request.get_json(force=True)
     fields, params = [], []
@@ -130,11 +213,13 @@ def update_transaction(tid):
     return jsonify({"ok": True})
 
 @app.route("/api/transactions/<int:tid>", methods=["DELETE"])
+@login_required
 def del_transaction(tid):
     get_db().execute("DELETE FROM transactions WHERE id=?", (tid,)); get_db().commit()
     return jsonify({"ok": True})
 
 @app.route("/api/transactions/bulk-delete", methods=["POST"])
+@login_required
 def bulk_delete():
     ids = request.get_json(force=True)
     if not isinstance(ids, list): return jsonify({"ok": False}), 400
@@ -143,6 +228,7 @@ def bulk_delete():
     return jsonify({"ok": True, "deleted": len(ids)})
 
 @app.route("/api/summary")
+@login_required
 def summary():
     db    = get_db()
     year  = request.args.get("year",  date.today().year,  type=int)
@@ -170,6 +256,7 @@ def summary():
                     "gelir_cats":gelir_cats,"gider_cats":gider_cats,"bar":bar,"budgets":budgets})
 
 @app.route("/api/budgets", methods=["POST"])
+@login_required
 def set_budget():
     d = request.get_json(force=True)
     cat = d.get("category",""); limit = float(d.get("limit",0))
@@ -179,10 +266,12 @@ def set_budget():
     db.commit(); return jsonify({"ok":True})
 
 @app.route("/api/categories")
+@login_required
 def categories():
     return jsonify({"gelir":GELIR_CATS,"gider":GIDER_CATS,"all":ALL_CATS})
 
 @app.route("/api/motivation")
+@login_required
 def motivation():
     db = get_db(); today = date.today()
     year, month = today.year, today.month
@@ -308,6 +397,7 @@ def _detect_cols(header):
             find("tutar","amount","miktar") if find("borç","borc") is None and find("alacak") is None else None)
 
 @app.route("/api/import/preview", methods=["POST"])
+@login_required
 def import_preview():
     f = request.files.get("file")
     if not f: return jsonify({"ok":False,"error":"Dosya yüklenmedi"}),400
@@ -348,10 +438,12 @@ def import_preview():
 # ── CARDS ─────────────────────────────────────────────────────────────────────
 
 @app.route("/api/cards", methods=["GET"])
+@login_required
 def list_cards():
     return jsonify([row_to_dict(r) for r in get_db().execute("SELECT * FROM cards ORDER BY bank_name").fetchall()])
 
 @app.route("/api/cards", methods=["POST"])
+@login_required
 def add_card():
     d = request.get_json(force=True)
     bank = d.get("bank_name","").strip(); card = d.get("card_name","").strip()
@@ -366,6 +458,7 @@ def add_card():
     db.commit(); return jsonify({"ok":True,"id":cur.lastrowid})
 
 @app.route("/api/cards/<int:cid>", methods=["PUT"])
+@login_required
 def update_card(cid):
     d = request.get_json(force=True); fields=[]; params=[]
     for col in ("bank_name","card_name","limit_","used_","due_day","min_pct","statement_day"):
@@ -378,6 +471,7 @@ def update_card(cid):
     return jsonify({"ok":True})
 
 @app.route("/api/cards/<int:cid>", methods=["DELETE"])
+@login_required
 def del_card(cid):
     get_db().execute("DELETE FROM cards WHERE id=?",(cid,)); get_db().commit()
     return jsonify({"ok":True})
@@ -426,15 +520,18 @@ def get_rates():
         return _rates_cache["data"]
 
 @app.route("/api/rates")
+@login_required
 def api_rates():
     return jsonify(get_rates())
 
 @app.route("/api/investments", methods=["GET"])
+@login_required
 def list_investments():
     rows = get_db().execute("SELECT * FROM investments ORDER BY buy_date DESC").fetchall()
     return jsonify([row_to_dict(r) for r in rows])
 
 @app.route("/api/investments", methods=["POST"])
+@login_required
 def add_investment():
     d = request.get_json(force=True)
     name     = d.get("name","").strip()
@@ -454,11 +551,13 @@ def add_investment():
     return jsonify({"ok": True, "id": cur.lastrowid})
 
 @app.route("/api/investments/<int:iid>", methods=["DELETE"])
+@login_required
 def del_investment(iid):
     get_db().execute("DELETE FROM investments WHERE id=?", (iid,)); get_db().commit()
     return jsonify({"ok": True})
 
 @app.route("/api/investments/value", methods=["GET"])
+@login_required
 def investment_values():
     """Return all investments with current TRY value and profit/loss."""
     rows  = get_db().execute("SELECT * FROM investments").fetchall()
@@ -504,6 +603,7 @@ def investment_values():
     return jsonify(result)
 
 @app.route("/api/investments/<int:iid>/book-income", methods=["POST"])
+@login_required
 def book_investment_income(iid):
     """Add investment profit as a gelir transaction for this month."""
     d = request.get_json(force=True)
@@ -520,6 +620,7 @@ def book_investment_income(iid):
     return jsonify({"ok": True, "id": cur.lastrowid})
 
 @app.route("/api/tefas/<fon_kod>")
+@login_required
 def tefas_fon(fon_kod):
     """Fetch latest NAV for a TEFAS fund code."""
     try:
@@ -550,11 +651,13 @@ def tefas_fon(fon_kod):
 # ── RECURRING ────────────────────────────────────────────────────────────────
 
 @app.route("/api/recurring", methods=["GET"])
+@login_required
 def list_recurring():
     rows = get_db().execute("SELECT * FROM recurring ORDER BY type DESC, day_of_month").fetchall()
     return jsonify([row_to_dict(r) for r in rows])
 
 @app.route("/api/recurring", methods=["POST"])
+@login_required
 def add_recurring():
     d = request.get_json(force=True)
     ttype = d.get("type"); amount = float(d.get("amount", 0))
@@ -570,11 +673,13 @@ def add_recurring():
     return jsonify({"ok": True, "id": cur.lastrowid})
 
 @app.route("/api/recurring/<int:rid>", methods=["DELETE"])
+@login_required
 def del_recurring(rid):
     get_db().execute("DELETE FROM recurring WHERE id=?", (rid,)); get_db().commit()
     return jsonify({"ok": True})
 
 @app.route("/api/recurring/<int:rid>", methods=["PUT"])
+@login_required
 def update_recurring(rid):
     d = request.get_json(force=True)
     fields, params = [], []
@@ -590,6 +695,7 @@ def update_recurring(rid):
     return jsonify({"ok": True})
 
 @app.route("/api/recurring/apply", methods=["POST"])
+@login_required
 def apply_recurring():
     """Generate transactions from recurring templates for given year (or year+month)."""
     d = request.get_json(force=True)
@@ -628,6 +734,7 @@ def apply_recurring():
     return jsonify({"ok": True, "created": created, "skipped": skipped})
 
 @app.route("/api/import/confirm", methods=["POST"])
+@login_required
 def import_confirm():
     rows=request.get_json(force=True)
     if not isinstance(rows,list): return jsonify({"ok":False}),400
@@ -640,6 +747,168 @@ def import_confirm():
     db.commit(); return jsonify({"ok":True,"imported":count})
 
 # ── HTML ──────────────────────────────────────────────────────────────────────
+
+AUTH_HTML = r"""<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0a0c12">
+<title>Kirpi — __MODE_TITLE__</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0c12;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;
+  min-height:100vh;display:grid;grid-template-columns:1fr 1fr;align-items:stretch}
+@media(max-width:700px){body{grid-template-columns:1fr}}
+.hero{background:linear-gradient(145deg,#0f1525 0%,#161c35 50%,#0e1520 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 40px;
+  position:relative;overflow:hidden}
+@media(max-width:700px){.hero{display:none}}
+.hero-title{font-size:2rem;font-weight:900;letter-spacing:-.04em;margin-bottom:8px;
+  background:linear-gradient(135deg,#818cf8,#a78bfa,#6ee7b7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero-sub{font-size:.9rem;color:#64748b;text-align:center;max-width:280px;line-height:1.6;margin-bottom:32px}
+.hero-pills{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:300px}
+.pill{background:#1e2233;border:1px solid #2a2f45;border-radius:20px;padding:6px 14px;
+  font-size:.75rem;color:#94a3b8;display:flex;align-items:center;gap:6px}
+.right{display:flex;align-items:center;justify-content:center;padding:40px 36px;background:#0d0f18}
+.box{background:#111318;border:1px solid #1e2233;border-radius:16px;padding:40px 36px;
+  width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.logo{text-align:center;margin-bottom:32px}
+.logo img{width:64px;height:64px;border-radius:16px;margin-bottom:12px}
+.logo h1{font-size:1.4rem;font-weight:800;letter-spacing:-.02em}
+.logo p{font-size:.82rem;color:#64748b;margin-top:4px}
+label{display:block;font-size:.78rem;color:#94a3b8;margin-bottom:5px;font-weight:500}
+input{width:100%;background:#1a1d26;border:1px solid #2a2f45;color:#e2e8f0;
+  padding:12px 14px;border-radius:9px;font-size:.9rem;outline:none;margin-bottom:14px;
+  font-family:inherit;transition:.15s}
+input:focus{border-color:#6366f1}
+.btn{width:100%;padding:13px;background:#6366f1;color:#fff;border:none;border-radius:9px;
+  font-size:.92rem;font-weight:700;cursor:pointer;transition:.2s;margin-top:4px}
+.btn:hover{background:#4f46e5}
+.msg{text-align:center;font-size:.82rem;padding:10px 14px;border-radius:8px;margin-bottom:16px}
+.msg.err{background:#ef444418;color:#ef4444;border:1px solid #ef444433}
+.msg.ok{background:#22c55e18;color:#22c55e;border:1px solid #22c55e33}
+.link{text-align:center;margin-top:18px;font-size:.82rem;color:#64748b}
+.link a{color:#818cf8;text-decoration:none;font-weight:600}
+.link a:hover{color:#a5b4fc}
+</style>
+</head>
+<body>
+
+<!-- HERO (sol taraf) -->
+<div class="hero">
+  <!-- Arka plan parçacıklar -->
+  <svg style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:.12" viewBox="0 0 500 600" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="80" cy="120" r="60" fill="#6366f1"/><circle cx="420" cy="80" r="40" fill="#a855f7"/>
+    <circle cx="350" cy="300" r="80" fill="#6366f1"/><circle cx="60" cy="450" r="50" fill="#8b5cf6"/>
+    <circle cx="450" cy="500" r="35" fill="#a855f7"/>
+  </svg>
+
+  <!-- Finans dashboard illüstrasyonu -->
+  <svg width="280" height="220" viewBox="0 0 280 220" style="margin-bottom:28px;filter:drop-shadow(0 8px 32px #6366f140)">
+    <!-- Kart arka planı -->
+    <rect x="20" y="10" width="240" height="200" rx="16" fill="#1a1d26" stroke="#2a2f45" stroke-width="1"/>
+    <!-- Gelir bar -->
+    <rect x="40" y="120" width="30" height="70" rx="6" fill="#22c55e" opacity=".8"/>
+    <rect x="80" y="90" width="30" height="100" rx="6" fill="#22c55e" opacity=".9"/>
+    <rect x="120" y="100" width="30" height="90" rx="6" fill="#22c55e"/>
+    <rect x="160" y="70" width="30" height="120" rx="6" fill="#22c55e" opacity=".85"/>
+    <rect x="200" y="85" width="30" height="105" rx="6" fill="#22c55e" opacity=".9"/>
+    <!-- Gider bar overlay -->
+    <rect x="40" y="150" width="30" height="40" rx="6" fill="#ef4444" opacity=".7"/>
+    <rect x="80" y="140" width="30" height="50" rx="6" fill="#ef4444" opacity=".7"/>
+    <rect x="120" y="145" width="30" height="45" rx="6" fill="#ef4444" opacity=".65"/>
+    <rect x="160" y="130" width="30" height="60" rx="6" fill="#ef4444" opacity=".7"/>
+    <rect x="200" y="135" width="30" height="55" rx="6" fill="#ef4444" opacity=".7"/>
+    <!-- Trend çizgi -->
+    <polyline points="55,115 95,82 135,95 175,62 215,78" stroke="#818cf8" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="55" cy="115" r="4" fill="#818cf8"/><circle cx="95" cy="82" r="4" fill="#818cf8"/>
+    <circle cx="135" cy="95" r="4" fill="#818cf8"/><circle cx="175" cy="62" r="4" fill="#818cf8"/>
+    <circle cx="215" cy="78" r="5" fill="#818cf8" stroke="#1a1d26" stroke-width="2"/>
+    <!-- Üst bilgi -->
+    <text x="40" y="42" font-family="system-ui" font-size="11" fill="#64748b">Bu Ay Net</text>
+    <text x="40" y="60" font-family="system-ui" font-size="18" font-weight="800" fill="#22c55e">+₺23.400</text>
+    <!-- Kirpi ikonu sağ üst -->
+    <text x="210" y="48" font-size="28">🦔</text>
+    <!-- Alt göstergeler -->
+    <rect x="40" y="200" width="8" height="8" rx="2" fill="#22c55e"/>
+    <text x="52" y="208" font-family="system-ui" font-size="9" fill="#64748b">Gelir</text>
+    <rect x="95" y="200" width="8" height="8" rx="2" fill="#ef4444"/>
+    <text x="107" y="208" font-family="system-ui" font-size="9" fill="#64748b">Gider</text>
+    <rect x="150" y="200" width="8" height="8" rx="2" fill="#818cf8"/>
+    <text x="162" y="208" font-family="system-ui" font-size="9" fill="#64748b">Trend</text>
+  </svg>
+
+  <div class="hero-title">🦔 Kirpi</div>
+  <div class="hero-sub">Gelirin, giderin, yatırımın ve kartların tek ekranda</div>
+  <div class="hero-pills">
+    <div class="pill">📊 Dashboard</div>
+    <div class="pill">💳 Kart Takibi</div>
+    <div class="pill">📈 Yatırım</div>
+    <div class="pill">🔁 Düzenli İşlem</div>
+    <div class="pill">📂 Banka CSV</div>
+    <div class="pill">🎯 Bütçe</div>
+  </div>
+</div>
+
+<!-- FORM (sağ taraf) -->
+<div class="right">
+<div class="box">
+  <div class="logo">
+    <img src="/icon.svg" alt="Kirpi">
+    <h1>🦔 Kirpi</h1>
+    <p>Nakit Akışı Takibi</p>
+  </div>
+
+  <!-- __MODE__ === register -->
+  <div id="reg-form" style="display:__REG_DISPLAY__">
+    <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:20px;text-align:center">Hesap Oluştur</h2>
+    __ERROR_BLOCK__
+    <form method="POST" action="/register">
+      <label>Ad Soyad</label>
+      <input type="text" name="display_name" placeholder="Çağdaş Çınar" autocomplete="name">
+      <label>Kullanıcı Adı</label>
+      <input type="text" name="username" placeholder="cagdas" required autocomplete="username">
+      <label>Şifre <span style="color:#64748b">(en az 6 karakter)</span></label>
+      <input type="password" name="password" required autocomplete="new-password">
+      <label>Şifre Tekrar</label>
+      <input type="password" name="confirm" required autocomplete="new-password">
+      <button class="btn" type="submit">Kayıt Ol</button>
+    </form>
+  </div>
+
+  <!-- __MODE__ === login -->
+  <div id="login-form" style="display:__LOGIN_DISPLAY__">
+    <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:20px;text-align:center">Giriş Yap</h2>
+    __ERROR_BLOCK__
+    <form method="POST" action="/login">
+      <label>Kullanıcı Adı</label>
+      <input type="text" name="username" required autocomplete="username">
+      <label>Şifre</label>
+      <input type="password" name="password" required autocomplete="current-password">
+      <button class="btn" type="submit">Giriş Yap</button>
+    </form>
+  </div>
+</div>
+</div><!-- /right -->
+</body>
+</html>"""
+
+def AUTH_HTML_render(mode, msg=""):
+    is_reg   = mode == "register"
+    is_err   = msg and not msg.startswith("Kayıt")
+    msg_html = f'<div class="msg {"err" if is_err else "ok"}">{msg}</div>' if msg else ""
+    return (AUTH_HTML
+        .replace("__MODE_TITLE__", "Kayıt Ol" if is_reg else "Giriş Yap")
+        .replace("__REG_DISPLAY__",   "block" if is_reg  else "none")
+        .replace("__LOGIN_DISPLAY__", "none"  if is_reg  else "block")
+        .replace("__ERROR_BLOCK__", msg_html)
+        .replace("__MODE__", mode))
+
+# patch string-based replacements with the real renderer
+class _AuthProxy:
+    def replace(self, key, val):
+        return self  # handled by AUTH_HTML_render
 
 HTML = r"""<!DOCTYPE html>
 <html lang="tr">
@@ -898,7 +1167,10 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       <span class="ico">🎯</span>Bütçe
     </div>
   </div>
-  <div class="nav-bottom">🦔 Kirpi v1.0 — Verileriniz güvende.</div>
+  <div class="nav-bottom">
+    <div style="font-weight:600;color:var(--txt);margin-bottom:5px">👤 __USER_DISPLAY__</div>
+    <a href="/logout" style="color:#ef4444;font-size:.75rem;text-decoration:none;display:inline-flex;align-items:center;gap:4px">↩ Çıkış Yap</a>
+  </div>
 </nav>
 
 <!-- ── MAIN ── -->
@@ -2339,7 +2611,10 @@ def icon_png():
     return redirect("/icon.svg")
 
 @app.route("/")
-def index(): return HTML
+@login_required
+def index():
+    display = session.get("display","")
+    return HTML.replace("__USER_DISPLAY__", display)
 
 if __name__ == "__main__":
     init_db()
