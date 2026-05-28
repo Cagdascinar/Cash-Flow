@@ -712,7 +712,12 @@ def summary():
     db    = get_db()
     year  = request.args.get("year",  date.today().year,  type=int)
     month = request.args.get("month", date.today().month, type=int)
-    start, end = month_range(year, month)
+    rstart = request.args.get("start","")
+    rend   = request.args.get("end","")
+    if rstart and rend:
+        start, end = rstart, rend
+    else:
+        start, end = month_range(year, month)
     rows = db.execute(
         "SELECT type,category,SUM(amount) as total FROM transactions "
         "WHERE profile_id=? AND date BETWEEN ? AND ? GROUP BY type,category", (pid, start, end)).fetchall()
@@ -1191,9 +1196,10 @@ def update_recurring(rid):
 def apply_recurring():
     uid = session["user_id"]; pid = get_pid()
     d = request.get_json(force=True)
-    year   = int(d.get("year",  date.today().year))
-    month  = d.get("month")
-    months = [int(month)] if month else list(range(1, 13))
+    year        = int(d.get("year", date.today().year))
+    month_start = int(d.get("month_start", 1))
+    month_end   = int(d.get("month_end",   12))
+    months      = list(range(month_start, month_end + 1))
 
     db        = get_db()
     templates = db.execute("SELECT * FROM recurring WHERE profile_id=? AND active=1",(pid,)).fetchall()
@@ -1540,8 +1546,8 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
 @media(max-width:768px){.nav-bottom{display:none}}
 
 /* ── PAGE ── */
-.page{display:none;padding:28px 28px;max-width:1280px;will-change:opacity,transform}
-.page.active{display:block}
+.page{display:none;padding:28px 28px;max-width:1280px;will-change:opacity,transform;opacity:0;transform:translateY(10px)}
+.page.active{display:block;opacity:1;transform:translateY(0);transition:opacity .22s ease,transform .22s ease}
 @media(max-width:600px){.page{padding:16px}}
 .page-title{font-size:1.4rem;font-weight:800;margin-bottom:4px;letter-spacing:-.02em}
 .page-sub{font-size:.82rem;color:var(--txt2);margin-bottom:24px}
@@ -1753,16 +1759,17 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     </div>
     <div id="profile-menu" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:8px;margin-bottom:10px">
       <div id="profile-list"></div>
-      <button onclick="showAddProfile()" style="width:100%;margin-top:6px;padding:7px;background:transparent;border:1px dashed var(--border2);border-radius:7px;color:var(--txt2);font-size:.75rem;cursor:pointer">+ Yeni Profil Ekle</button>
+      <button onclick="showAddProfile()" style="width:100%;margin-top:6px;padding:8px;background:transparent;border:1px dashed var(--border2);border-radius:7px;color:var(--b2);font-size:.75rem;cursor:pointer;font-weight:600">+ Yeni Kullanıcı Ekle</button>
     </div>
     <div id="add-profile-form" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px;margin-bottom:10px">
-      <input id="new-profile-name" placeholder="Profil adı (ör. Şirket)" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--txt);padding:7px 10px;border-radius:7px;font-size:.8rem;margin-bottom:6px;outline:none">
-      <select id="new-profile-type" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--txt);padding:7px 10px;border-radius:7px;font-size:.8rem;margin-bottom:8px">
-        <option value="sahis">👤 Şahıs</option>
-        <option value="sirket">🏢 Şirket</option>
+      <div style="font-size:.72rem;color:var(--txt2);margin-bottom:6px;font-weight:600">YENİ PROFİL</div>
+      <select id="new-profile-type" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--txt);padding:7px 10px;border-radius:7px;font-size:.8rem;margin-bottom:6px;outline:none">
+        <option value="sahis">👤 Şahıs (Kişisel)</option>
+        <option value="sirket">🏢 Şirket (Kurumsal)</option>
       </select>
+      <input id="new-profile-name" placeholder="İsim ya da Ünvan" style="width:100%;background:var(--bg);border:1px solid var(--border2);color:var(--txt);padding:7px 10px;border-radius:7px;font-size:.8rem;margin-bottom:8px;outline:none">
       <div style="display:flex;gap:6px">
-        <button onclick="createProfile()" style="flex:1;padding:7px;background:var(--b);border:none;border-radius:7px;color:#fff;font-size:.78rem;cursor:pointer;font-weight:600">Oluştur</button>
+        <button onclick="createProfile()" style="flex:1;padding:7px;background:var(--b);border:none;border-radius:7px;color:#fff;font-size:.78rem;cursor:pointer;font-weight:600">Profil Oluştur</button>
         <button onclick="cancelAddProfile()" style="padding:7px 10px;background:transparent;border:1px solid var(--border2);border-radius:7px;color:var(--txt2);font-size:.78rem;cursor:pointer">İptal</button>
       </div>
     </div>
@@ -1795,13 +1802,30 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       </div>
       <div class="mnav" id="month-nav">
         <button onclick="changeMonth(-1)">‹</button>
-        <div class="ml" id="mlabel"></div>
+        <div class="ml" id="mlabel" onclick="toggleDateRange()" style="cursor:pointer;user-select:none" title="Tarih aralığı seç"></div>
         <button onclick="changeMonth(1)">›</button>
       </div>
       <div class="mnav" id="year-nav" style="display:none">
         <button onclick="changeYear(-1)">‹</button>
         <div class="ml" id="ylabel"></div>
         <button onclick="changeYear(1)">›</button>
+      </div>
+      <div id="date-range-picker" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px;position:absolute;z-index:200;margin-top:4px;box-shadow:0 8px 24px rgba(0,0,0,.5)">
+        <div style="font-size:.72rem;color:var(--txt2);margin-bottom:8px;font-weight:600">TARİH ARALIĞI</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <div>
+            <div style="font-size:.7rem;color:var(--txt2);margin-bottom:3px">Başlangıç</div>
+            <input type="date" id="range-start" style="background:var(--bg);border:1px solid var(--border2);color:var(--txt);padding:6px 8px;border-radius:7px;font-size:.8rem;outline:none">
+          </div>
+          <div>
+            <div style="font-size:.7rem;color:var(--txt2);margin-bottom:3px">Bitiş</div>
+            <input type="date" id="range-end" style="background:var(--bg);border:1px solid var(--border2);color:var(--txt);padding:6px 8px;border-radius:7px;font-size:.8rem;outline:none">
+          </div>
+          <div style="display:flex;gap:6px;margin-top:16px">
+            <button onclick="applyDateRange()" style="padding:6px 14px;background:var(--b);border:none;border-radius:7px;color:#fff;font-size:.78rem;cursor:pointer;font-weight:600">Uygula</button>
+            <button onclick="clearDateRange()" style="padding:6px 10px;background:transparent;border:1px solid var(--border2);border-radius:7px;color:var(--txt2);font-size:.78rem;cursor:pointer">Temizle</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -2153,21 +2177,31 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
         Şablonları seçili yıl için toplu olarak işlemlere dönüştür.<br>
         Zaten girilmiş olanlar atlanır, çift kayıt oluşmaz.
       </p>
-      <div class="form-row" style="margin-bottom:16px">
+      <div class="form-row" style="margin-bottom:10px">
         <div>
           <label>Yıl</label>
           <select class="f-input" id="rec-apply-year"></select>
         </div>
         <div>
-          <label>Ay (opsiyonel)</label>
-          <select class="f-input" id="rec-apply-month">
-            <option value="">Tüm Yıl (12 ay)</option>
+          <label>Başlangıç Ayı</label>
+          <select class="f-input" id="rec-apply-month-start">
             <option value="1">Ocak</option><option value="2">Şubat</option>
             <option value="3">Mart</option><option value="4">Nisan</option>
             <option value="5">Mayıs</option><option value="6">Haziran</option>
             <option value="7">Temmuz</option><option value="8">Ağustos</option>
             <option value="9">Eylül</option><option value="10">Ekim</option>
             <option value="11">Kasım</option><option value="12">Aralık</option>
+          </select>
+        </div>
+        <div>
+          <label>Bitiş Ayı</label>
+          <select class="f-input" id="rec-apply-month-end">
+            <option value="1">Ocak</option><option value="2">Şubat</option>
+            <option value="3">Mart</option><option value="4">Nisan</option>
+            <option value="5">Mayıs</option><option value="6">Haziran</option>
+            <option value="7">Temmuz</option><option value="8">Ağustos</option>
+            <option value="9">Eylül</option><option value="10">Ekim</option>
+            <option value="11">Kasım</option><option value="12" selected>Aralık</option>
           </select>
         </div>
       </div>
@@ -2325,27 +2359,27 @@ function goPage(id, el){
   var next = document.getElementById('page-'+id);
   if(prev && prev === next) return;
 
-  // Exit animation
-  if(prev){
-    prev.style.transition='opacity .18s ease,transform .18s ease';
-    prev.style.opacity='0';
-    prev.style.transform='translateY(10px)';
-  }
-
   document.querySelectorAll('.nl').forEach(function(n){n.classList.remove('active')});
   if(el) el.classList.add('active');
 
-  setTimeout(function(){
+  function show(){
     document.querySelectorAll('.page').forEach(function(p){
       p.classList.remove('active');
-      p.style.opacity=''; p.style.transform='';
+      p.style.transition='none';
+      p.style.opacity='0';
+      p.style.transform='translateY(12px)';
+      p.style.display='none';
     });
-    next.classList.add('active');
-    next.style.opacity='0'; next.style.transform='translateY(12px)';
-    next.style.transition='opacity .22s ease,transform .22s ease';
+    next.style.display='block';
+    next.style.opacity='0';
+    next.style.transform='translateY(12px)';
+    next.style.transition='none';
     requestAnimationFrame(function(){
       requestAnimationFrame(function(){
-        next.style.opacity='1'; next.style.transform='translateY(0)';
+        next.style.transition='opacity .24s ease,transform .24s ease';
+        next.style.opacity='1';
+        next.style.transform='translateY(0)';
+        next.classList.add('active');
       });
     });
     if(id==='ledger') renderLedger();
@@ -2353,7 +2387,16 @@ function goPage(id, el){
     if(id==='recurring') initRecurringPage();
     if(id==='invest') initInvestPage();
     if(id==='cards') loadCards();
-  }, prev ? 160 : 0);
+  }
+
+  if(prev){
+    prev.style.transition='opacity .16s ease,transform .16s ease';
+    prev.style.opacity='0';
+    prev.style.transform='translateY(8px)';
+    setTimeout(show, 160);
+  } else {
+    show();
+  }
 }
 
 // ── PROFILE SWITCHER ─────────────────────────────────────────────────────────
@@ -2409,15 +2452,16 @@ function cancelAddProfile(){
 function createProfile(){
   var name=document.getElementById('new-profile-name').value.trim();
   var type=document.getElementById('new-profile-type').value;
-  if(!name) return;
-  xhr('/api/profiles','POST',function(d){
-    if(!d.ok){ showToast('Hata: '+d.error,'#ef4444'); return; }
+  if(!name){ showToast('İsim / Ünvan zorunlu','#ef4444'); return; }
+  xhr('/api/profiles',{name:name,type:type},function(d){
+    if(!d.ok){ showToast('Hata: '+(d.error||'Oluşturulamadı'),'#ef4444'); return; }
     _profiles.push(d);
     switchProfile(d.id);
     document.getElementById('new-profile-name').value='';
     document.getElementById('add-profile-form').style.display='none';
+    renderProfileList();
     showToast('Profil oluşturuldu: '+d.name,'#22c55e');
-  },{name:name,type:type});
+  });
 }
 function showToast(msg,color){
   var t=document.createElement('div');
@@ -2428,11 +2472,35 @@ function showToast(msg,color){
   setTimeout(function(){ t.style.opacity='0'; setTimeout(function(){ t.remove(); },300); },2500);
 }
 
-// ── MONTH NAV ─────────────────────────────────────────────────────────────────
+// ── MONTH NAV & DATE RANGE ───────────────────────────────────────────────────
+var _dateRangeActive=false, _rangeStart='', _rangeEnd='';
 function changeMonth(d){
+  if(_dateRangeActive) return;
   curMonth+=d;
   if(curMonth>12){curMonth=1;curYear++}
   if(curMonth<1){curMonth=12;curYear--}
+  updateMonthLabel();
+  loadDashboard();
+}
+function toggleDateRange(){
+  var p=document.getElementById('date-range-picker');
+  p.style.display = p.style.display==='none' ? 'block' : 'none';
+}
+function applyDateRange(){
+  var s=document.getElementById('range-start').value;
+  var e=document.getElementById('range-end').value;
+  if(!s||!e){ showToast('Başlangıç ve bitiş tarihi seçin','#ef4444'); return; }
+  if(s>e){ showToast('Başlangıç tarihi bitiş tarihinden önce olmalı','#ef4444'); return; }
+  _dateRangeActive=true; _rangeStart=s; _rangeEnd=e;
+  document.getElementById('mlabel').textContent=s.slice(5)+' → '+e.slice(5);
+  document.getElementById('date-range-picker').style.display='none';
+  loadDashboard();
+}
+function clearDateRange(){
+  _dateRangeActive=false; _rangeStart=''; _rangeEnd='';
+  document.getElementById('range-start').value='';
+  document.getElementById('range-end').value='';
+  document.getElementById('date-range-picker').style.display='none';
   updateMonthLabel();
   loadDashboard();
 }
@@ -2466,7 +2534,13 @@ function setTab(t){
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
 function loadDashboard(){
-  xhr('/api/summary?year='+curYear+'&month='+curMonth,null,function(d){
+  var url;
+  if(_dateRangeActive){
+    url='/api/summary?start='+_rangeStart+'&end='+_rangeEnd;
+  } else {
+    url='/api/summary?year='+curYear+'&month='+curMonth;
+  }
+  xhr(url,null,function(d){
     summaryData=d;
     renderStats(d);
     drawBar(d.bar);
@@ -3076,9 +3150,10 @@ function delRecurring(id){
 
 function applyRecurring(){
   var year  = parseInt(document.getElementById('rec-apply-year').value);
-  var month = document.getElementById('rec-apply-month').value;
-  var body  = {year: year};
-  if(month) body.month = month;
+  var mStart= parseInt(document.getElementById('rec-apply-month-start').value);
+  var mEnd  = parseInt(document.getElementById('rec-apply-month-end').value);
+  if(mEnd < mStart){ showToast('Bitiş ayı başlangıç ayından önce olamaz','#ef4444'); return; }
+  var body  = {year: year, month_start: mStart, month_end: mEnd};
   xhr('/api/recurring/apply', body, function(r){
     var el = document.getElementById('rec-apply-result');
     if(r.ok){
