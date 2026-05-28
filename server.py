@@ -1,4 +1,4 @@
-import sqlite3, json, os
+import sqlite3, json, os, csv, io, re
 from datetime import datetime, date
 from flask import Flask, request, jsonify, g
 
@@ -316,6 +316,213 @@ def motivation():
 def categories():
     return jsonify({"gelir": GELIR_CATS, "gider": GIDER_CATS})
 
+# ── CSV import ────────────────────────────────────────────────────────────────
+
+def _parse_amount(s):
+    """Parse Turkish/international number strings to float. Handles:
+    1.234,56 → 1234.56  (Turkish: dot=thousands, comma=decimal)
+    1,234.56 → 1234.56  (English: comma=thousands, dot=decimal)
+    35000,00 → 35000.00 (Turkish decimal-only)
+    35000.00 → 35000.00 (plain)
+    """
+    s = s.strip().replace(" ", "").replace("\xa0", "")
+    s = re.sub(r"[₺$€£+]", "", s)
+    neg = s.startswith("-")
+    s = s.lstrip("-")
+    if not s:
+        return None
+
+    dots   = s.count(".")
+    commas = s.count(",")
+
+    if dots == 0 and commas == 0:
+        # plain integer
+        pass
+    elif dots >= 1 and commas == 0:
+        # could be 35000.00 or 1.234.567 (all dots = thousands in some formats)
+        if dots == 1:
+            pass  # treat as decimal point
+        else:
+            s = s.replace(".", "")  # all dots = thousand separators
+    elif dots == 0 and commas == 1:
+        # 35000,00 → decimal comma
+        s = s.replace(",", ".")
+    elif dots == 0 and commas > 1:
+        # 1,234,567 → commas = thousands
+        s = s.replace(",", "")
+    elif dots == 1 and commas == 1:
+        if s.index(".") < s.index(","):
+            # 1.234,56 → Turkish (dot=thousands, comma=decimal)
+            s = s.replace(".", "").replace(",", ".")
+        else:
+            # 1,234.56 → English
+            s = s.replace(",", "")
+    elif dots > 1 and commas == 1:
+        # 1.234.567,89 → Turkish
+        s = s.replace(".", "").replace(",", ".")
+    elif dots == 1 and commas > 1:
+        # 1,234,567.89 → English
+        s = s.replace(",", "")
+
+    try:
+        return abs(float(s))
+    except Exception:
+        return None
+
+def _parse_date(s):
+    """Try multiple date formats → YYYY-MM-DD"""
+    s = s.strip()
+    for fmt in ("%d.%m.%Y", "%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d.%m.%y", "%m/%d/%Y"):
+        try:
+            return datetime.strptime(s, fmt).strftime("%Y-%m-%d")
+        except Exception:
+            pass
+    return None
+
+# keyword → category mapping (lowercase)
+_CAT_MAP = {
+    "maaş": "Maaş", "maas": "Maaş", "salary": "Maaş", "ücret": "Maaş",
+    "kira": "Kira / Mortgage", "mortgage": "Kira / Mortgage", "aidat": "Faturalar",
+    "elektrik": "Faturalar", "su fatura": "Faturalar", "doğalgaz": "Faturalar", "dogalgaz": "Faturalar",
+    "fatura": "Faturalar", "internet": "Abonelikler", "netflix": "Abonelikler",
+    "spotify": "Abonelikler", "abonelik": "Abonelikler",
+    "market": "Market / Gıda", "migros": "Market / Gıda", "a101": "Market / Gıda",
+    "bim": "Market / Gıda", "carrefour": "Market / Gıda", "şok": "Market / Gıda",
+    "taxi": "Ulaşım", "taksi": "Ulaşım", "uber": "Ulaşım", "metro": "Ulaşım",
+    "otobüs": "Ulaşım", "akaryakıt": "Ulaşım", "benzin": "Ulaşım", "shell": "Ulaşım",
+    "opet": "Ulaşım", "bp ": "Ulaşım",
+    "restoran": "Yemek / Restoran", "cafe": "Yemek / Restoran", "kahve": "Yemek / Restoran",
+    "yemeksepeti": "Yemek / Restoran", "getir": "Yemek / Restoran", "trendyol yemek": "Yemek / Restoran",
+    "sinema": "Eğlence", "konser": "Eğlence", "bilet": "Eğlence",
+    "eczane": "Sağlık", "hastane": "Sağlık", "doktor": "Sağlık", "ilaç": "Sağlık",
+    "giyim": "Giyim", "zara": "Giyim", "h&m": "Giyim", "lcw": "Giyim",
+    "okul": "Eğitim", "kurs": "Eğitim", "udemy": "Eğitim",
+    "amazon": "Elektronik", "trendyol": "Diğer Gider", "hepsiburada": "Diğer Gider",
+    "faiz": "Yatırım / Temettü", "temettü": "Yatırım / Temettü", "getirisi": "Yatırım / Temettü",
+    "hediye": "Hediye / İkramiye", "ikramiye": "Hediye / İkramiye",
+}
+
+def _guess_category(desc, ttype):
+    dl = desc.lower()
+    for kw, cat in _CAT_MAP.items():
+        if kw in dl:
+            return cat
+    return "Diğer Gelir" if ttype == "gelir" else "Diğer Gider"
+
+def _detect_bank_format(header_row):
+    """Return column indices: (date_col, desc_col, debit_col, credit_col, amount_col)"""
+    h = [c.lower().strip() for c in header_row]
+
+    def find(*names):
+        for n in names:
+            for i, c in enumerate(h):
+                if n in c:
+                    return i
+        return None
+
+    date_col   = find("tarih", "date", "işlem tarihi", "valör")
+    desc_col   = find("açıklama", "aciklama", "işlem", "description", "detay", "karşı taraf")
+    debit_col  = find("borç", "borc", "çıkış", "debit", "gider", "harcama")
+    credit_col = find("alacak", "giriş", "credit", "gelir", "tahsilat")
+    amount_col = find("tutar", "amount", "miktar") if (debit_col is None and credit_col is None) else None
+
+    return date_col, desc_col, debit_col, credit_col, amount_col
+
+@app.route("/api/import/preview", methods=["POST"])
+def import_preview():
+    """Parse uploaded CSV, return preview rows (not saved yet)."""
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"ok": False, "error": "Dosya yüklenmedi"}), 400
+
+    raw = f.read().decode("utf-8-sig", errors="replace")  # handle BOM
+    # try comma then semicolon
+    dialect = "excel"
+    if raw.count(";") > raw.count(","):
+        dialect = "excel-semicolon"
+        csv.register_dialect("excel-semicolon", delimiter=";")
+
+    reader = csv.reader(io.StringIO(raw), dialect)
+    rows   = [r for r in reader if any(c.strip() for c in r)]
+
+    if len(rows) < 2:
+        return jsonify({"ok": False, "error": "CSV çok kısa veya boş"}), 400
+
+    # skip leading non-data rows (banks often have bank name / account info at top)
+    header_idx = 0
+    for i, row in enumerate(rows):
+        if any(kw in " ".join(row).lower() for kw in ("tarih", "date", "tutar", "açıklama", "işlem")):
+            header_idx = i
+            break
+
+    header = rows[header_idx]
+    data_rows = rows[header_idx + 1:]
+
+    date_col, desc_col, debit_col, credit_col, amount_col = _detect_bank_format(header)
+
+    parsed = []
+    skipped = 0
+    for row in data_rows:
+        if len(row) <= max(filter(lambda x: x is not None,
+                                  [date_col or 0, desc_col or 0, debit_col or 0,
+                                   credit_col or 0, amount_col or 0])):
+            skipped += 1
+            continue
+
+        dt  = _parse_date(row[date_col]) if date_col is not None and date_col < len(row) else None
+        if not dt:
+            skipped += 1
+            continue
+
+        desc = row[desc_col].strip() if desc_col is not None and desc_col < len(row) else ""
+
+        if amount_col is not None:
+            # single amount column — need sign or separate gelir/gider detection
+            raw_amt = row[amount_col] if amount_col < len(row) else ""
+            neg = raw_amt.strip().startswith("-")
+            amt = _parse_amount(raw_amt)
+            if not amt:
+                skipped += 1; continue
+            ttype = "gider" if neg else "gelir"
+        elif debit_col is not None or credit_col is not None:
+            d_val = _parse_amount(row[debit_col])  if debit_col  is not None and debit_col  < len(row) else None
+            c_val = _parse_amount(row[credit_col]) if credit_col is not None and credit_col < len(row) else None
+            if d_val and d_val > 0:
+                amt, ttype = d_val, "gider"
+            elif c_val and c_val > 0:
+                amt, ttype = c_val, "gelir"
+            else:
+                skipped += 1; continue
+        else:
+            skipped += 1; continue
+
+        cat = _guess_category(desc, ttype)
+        parsed.append({
+            "date": dt, "description": desc, "amount": round(amt, 2),
+            "type": ttype, "category": cat
+        })
+
+    return jsonify({"ok": True, "rows": parsed, "skipped": skipped, "headers": header})
+
+@app.route("/api/import/confirm", methods=["POST"])
+def import_confirm():
+    """Save a list of already-previewed transactions."""
+    rows = request.get_json(force=True)
+    if not isinstance(rows, list):
+        return jsonify({"ok": False}), 400
+    db  = get_db()
+    now = datetime.now().isoformat()
+    count = 0
+    for r in rows:
+        if not r.get("skip") and r.get("amount", 0) > 0:
+            db.execute(
+                "INSERT INTO transactions (type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?)",
+                (r["type"], r["amount"], r["category"], r.get("description",""), r["date"], now)
+            )
+            count += 1
+    db.commit()
+    return jsonify({"ok": True, "imported": count})
+
 # ── HTML ──────────────────────────────────────────────────────────────────────
 
 HTML = r"""<!DOCTYPE html>
@@ -562,6 +769,52 @@ canvas{display:block}
     </div>
     <div style="display:flex;align-items:flex-end">
       <button class="btn btn-b" onclick="saveBudget()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- CSV IMPORT -->
+<div class="card" style="margin-bottom:20px" id="csv-card">
+  <div class="section-title">Banka CSV Aktar</div>
+  <p style="font-size:.85rem;color:var(--muted);margin-bottom:16px;line-height:1.6">
+    Banka uygulamasından <strong style="color:var(--txt)">Hesap Hareketleri → Dışa Aktar (CSV/Excel)</strong> yapıp
+    dosyayı aşağıya yükle. Garanti, İş Bankası, Akbank, Yapı Kredi formatları desteklenir.
+  </p>
+
+  <!-- drop zone -->
+  <div id="drop-zone" onclick="document.getElementById('csv-file').click()"
+    style="border:2px dashed var(--border);border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:.2s;margin-bottom:16px">
+    <div style="font-size:2rem;margin-bottom:8px">📂</div>
+    <div style="font-size:.9rem;color:var(--muted)">Dosyayı buraya sürükle veya tıkla</div>
+    <div style="font-size:.78rem;color:var(--muted);margin-top:4px">CSV, XLS, XLSX — maks 5 MB</div>
+    <input type="file" id="csv-file" accept=".csv,.xls,.xlsx" style="display:none" onchange="csvSelected(this)">
+  </div>
+
+  <!-- preview table -->
+  <div id="csv-preview" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div id="csv-stats" style="font-size:.85rem;color:var(--muted)"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" style="background:var(--bg3);border:1px solid var(--border);color:var(--muted)" onclick="csvReset()">İptal</button>
+        <button class="btn btn-b" id="csv-confirm-btn" onclick="csvConfirm()">Seçilenleri İçe Aktar</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;max-height:340px;overflow-y:auto">
+      <table id="csv-table" style="width:100%;border-collapse:collapse;font-size:.82rem">
+        <thead>
+          <tr style="position:sticky;top:0;background:var(--bg2)">
+            <th style="padding:8px 6px;text-align:left;color:var(--muted);font-weight:600;white-space:nowrap">
+              <input type="checkbox" id="csv-chk-all" onchange="csvToggleAll(this.checked)" checked> Tümü
+            </th>
+            <th style="padding:8px 6px;text-align:left;color:var(--muted);font-weight:600">Tarih</th>
+            <th style="padding:8px 6px;text-align:left;color:var(--muted);font-weight:600">Açıklama</th>
+            <th style="padding:8px 6px;text-align:left;color:var(--muted);font-weight:600">Tür</th>
+            <th style="padding:8px 6px;text-align:left;color:var(--muted);font-weight:600">Kategori</th>
+            <th style="padding:8px 6px;text-align:right;color:var(--muted);font-weight:600">Tutar</th>
+          </tr>
+        </thead>
+        <tbody id="csv-tbody"></tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -958,7 +1211,114 @@ function toast(msg) {
   setTimeout(function() { el.classList.remove('show'); }, 2500);
 }
 
-// resize
+// ── CSV import ────────────────────────────────────────────────────────────────
+var csvRows = [];
+
+// drag & drop
+var dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', function(e){ e.preventDefault(); dz.style.borderColor='var(--b)'; });
+dz.addEventListener('dragleave', function(){ dz.style.borderColor='var(--border)'; });
+dz.addEventListener('drop', function(e){
+  e.preventDefault(); dz.style.borderColor='var(--border)';
+  var f = e.dataTransfer.files[0];
+  if (f) uploadCsv(f);
+});
+
+function csvSelected(input) {
+  if (input.files[0]) uploadCsv(input.files[0]);
+}
+
+function uploadCsv(file) {
+  if (file.size > 5 * 1024 * 1024) { toast('Dosya çok büyük (maks 5 MB)'); return; }
+  var fd = new FormData();
+  fd.append('file', file);
+  dz.innerHTML = '<div style="font-size:1.5rem">⏳</div><div style="color:var(--muted);font-size:.88rem;margin-top:6px">Analiz ediliyor…</div>';
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/import/preview');
+  xhr.onload = function() {
+    var d = JSON.parse(xhr.responseText);
+    if (!d.ok) { toast('Hata: ' + d.error); csvReset(); return; }
+    csvRows = d.rows;
+    renderCsvPreview(d);
+  };
+  xhr.onerror = function() { toast('Yükleme başarısız'); csvReset(); };
+  xhr.send(fd);
+}
+
+function renderCsvPreview(d) {
+  document.getElementById('csv-stats').textContent =
+    d.rows.length + ' işlem bulundu' + (d.skipped ? ', ' + d.skipped + ' satır atlandı' : '');
+  var tbody = document.getElementById('csv-tbody');
+  tbody.innerHTML = d.rows.map(function(r, i) {
+    var isG = r.type === 'gelir';
+    return '<tr style="border-bottom:1px solid var(--border)">' +
+      '<td style="padding:7px 6px"><input type="checkbox" class="csv-chk" data-i="'+i+'" checked></td>' +
+      '<td style="padding:7px 6px;white-space:nowrap">' + r.date + '</td>' +
+      '<td style="padding:7px 6px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+r.description+'">' + (r.description||'—') + '</td>' +
+      '<td style="padding:7px 6px">' +
+        '<span class="badge '+(isG?'badge-g':'badge-r')+'">'+(isG?'Gelir':'Gider')+'</span></td>' +
+      '<td style="padding:7px 6px">' +
+        '<select class="csv-cat-sel" data-i="'+i+'" style="background:var(--bg3);border:1px solid var(--border);color:var(--txt);padding:3px 6px;border-radius:6px;font-size:.78rem">' +
+        buildCatOptions(r.type, r.category) + '</select></td>' +
+      '<td style="padding:7px 6px;text-align:right;font-weight:600;color:'+(isG?'var(--g)':'var(--r)')+'">'+
+        (isG?'+':'-') + fmt(r.amount) + '</td>' +
+    '</tr>';
+  }).join('');
+  // sync category changes back to csvRows
+  [].forEach.call(document.querySelectorAll('.csv-cat-sel'), function(sel) {
+    sel.addEventListener('change', function() {
+      csvRows[parseInt(this.dataset.i)].category = this.value;
+    });
+  });
+  document.getElementById('csv-preview').style.display = 'block';
+}
+
+function buildCatOptions(ttype, selected) {
+  var list = ttype === 'gelir' ? CATS.gelir : CATS.gider;
+  return list.map(function(c) {
+    return '<option value="'+c+'"'+(c===selected?' selected':'')+'>'+c+'</option>';
+  }).join('');
+}
+
+function csvToggleAll(checked) {
+  [].forEach.call(document.querySelectorAll('.csv-chk'), function(c){ c.checked = checked; });
+}
+
+function csvConfirm() {
+  var toImport = [];
+  [].forEach.call(document.querySelectorAll('.csv-chk'), function(chk) {
+    if (chk.checked) {
+      var i = parseInt(chk.dataset.i);
+      toImport.push(csvRows[i]);
+    }
+  });
+  if (!toImport.length) { toast('Hiç satır seçili değil'); return; }
+  var btn = document.getElementById('csv-confirm-btn');
+  btn.textContent = 'Kaydediliyor…'; btn.disabled = true;
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/import/confirm');
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onload = function() {
+    var d = JSON.parse(xhr.responseText);
+    toast(d.imported + ' işlem içe aktarıldı ✓');
+    csvReset();
+    loadAll();
+  };
+  xhr.send(JSON.stringify(toImport));
+}
+
+function csvReset() {
+  csvRows = [];
+  document.getElementById('csv-preview').style.display = 'none';
+  dz.innerHTML = '<div style="font-size:2rem;margin-bottom:8px">📂</div>' +
+    '<div style="font-size:.9rem;color:var(--muted)">Dosyayı buraya sürükle veya tıkla</div>' +
+    '<div style="font-size:.78rem;color:var(--muted);margin-top:4px">CSV, XLS, XLSX — maks 5 MB</div>' +
+    '<input type="file" id="csv-file" accept=".csv,.xls,.xlsx" style="display:none" onchange="csvSelected(this)">';
+  dz.style.borderColor = 'var(--border)';
+  document.getElementById('csv-file') && (document.getElementById('csv-file').value = '');
+}
+
+// ── resize ────────────────────────────────────────────────────────────────────
 window.addEventListener('resize', function() {
   if (summaryData.bar) { drawBar(summaryData.bar); drawDonut(summaryData.gider_cats || {}); }
 });
