@@ -4010,9 +4010,6 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <div class="nl nl-desktop" data-page="invest" onclick="goPage('invest',this)">
       <span class="ico">📈</span>Yatırım
     </div>
-    <div class="nl nl-desktop" data-page="cards" onclick="goPage('cards',this)">
-      <span class="ico">💳</span>Kartlar
-    </div>
     <div class="nl nl-desktop" data-page="hesaplar" onclick="goPage('hesaplar',this)">
       <span class="ico">🏦</span>Hesaplar
     </div>
@@ -4056,9 +4053,6 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     </div>
     <div class="more-tile" onclick="goPageFromSheet('invest')">
       <div class="mt-ico">📈</div><div class="mt-lbl">Yatırım</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('cards')">
-      <div class="mt-ico">💳</div><div class="mt-lbl">Kartlar</div>
     </div>
     <div class="more-tile" onclick="goPageFromSheet('hesaplar')">
       <div class="mt-ico">🏦</div><div class="mt-lbl">Hesaplar</div>
@@ -4692,8 +4686,8 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 
 <!-- HESAPLAR (Banka Ürünleri) -->
 <div class="page" id="page-hesaplar">
-  <div class="page-title">Banka Ürünleri</div>
-  <div class="page-sub">Kredi kartı, KMH, vadesiz ve tasarruf hesaplarını ekle — masraf eklerken ödeme yöntemini seç</div>
+  <div class="page-title">Kartlar & Hesaplar</div>
+  <div class="page-sub">Kredi kartı, KMH, vadesiz, tasarruf — ekle ve masraf eklerken ödeme yöntemi olarak seç</div>
 
   <div class="grid2">
     <!-- ADD FORM -->
@@ -5868,7 +5862,7 @@ function loadTodayWidgets(){
     var co=document.getElementById('cc-overview');
     if(co){
       if(!d.cards||!d.cards.length){
-        co.innerHTML='<div class="empty-cc">💳 Kredi kartı eklenmemiş<br><span style="font-size:.75rem;color:var(--txt2)">Kartlar sayfasından ekleyebilirsiniz</span></div>';
+        co.innerHTML='<div class="empty-cc">🏦 Hesap eklenmemiş<br><span style="font-size:.75rem;color:var(--txt2)">Hesaplar sayfasından ekleyebilirsiniz</span></div>';
       } else {
         var totals='<div class="cc-total-row">'+
           '<div class="cc-total-cell"><div class="ccl">Toplam Limit</div><div class="ccv" style="color:var(--b2)">'+fmt(d.total_limit)+'</div></div>'+
@@ -5880,7 +5874,7 @@ function loadTodayWidgets(){
           var pc=pct<50?'ok':pct<80?'warn':'high';
           var fc=pct<50?'var(--g)':pct<80?'var(--y)':'var(--r)';
           var nm=c.bank+(c.name?' · '+c.name:'');
-          return '<div class="cc-item" onclick="goPage(\'cards\',document.querySelector(\'[data-page=cards]\'))" style="cursor:pointer">'+
+          return '<div class="cc-item" onclick="goPage(\'hesaplar\',document.querySelector(\'[data-page=hesaplar]\'))" style="cursor:pointer">'+
             '<div class="cc-item-top"><div class="cc-bank">💳 '+nm+'</div>'+
             '<span class="cc-pct-badge '+pc+'">%'+pct+'</span></div>'+
             '<div class="cc-prog-bg"><div class="cc-prog-fill" style="width:'+pct+'%;background:'+fc+'"></div></div>'+
