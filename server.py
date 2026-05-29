@@ -4791,6 +4791,12 @@ function loadProfiles(){
     _profiles=list;
     renderDropdownProfiles();
     renderSettingsProfiles();
+    var preferred=parseInt(localStorage.getItem('preferred_pid')||'0');
+    var curPid=parseInt(sessionStorage.getItem('cur_pid')||'0');
+    if(preferred && preferred!==curPid){
+      var match=list.find(function(p){return p.id===preferred;});
+      if(match) switchProfile(preferred);
+    }
   });
 }
 
@@ -4860,6 +4866,7 @@ function switchProfile(pid){
     if(!d.ok) return;
     document.getElementById('user-dropdown').classList.remove('open');
     sessionStorage.setItem('cur_pid', pid);
+    localStorage.setItem('preferred_pid', pid);
     renderDropdownProfiles();
     renderSettingsProfiles();
     showToast('Profil: '+d.name,'#6366f1');
