@@ -1968,41 +1968,390 @@ def delete_account(aid):
 @app.route("/api/export/excel")
 @login_required
 def export_excel():
-    import io
     from openpyxl import Workbook
-    from openpyxl.styles import (Font, PatternFill, Alignment, Border, Side,
-                                  GradientFill)
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
-    from openpyxl.chart import BarChart, Reference
+    from collections import defaultdict
 
     pid = get_pid(); db = get_db()
     today_d = date.today()
 
-    NAVY   = "1A3557"
-    ORANGE = "E8773A"
-    LGRAY  = "F0F4F8"
-    WHITE  = "FFFFFF"
+    # ── Renkler ──────────────────────────────────────────────────────────────
+    BLUE   = "0A84FF"
+    NAVY   = "0D1B2A"
     GREEN  = "1D7A46"
     RED    = "C0392B"
-    YELLOW = "D4A017"
+    LGRAY  = "F5F5F7"
+    DGRAY  = "E5E5EA"
+    WHITE  = "FFFFFF"
+    ORANGE = "FF9500"
 
-    def hdr_font(bold=True, size=11, color=WHITE):
+    MONTHS_TR = ["","Ocak","Şubat","Mart","Nisan","Mayıs","Haziran",
+                 "Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"]
+
+    def F(bold=False, size=10, color="1C1C1E"):
         return Font(name="Calibri", bold=bold, size=size, color=color)
-    def body_font(bold=False, size=10, color="1C1C1E"):
-        return Font(name="Calibri", bold=bold, size=size, color=color)
-    def navy_fill():
-        return PatternFill("solid", fgColor=NAVY)
-    def orange_fill():
-        return PatternFill("solid", fgColor=ORANGE)
-    def gray_fill():
-        return PatternFill("solid", fgColor=LGRAY)
-    def thin_border():
+    def fill(hex_):
+        return PatternFill("solid", fgColor=hex_)
+    def border():
         s = Side(style="thin", color="D1D1D6")
         return Border(left=s, right=s, top=s, bottom=s)
-    def center():
-        return Alignment(horizontal="center", vertical="center", wrap_text=True)
-    def left():
-        return Alignment(horizontal="left", vertical="center", wrap_text=True)
+    def C(): return Alignment(horizontal="center", vertical="center")
+    def L(): return Alignment(horizontal="left",   vertical="center")
+    def R(): return Alignment(horizontal="right",  vertical="center")
+
+    def row_fill(i):
+        return fill(LGRAY) if i % 2 == 0 else fill(WHITE)
+
+    def set_cell(ws, r, c, val, bold=False, size=10, color="1C1C1E",
+                 bg=None, align="L", fmt=None):
+        cell = ws.cell(row=r, column=c, value=val)
+        cell.font   = F(bold=bold, size=size, color=color)
+        cell.border = border()
+        cell.alignment = C() if align == "C" else (R() if align == "R" else L())
+        if bg:   cell.fill = fill(bg)
+        if fmt:  cell.number_format = fmt
+        return cell
+
+    # ── Veri çekme ───────────────────────────────────────────────────────────
+    profile_row  = db.execute("SELECT name FROM profiles WHERE id=?", (pid,)).fetchone()
+    profile_name = profile_row["name"] if profile_row else ""
+
+    txs = db.execute(
+        "SELECT type,amount,category,description,date FROM transactions "
+        "WHERE profile_id=? ORDER BY date, id", (pid,)
+    ).fetchall()
+
+    # Ay bazlı gruplama
+    by_month  = defaultdict(list)
+    cat_pivot = defaultdict(lambda: defaultdict(float))  # cat → ym → amt
+    gelir_total = gider_total = 0.0
+    active_months = set()
+    for r in txs:
+        ym = r["date"][:7]
+        by_month[ym].append(r)
+        active_months.add(ym)
+        cat_pivot[r["type"]][r["category"]][ym] += float(r["amount"])
+        if r["type"] == "gelir": gelir_total += float(r["amount"])
+        else:                    gider_total += float(r["amount"])
+
+    sorted_months = sorted(active_months)
+    pending = db.execute(
+        "SELECT * FROM supplier_invoices WHERE profile_id=? AND status='bekliyor' ORDER BY due_date",
+        (pid,)
+    ).fetchall()
+    assets = db.execute(
+        "SELECT * FROM assets WHERE profile_id=? AND active=1 ORDER BY name", (pid,)
+    ).fetchall()
+
+    wb = Workbook()
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # SHEET 1 — DASHBOARD
+    # ══════════════════════════════════════════════════════════════════════════
+    ws0 = wb.active
+    ws0.title = "📊 Dashboard"
+
+    # Başlık bandı
+    ws0.merge_cells("A1:H1")
+    h = ws0["A1"]
+    h.value = f"🦔  KİRPİ  —  FİNANSAL RAPOR"
+    h.font  = Font(name="Calibri", bold=True, size=18, color=WHITE)
+    h.fill  = fill(NAVY); h.alignment = C()
+    ws0.row_dimensions[1].height = 42
+
+    ws0.merge_cells("A2:H2")
+    s = ws0["A2"]
+    s.value = f"{profile_name}  ·  Tüm Dönem  ·  Oluşturulma: {today_d.strftime('%d.%m.%Y')}"
+    s.font  = Font(name="Calibri", size=10, color="90A4AE")
+    s.fill  = fill(NAVY); s.alignment = C()
+    ws0.row_dimensions[2].height = 22
+
+    # KPI kartları — satır 4
+    ws0.row_dimensions[3].height = 14  # boşluk
+    kpi_data = [
+        ("TOPLAM GELİR",  gelir_total, GREEN,  "A4:B6"),
+        ("TOPLAM GİDER",  gider_total, RED,    "C4:D6"),
+        ("NET BAKİYE",    gelir_total - gider_total,
+         GREEN if gelir_total >= gider_total else RED, "E4:F6"),
+        ("TOPLAM İŞLEM",  len(txs),   BLUE,   "G4:H6"),
+    ]
+    for label, val, clr, cells in kpi_data:
+        ws0.merge_cells(cells)
+        c_obj = ws0[cells.split(":")[0]]
+        c_obj.fill = fill(clr)
+        for r_ in range(4, 7):
+            for c_ in range(ord(cells[0])-64, ord(cells.split(":")[1][0])-64+1):
+                ws0.cell(row=r_, column=c_).fill = fill(clr)
+        ws0.row_dimensions[4].height = 18
+        ws0.row_dimensions[5].height = 28
+        ws0.row_dimensions[6].height = 18
+        lbl_cell = ws0[cells.split(":")[0]]
+        lbl_cell.value = label
+        lbl_cell.font  = Font(name="Calibri", bold=True, size=9, color=WHITE)
+        lbl_cell.alignment = C()
+        val_cell = ws0.cell(row=5, column=ord(cells[0])-64)
+        val_cell.value  = val if isinstance(val, int) else round(val, 2)
+        val_cell.font   = Font(name="Calibri", bold=True, size=15, color=WHITE)
+        val_cell.fill   = fill(clr)
+        val_cell.alignment = C()
+        if not isinstance(val, int):
+            val_cell.number_format = '#,##0.00 ₺'
+
+    ws0.row_dimensions[7].height = 14  # boşluk
+
+    # Aylık özet tablosu
+    ws0.merge_cells("A8:H8")
+    sh = ws0["A8"]
+    sh.value = "  AYLIK GELİR / GİDER ÖZETİ"
+    sh.font  = Font(name="Calibri", bold=True, size=11, color=WHITE)
+    sh.fill  = fill(BLUE); sh.alignment = L()
+    ws0.row_dimensions[8].height = 24
+
+    mo_summary = defaultdict(lambda: {"gelir": 0.0, "gider": 0.0})
+    for r in txs:
+        mo_summary[r["date"][:7]][r["type"]] += float(r["amount"])
+
+    hdr_row = 9
+    for ci, h_ in enumerate(["Yıl","Ay","Gelir","Gider","Net","Değişim"], 1):
+        set_cell(ws0, hdr_row, ci, h_, bold=True, color=WHITE, bg=NAVY, align="C")
+    ws0.row_dimensions[hdr_row].height = 22
+
+    prev_net = None
+    for i, ym in enumerate(sorted(mo_summary.keys(), reverse=True)):
+        yr_, mo_ = int(ym[:4]), int(ym[5:7])
+        g_ = mo_summary[ym]["gelir"]; z_ = mo_summary[ym]["gider"]
+        net_ = g_ - z_
+        change = "" if prev_net is None else f"{'▲' if net_ >= prev_net else '▼'} {abs(net_-prev_net):,.0f}"
+        prev_net = net_
+        dr = hdr_row + 1 + i
+        bg_ = LGRAY if i % 2 == 0 else WHITE
+        set_cell(ws0, dr, 1, yr_,                  bg=bg_, align="C")
+        set_cell(ws0, dr, 2, MONTHS_TR[mo_] if mo_<=12 else mo_, bg=bg_, align="C")
+        set_cell(ws0, dr, 3, round(g_,2),   fmt='#,##0.00 ₺', color=GREEN, bold=True, bg=bg_, align="R")
+        set_cell(ws0, dr, 4, round(z_,2),   fmt='#,##0.00 ₺', color=RED,   bold=True, bg=bg_, align="R")
+        set_cell(ws0, dr, 5, round(net_,2), fmt='#,##0.00 ₺',
+                 color=GREEN if net_>=0 else RED, bold=True, bg=bg_, align="R")
+        set_cell(ws0, dr, 6, change, color="888888", bg=bg_, align="C")
+        ws0.row_dimensions[dr].height = 18
+
+    for ci, w in enumerate([8, 14, 16, 16, 16, 14, 16, 16], 1):
+        ws0.column_dimensions[get_column_letter(ci)].width = w
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # SHEET 2 — GELİR PİVOT (kategoriler × aylar)
+    # ══════════════════════════════════════════════════════════════════════════
+    def make_pivot_sheet(wb_, title, ttype, color):
+        ws = wb_.create_sheet(title)
+        cats = sorted(cat_pivot[ttype].keys())
+        months = sorted_months
+
+        ws.merge_cells(f"A1:{get_column_letter(len(months)+2)}1")
+        h_ = ws["A1"]
+        h_.value = f"🦔  {title.upper()}"
+        h_.font  = Font(name="Calibri", bold=True, size=14, color=WHITE)
+        h_.fill  = fill(NAVY); h_.alignment = C()
+        ws.row_dimensions[1].height = 36
+
+        # Sütun başlıkları
+        set_cell(ws, 2, 1, "Kategori", bold=True, color=WHITE, bg=color, align="C")
+        for mi, ym in enumerate(months, 2):
+            yr_, mo_ = int(ym[:4]), int(ym[5:7])
+            set_cell(ws, 2, mi, f"{MONTHS_TR[mo_]}\n{yr_}", bold=True, color=WHITE, bg=color, align="C")
+            ws.column_dimensions[get_column_letter(mi)].width = 13
+        set_cell(ws, 2, len(months)+2, "TOPLAM", bold=True, color=WHITE, bg=NAVY, align="C")
+        ws.row_dimensions[2].height = 30
+        ws.column_dimensions["A"].width = 24
+        ws.column_dimensions[get_column_letter(len(months)+2)].width = 16
+
+        # Kategori satırları
+        cat_totals = {}
+        for ci_, cat in enumerate(cats):
+            dr = 3 + ci_
+            bg_ = LGRAY if ci_ % 2 == 0 else WHITE
+            set_cell(ws, dr, 1, cat, bold=True, bg=bg_)
+            row_total = 0.0
+            for mi, ym in enumerate(months, 2):
+                v = cat_pivot[ttype][cat].get(ym, 0)
+                row_total += v
+                set_cell(ws, dr, mi, round(v, 2) if v else "",
+                         fmt='#,##0.00' if v else None, color=color if v else "CCCCCC",
+                         bg=bg_, align="R")
+            set_cell(ws, dr, len(months)+2, round(row_total, 2),
+                     bold=True, fmt='#,##0.00', color=color, bg=DGRAY, align="R")
+            cat_totals[cat] = row_total
+            ws.row_dimensions[dr].height = 18
+
+        # Toplam satırı
+        total_row = 3 + len(cats)
+        set_cell(ws, total_row, 1, "TOPLAM", bold=True, size=11, color=WHITE, bg=NAVY, align="C")
+        grand = 0.0
+        for mi, ym in enumerate(months, 2):
+            col_sum = sum(cat_pivot[ttype][c].get(ym, 0) for c in cats)
+            grand += col_sum
+            set_cell(ws, total_row, mi, round(col_sum, 2), bold=True,
+                     fmt='#,##0.00', color=WHITE, bg=NAVY, align="R")
+        set_cell(ws, total_row, len(months)+2, round(grand, 2), bold=True,
+                 size=12, fmt='#,##0.00', color=WHITE, bg=color, align="R")
+        ws.row_dimensions[total_row].height = 26
+
+        ws.freeze_panes = "B3"
+        return ws
+
+    make_pivot_sheet(wb, "💚 Gelir Pivot", "gelir", GREEN)
+    make_pivot_sheet(wb, "❤️ Gider Pivot", "gider", RED)
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # SHEET 3 — HESAP HAREKETLERİ (ay gruplu)
+    # ══════════════════════════════════════════════════════════════════════════
+    ws_tx = wb.create_sheet("📋 Hareketler")
+    ws_tx.merge_cells("A1:F1")
+    h_ = ws_tx["A1"]
+    h_.value = "🦔  HESAP HAREKETLERİ"
+    h_.font  = Font(name="Calibri", bold=True, size=14, color=WHITE)
+    h_.fill  = fill(NAVY); h_.alignment = C()
+    ws_tx.row_dimensions[1].height = 36
+
+    col_w = [13, 10, 20, 36, 16, 14]
+    for ci_, w in enumerate(col_w, 1):
+        ws_tx.column_dimensions[get_column_letter(ci_)].width = w
+
+    cur_row = 2
+    for ym in sorted(by_month.keys(), reverse=True):
+        yr_, mo_ = int(ym[:4]), int(ym[5:7])
+        mo_txs = by_month[ym]
+        mo_g = sum(float(r["amount"]) for r in mo_txs if r["type"] == "gelir")
+        mo_z = sum(float(r["amount"]) for r in mo_txs if r["type"] == "gider")
+        mo_net = mo_g - mo_z
+
+        # Ay başlığı
+        ws_tx.merge_cells(f"A{cur_row}:D{cur_row}")
+        mc = ws_tx[f"A{cur_row}"]
+        mc.value = f"  {MONTHS_TR[mo_]} {yr_}  —  {len(mo_txs)} işlem"
+        mc.font  = Font(name="Calibri", bold=True, size=11, color=WHITE)
+        mc.fill  = fill(BLUE); mc.alignment = L()
+        set_cell(ws_tx, cur_row, 5, round(mo_g, 2),   bold=True, fmt='#,##0.00 ₺',
+                 color=WHITE, bg=BLUE, align="R")
+        set_cell(ws_tx, cur_row, 6, round(mo_z, 2),   bold=True, fmt='#,##0.00 ₺',
+                 color=WHITE, bg=BLUE, align="R")
+        ws_tx.row_dimensions[cur_row].height = 24
+        cur_row += 1
+
+        # Sütun başlıkları
+        for ci_, h_ in enumerate(["Tarih","Tür","Kategori","Açıklama","Tutar",""], 1):
+            set_cell(ws_tx, cur_row, ci_, h_, bold=True, color=WHITE, bg=NAVY, align="C")
+        ws_tx.row_dimensions[cur_row].height = 20
+        cur_row += 1
+
+        # İşlemler
+        for i, r in enumerate(sorted(mo_txs, key=lambda x: x["date"])):
+            is_g = r["type"] == "gelir"
+            bg_  = ("EDFAF3" if is_g else "FEF0F0") if i%2==0 else WHITE
+            set_cell(ws_tx, cur_row, 1, r["date"],           bg=bg_, align="C")
+            set_cell(ws_tx, cur_row, 2, "Gelir" if is_g else "Gider",
+                     bold=True, color=GREEN if is_g else RED, bg=bg_, align="C")
+            set_cell(ws_tx, cur_row, 3, r["category"],       bg=bg_)
+            set_cell(ws_tx, cur_row, 4, r["description"] or "", bg=bg_)
+            set_cell(ws_tx, cur_row, 5, float(r["amount"]),
+                     bold=True, fmt='#,##0.00 ₺',
+                     color=GREEN if is_g else RED, bg=bg_, align="R")
+            ws_tx.row_dimensions[cur_row].height = 18
+            cur_row += 1
+
+        # Ay net toplamı
+        set_cell(ws_tx, cur_row, 1, "", bg=DGRAY)
+        ws_tx.merge_cells(f"B{cur_row}:D{cur_row}")
+        ws_tx.cell(row=cur_row, column=2).value = f"NET: {'▲' if mo_net>=0 else '▼'} ₺{abs(mo_net):,.2f}"
+        ws_tx.cell(row=cur_row, column=2).font  = Font(name="Calibri", bold=True, size=10,
+                                                        color=GREEN if mo_net>=0 else RED)
+        ws_tx.cell(row=cur_row, column=2).fill  = fill(DGRAY)
+        ws_tx.cell(row=cur_row, column=2).alignment = R()
+        ws_tx.row_dimensions[cur_row].height = 18
+        cur_row += 2  # boşluk
+
+    ws_tx.freeze_panes = "A2"
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # SHEET 4 — TEDARİKÇİ FATURALARI (var ise)
+    # ══════════════════════════════════════════════════════════════════════════
+    ws_sup = wb.create_sheet("🏭 Tedarikçi")
+    ws_sup.merge_cells("A1:G1")
+    h_ = ws_sup["A1"]
+    h_.value = "🦔  TEDARİKÇİ FATURALARI & YAŞLANDIRMA"
+    h_.font  = Font(name="Calibri", bold=True, size=14, color=WHITE)
+    h_.fill  = fill(NAVY); h_.alignment = C()
+    ws_sup.row_dimensions[1].height = 36
+
+    for ci_, (hdr, w) in enumerate(zip(
+        ["Tedarikçi","Fatura No","Tutar","Para Birimi","Fatura Tar.","Vade","Durum"],
+        [22, 14, 14, 10, 13, 13, 14]
+    ), 1):
+        set_cell(ws_sup, 2, ci_, hdr, bold=True, color=WHITE, bg=BLUE, align="C")
+        ws_sup.column_dimensions[get_column_letter(ci_)].width = w
+    ws_sup.row_dimensions[2].height = 22
+
+    for i, row in enumerate(db.execute(
+        "SELECT * FROM supplier_invoices WHERE profile_id=? ORDER BY due_date", (pid,)
+    ).fetchall()):
+        dr = 3 + i
+        try:
+            due_d  = date.fromisoformat(row["due_date"])
+            is_late = due_d < today_d and row["status"] == "bekliyor"
+        except:
+            is_late = False
+        bg_ = LGRAY if i % 2 == 0 else WHITE
+        status_lbl = "✅ Ödendi" if row["status"] == "odendi" else ("⚠️ Gecikmiş" if is_late else "🕐 Bekliyor")
+        set_cell(ws_sup, dr, 1, row["supplier_name"],   bg=bg_)
+        set_cell(ws_sup, dr, 2, row["invoice_no"] or "", bg=bg_, align="C")
+        set_cell(ws_sup, dr, 3, float(row["amount"]),    fmt='#,##0.00', bg=bg_, align="R")
+        set_cell(ws_sup, dr, 4, row["currency"],         bg=bg_, align="C")
+        set_cell(ws_sup, dr, 5, row["invoice_date"],     bg=bg_, align="C")
+        set_cell(ws_sup, dr, 6, row["due_date"],         bg=bg_, align="C",
+                 color=RED if is_late else "1C1C1E")
+        set_cell(ws_sup, dr, 7, status_lbl, bold=True, bg=bg_, align="C",
+                 color=GREEN if row["status"]=="odendi" else (RED if is_late else ORANGE))
+        ws_sup.row_dimensions[dr].height = 18
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # SHEET 5 — VARLIKLAR & AMORTİSMAN
+    # ══════════════════════════════════════════════════════════════════════════
+    ws_ast = wb.create_sheet("🚗 Varlıklar")
+    ws_ast.merge_cells("A1:G1")
+    h_ = ws_ast["A1"]
+    h_.value = "🦔  VARLIKLAR & AMORTİSMAN"
+    h_.font  = Font(name="Calibri", bold=True, size=14, color=WHITE)
+    h_.fill  = fill(NAVY); h_.alignment = C()
+    ws_ast.row_dimensions[1].height = 36
+
+    for ci_, (hdr, w) in enumerate(zip(
+        ["Varlık Adı","Tür","Alış Tarihi","Alış Bedeli","Oran %","Yıllık Amort.","Defter Değeri"],
+        [24, 14, 13, 14, 10, 16, 16]
+    ), 1):
+        set_cell(ws_ast, 2, ci_, hdr, bold=True, color=WHITE, bg=BLUE, align="C")
+        ws_ast.column_dimensions[get_column_letter(ci_)].width = w
+    ws_ast.row_dimensions[2].height = 22
+
+    for i, row in enumerate(assets):
+        dep = calc_depreciation(float(row["purchase_price"]), row["purchase_date"],
+                                float(row["depreciation_rate"]))
+        dr = 3 + i
+        bg_ = LGRAY if i % 2 == 0 else WHITE
+        set_cell(ws_ast, dr, 1, row["name"],                      bg=bg_)
+        set_cell(ws_ast, dr, 2, row["asset_type"],                bg=bg_, align="C")
+        set_cell(ws_ast, dr, 3, row["purchase_date"],             bg=bg_, align="C")
+        set_cell(ws_ast, dr, 4, float(row["purchase_price"]),     fmt='#,##0.00 ₺', bg=bg_, align="R")
+        set_cell(ws_ast, dr, 5, f"%{float(row['depreciation_rate']):.0f}", bg=bg_, align="C")
+        set_cell(ws_ast, dr, 6, dep["annual"],    fmt='#,##0.00 ₺', bold=True, color=RED,  bg=bg_, align="R")
+        set_cell(ws_ast, dr, 7, dep["book_value"],fmt='#,##0.00 ₺', bold=True, color=BLUE, bg=bg_, align="R")
+        ws_ast.row_dimensions[dr].height = 18
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fname = f"kirpi_rapor_{today_d.strftime('%Y%m%d')}.xlsx"
+    from flask import send_file
+    return send_file(buf, as_attachment=True, download_name=fname,
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     def write_sheet_header(ws, title, subtitle=""):
         ws.merge_cells("A1:H1")
@@ -2354,6 +2703,163 @@ def export_excel():
     return send_file(buf, as_attachment=True, download_name=fname,
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
+
+@app.route("/api/export/pdf")
+@login_required
+def export_pdf():
+    pid   = get_pid()
+    db    = get_db()
+    today_d = date.today()
+    year  = request.args.get("year",  today_d.year,  type=int)
+    month = request.args.get("month", today_d.month, type=int)
+    start, end = month_range(year, month)
+
+    MONTHS_TR = ["","Ocak","Şubat","Mart","Nisan","Mayıs","Haziran",
+                 "Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"]
+    period_label = f"{MONTHS_TR[month]} {year}"
+
+    profile = db.execute("SELECT name FROM profiles WHERE id=?", (pid,)).fetchone()
+    prof_name = profile["name"] if profile else ""
+
+    txns = db.execute(
+        "SELECT type,amount,category,description,date FROM transactions "
+        "WHERE profile_id=? AND date BETWEEN ? AND ? ORDER BY date,id",
+        (pid, start, end)
+    ).fetchall()
+
+    gelir_total = sum(r["amount"] for r in txns if r["type"] == "gelir")
+    gider_total = sum(r["amount"] for r in txns if r["type"] == "gider")
+    net = gelir_total - gider_total
+
+    gelir_cats: dict = {}
+    gider_cats: dict = {}
+    for r in txns:
+        if r["type"] == "gelir":
+            gelir_cats[r["category"]] = gelir_cats.get(r["category"], 0) + r["amount"]
+        else:
+            gider_cats[r["category"]] = gider_cats.get(r["category"], 0) + r["amount"]
+
+    def fmt(n):
+        return f"{n:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    def bar_rows(cats, total, color):
+        if not cats: return "<p style='color:#888;font-size:.85rem'>Kayıt yok</p>"
+        out = ""
+        for cat, amt in sorted(cats.items(), key=lambda x: -x[1]):
+            pct = (amt / total * 100) if total else 0
+            out += f"""
+            <div style="margin-bottom:10px">
+              <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:3px">
+                <span>{html_escape(cat)}</span>
+                <span style="font-weight:700">₺{fmt(amt)} <span style="color:#888;font-weight:400">({pct:.1f}%)</span></span>
+              </div>
+              <div style="height:7px;background:#eee;border-radius:4px">
+                <div style="height:7px;background:{color};border-radius:4px;width:{min(pct,100):.1f}%"></div>
+              </div>
+            </div>"""
+        return out
+
+    tx_rows = ""
+    for r in txns:
+        sign = "+" if r["type"] == "gelir" else "−"
+        color = "#1a7a46" if r["type"] == "gelir" else "#c0392b"
+        tx_rows += f"""<tr>
+          <td>{r['date']}</td>
+          <td>{html_escape(r['category'])}</td>
+          <td style="color:#555">{html_escape(r['description'] or '')}</td>
+          <td style="text-align:right;font-weight:700;color:{color}">{sign}₺{fmt(r['amount'])}</td>
+        </tr>"""
+
+    net_color = "#1a7a46" if net >= 0 else "#c0392b"
+    sign = "+" if net >= 0 else "−"
+
+    html = f"""<!DOCTYPE html>
+<html lang="tr"><head>
+<meta charset="UTF-8">
+<title>Kirpi Raporu — {period_label}</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:'Helvetica Neue',Arial,sans-serif;color:#1c1c1e;background:#fff;padding:32px 40px;font-size:13px}}
+  @media print{{body{{padding:0}}@page{{margin:20mm 15mm}}.no-print{{display:none}}}}
+  .header{{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #007aff;padding-bottom:16px;margin-bottom:24px}}
+  .header-left h1{{font-size:1.5rem;font-weight:900;color:#007aff;letter-spacing:-.02em}}
+  .header-left p{{font-size:.85rem;color:#6d6d72;margin-top:3px}}
+  .header-right{{text-align:right;font-size:.8rem;color:#6d6d72;line-height:1.8}}
+  .summary{{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px}}
+  .card{{border:1px solid #e5e5ea;border-radius:12px;padding:16px;text-align:center}}
+  .card-lbl{{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6d6d72;margin-bottom:6px}}
+  .card-val{{font-size:1.35rem;font-weight:900}}
+  .section-title{{font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#6d6d72;margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid #e5e5ea}}
+  .two-col{{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px}}
+  table{{width:100%;border-collapse:collapse;font-size:.82rem}}
+  thead tr{{background:#f5f5f7}}
+  th{{text-align:left;padding:8px 10px;font-weight:700;color:#6d6d72;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em}}
+  td{{padding:7px 10px;border-bottom:1px solid #f0f0f0}}
+  tr:last-child td{{border-bottom:none}}
+  .footer{{margin-top:28px;padding-top:12px;border-top:1px solid #e5e5ea;font-size:.72rem;color:#aaa;text-align:center}}
+  .print-btn{{position:fixed;bottom:24px;right:24px;background:#007aff;color:#fff;border:none;border-radius:12px;padding:12px 20px;font-size:.9rem;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(0,122,255,.4)}}
+  .print-btn:hover{{background:#0062cc}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>🦔 Kirpi</h1>
+    <p>{html_escape(prof_name)} · {period_label} Finansal Raporu</p>
+  </div>
+  <div class="header-right">
+    <div>Rapor Tarihi: {today_d.strftime('%d.%m.%Y')}</div>
+    <div>Dönem: {start} / {end}</div>
+    <div>İşlem Sayısı: {len(txns)}</div>
+  </div>
+</div>
+
+<div class="summary">
+  <div class="card" style="border-color:#34c75930;background:#f0fdf4">
+    <div class="card-lbl">Toplam Gelir</div>
+    <div class="card-val" style="color:#1a7a46">₺{fmt(gelir_total)}</div>
+  </div>
+  <div class="card" style="border-color:#ff3b3030;background:#fff5f5">
+    <div class="card-lbl">Toplam Gider</div>
+    <div class="card-val" style="color:#c0392b">₺{fmt(gider_total)}</div>
+  </div>
+  <div class="card" style="border-color:#007aff30;background:#f0f6ff">
+    <div class="card-lbl">Net</div>
+    <div class="card-val" style="color:{net_color}">{sign}₺{fmt(abs(net))}</div>
+  </div>
+</div>
+
+<div class="two-col">
+  <div>
+    <div class="section-title">Gelir Kalemleri</div>
+    {bar_rows(gelir_cats, gelir_total, "#34c759")}
+  </div>
+  <div>
+    <div class="section-title">Gider Kalemleri</div>
+    {bar_rows(gider_cats, gider_total, "#ff3b30")}
+  </div>
+</div>
+
+<div class="section-title">İşlem Detayları</div>
+<table>
+  <thead><tr><th>Tarih</th><th>Kategori</th><th>Açıklama</th><th style="text-align:right">Tutar</th></tr></thead>
+  <tbody>{tx_rows if tx_rows else '<tr><td colspan="4" style="text-align:center;color:#888;padding:20px">Bu dönemde işlem yok</td></tr>'}</tbody>
+</table>
+
+<div class="footer">Kirpi Nakit Akışı · Oluşturulma: {datetime.now().strftime('%d.%m.%Y %H:%M')}</div>
+
+<button class="print-btn no-print" onclick="window.print()">🖨️ Yazdır / PDF Kaydet</button>
+<script>
+window.addEventListener('load', function() {{
+  if(window.matchMedia && !window.matchMedia('print').matches) {{
+    document.title = 'Kirpi_{year}_{month:02d}';
+  }}
+}});
+</script>
+</body></html>"""
+
+    return html
 
 @app.route("/api/goals/analysis")
 @login_required
@@ -4737,6 +5243,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <select class="filter-sel" id="ledger-f-cat" onchange="filterLedger()"><option value="">Tüm Kategoriler</option></select>
     <select class="filter-sel" id="f-year" onchange="onYearFilterChange()"></select>
     <button class="btn btn-ghost" onclick="exportCsv()">⬇ CSV</button>
+    <button class="btn btn-ghost" onclick="exportPDF()" title="Aylık PDF Raporu">📄 PDF</button>
   </div>
   <div class="ledger-toolbar" style="margin-top:-6px;margin-bottom:10px">
     <span style="font-size:.78rem;color:var(--txt2);white-space:nowrap">Tarih aralığı:</span>
@@ -8344,6 +8851,11 @@ function saveCardBalance(cardId){
 function exportExcel(){
   toast('Excel hazırlanıyor...');
   window.location.href = '/api/export/excel';
+}
+function exportPDF(year, month){
+  var y = year  || curYear;
+  var m = month || curMonth;
+  window.open('/api/export/pdf?year='+y+'&month='+m,'_blank');
 }
 </script>
 
