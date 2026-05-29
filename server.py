@@ -1608,17 +1608,23 @@ def telegram_link_code():
 @login_required
 def telegram_status():
     uid = session["user_id"]
-    link = get_db().execute("SELECT tg_user_id, created_at FROM telegram_links WHERE user_id=%s", (uid,)).fetchone()
-    if link:
-        return jsonify({"linked": True, "since": link["created_at"]})
-    return jsonify({"linked": False})
+    links = get_db().execute(
+        "SELECT id, tg_user_id, created_at FROM telegram_links WHERE user_id=%s ORDER BY created_at", (uid,)
+    ).fetchall()
+    return jsonify({"count": len(links), "links": [row_to_dict(r) for r in links]})
 
 @app.route("/api/telegram/unlink", methods=["DELETE"])
 @login_required
 def telegram_unlink():
     uid = session["user_id"]
-    get_db().execute("DELETE FROM telegram_links WHERE user_id=%s", (uid,))
-    get_db().commit()
+    data = request.get_json(force=True, silent=True) or {}
+    lid = data.get("id")
+    db = get_db()
+    if lid:
+        db.execute("DELETE FROM telegram_links WHERE id=%s AND user_id=%s", (lid, uid))
+    else:
+        db.execute("DELETE FROM telegram_links WHERE user_id=%s", (uid,))
+    db.commit()
     return jsonify({"ok": True})
 
 @app.route("/api/telegram/setup-webhook", methods=["POST"])
@@ -5109,26 +5115,24 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   <!-- App Info -->
   <!-- Telegram Bot -->
   <div class="settings-card">
-    <div class="settings-sect-title">📱 Telegram Bot</div>
-    <div id="tg-status-lbl" style="font-size:.82rem;color:var(--txt2);margin-bottom:14px">Kontrol ediliyor…</div>
-    <div id="tg-link-area">
-      <button class="btn btn-primary" style="width:100%;padding:11px;font-size:.86rem" onclick="getTgCode()">🔗 Telegram'a Bağla</button>
+    <div class="settings-sect-title">📱 Telegram</div>
+    <div style="font-size:.78rem;color:var(--txt2);margin-bottom:12px;line-height:1.6">
+      Telegram'da <b id="tg-botname-lbl">@AppKirpi_BOT</b>'u açıp bağlantı kodu göndererek harcamalarınızı mesajla kaydedebilirsiniz.
     </div>
-    <div id="tg-code-area" style="display:none">
-      <div style="background:var(--bg3);border-radius:13px;padding:14px 16px;margin-bottom:12px;border:1px solid var(--border2)">
+    <div id="tg-members-list" style="margin-bottom:12px"></div>
+    <div id="tg-code-area" style="display:none;margin-bottom:12px">
+      <div style="background:var(--bg3);border-radius:13px;padding:14px 16px;margin-bottom:10px;border:1px solid var(--border2)">
         <div style="font-size:.7rem;color:var(--txt2);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Telegram botuna bu kodu gönderin</div>
         <div id="tg-code-val" style="font-size:1.5rem;font-weight:900;letter-spacing:.18em;color:var(--b);font-family:monospace">—</div>
         <div style="font-size:.7rem;color:var(--txt2);margin-top:6px">Komut: <code id="tg-cmd" style="background:var(--bg4);padding:2px 6px;border-radius:5px">/link KOD</code> &nbsp;·&nbsp; 15 dk geçerli</div>
       </div>
-      <div style="font-size:.78rem;color:var(--txt2);line-height:1.7;margin-bottom:12px">
-        1. Telegram'da <b id="tg-botname">@KirpiNakitBot</b>'u açın veya arayın<br>
+      <div style="font-size:.78rem;color:var(--txt2);line-height:1.7">
+        1. Telegram'da <b id="tg-botname">@AppKirpi_BOT</b>'u açın<br>
         2. <code>/link <span id="tg-code-inline">KOD</span></code> yazıp gönderin<br>
-        3. Artık <code>market 250</code>, <code>yemek 85</code> gibi mesajlarla harcama kaydedebilirsiniz
+        3. Artık <code>market 250</code>, <code>yemek 85</code> gibi mesajlarla harcama kaydolur
       </div>
     </div>
-    <div id="tg-unlink-area" style="display:none">
-      <button class="btn" style="width:100%;padding:9px;font-size:.82rem;background:rgba(255,59,48,.08);color:var(--r);border:1px solid rgba(255,59,48,.18)" onclick="tgUnlink()">Bağlantıyı Kaldır</button>
-    </div>
+    <button class="btn btn-primary" style="width:100%;padding:11px;font-size:.86rem" onclick="getTgCode()">➕ Kişi Ekle / Bağla</button>
   </div>
 
   <div class="settings-card">
@@ -5828,44 +5832,40 @@ function initSettingsPage(){
 // ── TELEGRAM ─────────────────────────────────────────────────────────────────
 function initTelegramSection(){
   xhr('/api/telegram/status',null,function(d){
-    var lbl=document.getElementById('tg-status-lbl');
-    var linkArea=document.getElementById('tg-link-area');
-    var codeArea=document.getElementById('tg-code-area');
-    var unlinkArea=document.getElementById('tg-unlink-area');
-    if(!lbl) return;
-    if(d.linked){
-      lbl.innerHTML='✅ <b>Bağlı</b> — Telegram hesabı Kirpi\'ye bağlandı';
-      lbl.style.color='var(--g)';
-      linkArea.style.display='none';
-      codeArea.style.display='none';
-      unlinkArea.style.display='';
+    var listEl=document.getElementById('tg-members-list');
+    if(!listEl) return;
+    if(d.count>0){
+      var html='';
+      d.links.forEach(function(l){
+        var dt=l.created_at?l.created_at.substring(0,10):'';
+        html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg3);border-radius:10px;margin-bottom:6px">'
+          +'<div><span style="font-size:.82rem;font-weight:600;color:var(--g)">✅ Bağlı</span>'
+          +(dt?'<span style="font-size:.7rem;color:var(--txt2);margin-left:6px">'+dt+'</span>':'')+'</div>'
+          +'<button onclick="tgUnlinkOne('+l.id+')" style="border:none;background:rgba(255,59,48,.1);color:var(--r);border-radius:7px;padding:4px 10px;font-size:.72rem;font-weight:700;cursor:pointer">Kaldır</button>'
+          +'</div>';
+      });
+      listEl.innerHTML=html;
     } else {
-      lbl.textContent='Telegram hesabı bağlı değil';
-      lbl.style.color='var(--txt2)';
-      linkArea.style.display='';
-      codeArea.style.display='none';
-      unlinkArea.style.display='none';
+      listEl.innerHTML='<div style="font-size:.8rem;color:var(--txt2);margin-bottom:8px">Henüz bağlı Telegram hesabı yok.</div>';
     }
   });
 }
 function getTgCode(){
   xhr('/api/telegram/link-code',{},function(d){
     if(!d.ok) return;
-    var code=d.code;
-    var bot=d.bot||'KirpiNakitBot';
+    var code=d.code; var bot=d.bot||'AppKirpi_BOT';
     document.getElementById('tg-code-val').textContent=code;
     document.getElementById('tg-cmd').textContent='/link '+code;
-    document.getElementById('tg-botname').textContent='@'+bot;
-    var ci=document.getElementById('tg-code-inline');
-    if(ci) ci.textContent=code;
-    document.getElementById('tg-link-area').style.display='none';
+    var bn=document.getElementById('tg-botname'); if(bn) bn.textContent='@'+bot;
+    var bn2=document.getElementById('tg-botname-lbl'); if(bn2) bn2.textContent='@'+bot;
+    var ci=document.getElementById('tg-code-inline'); if(ci) ci.textContent=code;
     document.getElementById('tg-code-area').style.display='';
   });
 }
-function tgUnlink(){
-  if(!confirm('Telegram bağlantısını kaldırmak istediğine emin misin?')) return;
-  xhr('/api/telegram/unlink',null,function(d){
-    if(d.ok){toast('Bağlantı kaldırıldı');initTelegramSection();}
+function tgUnlinkOne(id){
+  if(!confirm('Bu Telegram bağlantısını kaldır?')) return;
+  xhr('/api/telegram/unlink',{id:id},function(d){
+    if(d.ok){toast('Kaldırıldı');initTelegramSection();}
   },false,true);
 }
 
