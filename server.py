@@ -3988,7 +3988,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       <span class="ico">📋</span>Tablo
     </div>
     <div class="nl nl-add" data-page="add" onclick="goPage('add',this)">
-      <span class="ico">➕</span>Ekle
+      <span class="ico">💸</span>Harcama
     </div>
     <div class="nl" data-page="todos" onclick="goPage('todos',this)">
       <span class="ico">✅</span>Görevler
@@ -4317,27 +4317,27 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 
 <!-- ADD -->
 <div class="page" id="page-add">
-  <div class="page-title">İşlem Ekle</div>
-  <div class="page-sub">Manuel olarak gelir veya gider gir</div>
+  <div class="page-title">Harcama Ekle</div>
+  <div class="page-sub">Gider veya gelir gir, ödeme yöntemini seç</div>
 
   <div class="card" style="max-width:520px">
     <div class="type-tabs">
-      <button class="type-tab tg" id="tab-g" onclick="setTab('gelir')">📈  Gelir</button>
-      <button class="type-tab" id="tab-r" onclick="setTab('gider')">📉  Gider</button>
+      <button class="type-tab tr" id="tab-r" onclick="setTab('gider')">📉  Gider</button>
+      <button class="type-tab" id="tab-g" onclick="setTab('gelir')">📈  Gelir</button>
     </div>
     <div class="form-row">
       <div><label>Tutar (₺)</label><input class="f-input" type="text" inputmode="decimal" data-num id="f-amount" placeholder="0,00"></div>
       <div><label>Tarih</label><input class="f-input" type="date" id="f-date"></div>
     </div>
     <div style="margin-bottom:12px"><label>Kategori</label><select class="f-input" id="f-cat"></select></div>
-    <div style="margin-bottom:12px"><label>Açıklama</label><input class="f-input" type="text" id="f-desc" placeholder="örn. Ocak maaşı"></div>
-    <div style="margin-bottom:20px">
+    <div style="margin-bottom:12px"><label>Açıklama</label><input class="f-input" type="text" id="f-desc" placeholder="örn. Market alışverişi"></div>
+    <div style="margin-bottom:20px" id="f-account-row">
       <label>Ödeme Yöntemi</label>
       <select class="f-input" id="f-account">
         <option value="">— Nakit / Belirtme —</option>
       </select>
     </div>
-    <button class="btn btn-green" id="add-btn" style="width:100%;padding:13px" onclick="addTx()">Kaydet</button>
+    <button class="btn btn-danger" id="add-btn" style="width:100%;padding:13px" onclick="addTx()">Kaydet</button>
   </div>
 </div>
 
@@ -5154,7 +5154,7 @@ var MONTHS=['','Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
 var CLRS=['#6366f1','#f59e0b','#a855f7','#ef4444','#22c55e','#06b6d4',
           '#f97316','#ec4899','#84cc16','#14b8a6','#e11d48','#0ea5e9'];
 var curYear=new Date().getFullYear(), curMonth=new Date().getMonth()+1;
-var curTab='gelir', summaryData={}, allTx=[], filteredTx=[];
+var curTab='gider', summaryData={}, allTx=[], filteredTx=[];
 var sortCol='date', sortDir=-1;
 var CATS={gelir:[],gider:[],all:[]};
 var _todayDate=new Date().toISOString().split('T')[0];
@@ -5229,7 +5229,7 @@ function goPage(id, el){
     if(id==='invest') initInvestPage();
     if(id==='cards') loadCards();
     if(id==='hesaplar') loadAccounts();
-    if(id==='add') loadAccountsDropdown();
+    if(id==='add'){ setTab('gider'); loadAccountsDropdown(); }
     if(id==='settings') initSettingsPage();
     if(id==='budget') loadGoalsPage();
     if(id==='todos') initTodosPage();
@@ -5753,6 +5753,8 @@ function setTab(t){
   document.getElementById('tab-r').className='type-tab'+(t==='gider'?' tr':'');
   document.getElementById('add-btn').className='btn '+(t==='gelir'?'btn-green':'btn-danger');
   fillSel('f-cat',CATS[t]);
+  var accRow=document.getElementById('f-account-row');
+  if(accRow) accRow.style.display=(t==='gider'?'':'none');
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
