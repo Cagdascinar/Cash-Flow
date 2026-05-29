@@ -330,6 +330,7 @@ def init_db():
         ("recurring",    "user_id",         "INTEGER NOT NULL DEFAULT 1"),
         ("recurring",    "profile_id",      "INTEGER NOT NULL DEFAULT 1"),
         ("recurring",    "days_of_month",   "TEXT NOT NULL DEFAULT ''"),
+        ("profiles",     "avatar",          "TEXT NOT NULL DEFAULT ''"),
         ("users",        "avatar",          "TEXT NOT NULL DEFAULT ''"),
     ]
     with pg_connect() as con:
@@ -789,6 +790,17 @@ def add_profile():
         (uid, name, ptype, datetime.now().isoformat()))
     db.commit()
     return jsonify({"ok":True,"id":cur.lastrowid,"name":name,"type":ptype})
+
+@app.route("/api/profiles/<int:pid>/avatar", methods=["PUT"])
+@login_required
+def update_profile_avatar(pid):
+    uid = session["user_id"]
+    data = request.get_json(force=True)
+    avatar = data.get("avatar", "")
+    db = get_db()
+    db.execute("UPDATE profiles SET avatar=? WHERE id=? AND user_id=?", (avatar, pid, uid))
+    db.commit()
+    return jsonify({"ok": True})
 
 @app.route("/api/profiles/<int:pid>/switch", methods=["POST"])
 @login_required
@@ -3074,7 +3086,7 @@ HTML = r"""<!DOCTYPE html>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Kirpi">
 <link rel="manifest" href="/manifest.json">
-<title>Kirpi — Nakit Akışı</title>
+<title>Kirpi — Finansal Kontrol</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -3841,7 +3853,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <div class="brand">
       <div class="kirpi-walk-wrap"><img src="/icon.svg" class="kirpi-walk-img" style="width:32px;height:32px;border-radius:8px"> </div>Kirpi
     </div>
-    <div class="sub">Nakit Akışı Takibi</div>
+    <div class="sub">Gelir · Gider · Yatırım</div>
   </div>
   <div class="nav-links">
     <div class="nav-sect">Ana</div>
@@ -3894,8 +3906,12 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       <span class="ico">⚙️</span>Ayarlar
     </div>
   </div>
-  <div class="nav-bottom">
-    <div style="font-size:.7rem;color:var(--txt2);opacity:.5">Kirpi v1.0</div>
+  <div class="nav-bottom" style="display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer" onclick="goPage('settings',document.querySelector('[data-page=settings]'))">
+    <div id="sidebar-profile-avatar" style="width:34px;height:34px;border-radius:50%;background:var(--bg3);border:1.5px solid var(--border2);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1rem"></div>
+    <div style="min-width:0">
+      <div id="sidebar-profile-name" style="font-size:.78rem;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
+      <div style="font-size:.65rem;color:var(--txt2);opacity:.6">v1.0 · Ayarlar</div>
+    </div>
   </div>
 </nav>
 
@@ -4160,7 +4176,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
           <th class="sortable" onclick="sortBy('date')">Tarih <span class="sort-ico" id="sort-date">↕</span></th>
           <th class="sortable" onclick="sortBy('type')">Tür <span class="sort-ico" id="sort-type">↕</span></th>
           <th class="sortable" onclick="sortBy('category')">Kategori <span class="sort-ico" id="sort-category">↕</span></th>
-          <th>Açıklama</th>
+          <th class="sortable" onclick="sortBy('description')">Açıklama <span class="sort-ico" id="sort-description">↕</span></th>
           <th class="sortable" onclick="sortBy('amount')" style="text-align:right">Tutar <span class="sort-ico" id="sort-amount">↕</span></th>
           <th style="width:36px"></th>
         </tr>
@@ -5078,8 +5094,15 @@ function loadProfiles(){
     _profiles=list;
     renderDropdownProfiles();
     renderSettingsProfiles();
-    var preferred=parseInt(localStorage.getItem('preferred_pid')||'0');
     var curPid=parseInt(sessionStorage.getItem('cur_pid')||'0');
+    var preferred=parseInt(localStorage.getItem('preferred_pid')||'0');
+    var activePid=preferred&&preferred!==curPid?preferred:curPid;
+    var activeP=list.find(function(p){return p.id===activePid;})||list[0];
+    if(activeP){
+      var snEl=document.getElementById('sidebar-profile-name');
+      if(snEl) snEl.textContent=activeP.name;
+      updateSidebarProfileAvatar(activeP.avatar||'');
+    }
     if(preferred && preferred!==curPid){
       var match=list.find(function(p){return p.id===preferred;});
       if(match) switchProfile(preferred);
@@ -5140,12 +5163,57 @@ function renderSettingsProfiles(){
   el.innerHTML=_profiles.map(function(p){
     var icon=p.type==='sirket'?'🏢':'👤';
     var isActive=p.id===pid;
-    return '<div class="settings-profile-item">'
-      +'<div><div class="sp-info">'+icon+' '+p.name+'</div>'
-      +'<div class="sp-type">'+(p.type==='sirket'?'Şirket':'Kişisel')+'</div></div>'
+    var avatarHtml=p.avatar
+      ?'<img src="'+p.avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">'
+      :'<span style="font-size:1.2rem">'+icon+'</span>';
+    return '<div class="settings-profile-item" style="align-items:center;gap:12px">'
+      +'<div style="position:relative;flex-shrink:0">'
+        +'<div style="width:48px;height:48px;border-radius:50%;background:var(--bg3);border:2px solid var(--border2);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer" onclick="triggerProfileAvatarUpload('+p.id+')" title="Fotoğraf değiştir">'
+          +avatarHtml
+        +'</div>'
+        +'<div style="position:absolute;bottom:0;right:0;width:16px;height:16px;background:var(--b);border-radius:50%;border:2px solid var(--bg2);display:flex;align-items:center;justify-content:center;pointer-events:none">'
+          +'<span style="color:#fff;font-size:.55rem;line-height:1">📷</span>'
+        +'</div>'
+      +'</div>'
+      +'<div style="flex:1;min-width:0">'
+        +'<div class="sp-info">'+p.name+'</div>'
+        +'<div class="sp-type">'+(p.type==='sirket'?'Şirket':'Kişisel')+'</div>'
+      +'</div>'
       +(isActive?'<span class="sp-active">Aktif</span>':'<button onclick="switchProfile('+p.id+')" style="padding:5px 12px;background:var(--b);border:none;border-radius:8px;color:#fff;font-size:.75rem;cursor:pointer;font-weight:600">Geç</button>')
-      +'</div>';
+      +'</div>'
+      +'<input type="file" id="pav-input-'+p.id+'" accept="image/*" style="display:none" onchange="handleProfileAvatarUpload(this,'+p.id+')">';
   }).join('');
+}
+
+function triggerProfileAvatarUpload(pid){
+  var inp=document.getElementById('pav-input-'+pid);
+  if(inp) inp.click();
+}
+
+function handleProfileAvatarUpload(input, pid){
+  var file=input.files[0]; if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var b64=e.target.result;
+    xhr('/api/profiles/'+pid+'/avatar', {avatar:b64}, function(r){
+      if(r.ok){
+        var p=_profiles.find(function(x){return x.id===pid});
+        if(p) p.avatar=b64;
+        renderSettingsProfiles();
+        // If active profile, update sidebar avatar display
+        var curPid=parseInt(sessionStorage.getItem('cur_pid')||'0');
+        if(pid===curPid) updateSidebarProfileAvatar(b64);
+        toast('Profil fotoğrafı güncellendi ✓');
+      }
+    }, true);
+  };
+  reader.readAsDataURL(file);
+}
+
+function updateSidebarProfileAvatar(avatar){
+  var el=document.getElementById('sidebar-profile-avatar');
+  if(!el) return;
+  el.innerHTML=avatar?'<img src="'+avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':'';
 }
 
 function switchProfile(pid){
@@ -5753,6 +5821,10 @@ function setCurrency(code){
   if(el) el.textContent=code+' '+c.sym;
   if(summaryData) { renderStats(summaryData); if(summaryData.bar) drawBar(summaryData.bar); if(summaryData.gider_cats) drawDonut(summaryData.gider_cats); }
 }
+function fmtDate(iso){
+  if(!iso||iso.length<10) return iso||'';
+  var p=iso.split('-'); return p[2]+'.'+p[1]+'.'+p[0];
+}
 function fmt(n){
   var s=Number(n).toLocaleString(_curLocale,{minimumFractionDigits:2,maximumFractionDigits:2});
   return _curSym+s;
@@ -6217,7 +6289,7 @@ function renderLedger(){
     var isG=t.type==='gelir';
     return '<tr data-id="'+t.id+'" data-type="'+t.type+'">'+
       '<td><div class="cell"><input type="checkbox" class="row-chk" data-id="'+t.id+'" onchange="rowChkChange()"></div></td>'+
-      '<td class="editable" data-field="date" data-id="'+t.id+'"><div class="cell">'+t.date+'</div></td>'+
+      '<td class="editable" data-field="date" data-id="'+t.id+'"><div class="cell">'+fmtDate(t.date)+'</div></td>'+
       '<td><div class="cell"><span class="badge '+(isG?'badge-g':'badge-r')+'">'+(isG?'Gelir':'Gider')+'</span></div></td>'+
       '<td class="editable" data-field="category" data-id="'+t.id+'"><div class="cell"><span class="badge badge-cat">'+t.category+'</span></div></td>'+
       '<td class="editable" data-field="description" data-id="'+t.id+'"><div class="cell">'+(t.description||'<span style="color:var(--txt2);font-size:.78rem">—</span>')+'</div></td>'+
@@ -6756,7 +6828,7 @@ function renderCsvPreview(d){
     var catSel='<select class="csv-cat-sel" data-i="'+i+'" onchange="csvRows[parseInt(this.dataset.i)].category=this.value" style="max-width:130px">'+
       (isG?CATS.gelir:CATS.gider).map(function(c){return'<option'+(c===r.category?' selected':'')+'>'+c+'</option>'}).join('')+'</select>';
     return '<tr><td><input type="checkbox" class="prev-chk" data-i="'+i+'" checked></td>'+
-      '<td>'+r.date+'</td>'+
+      '<td>'+fmtDate(r.date)+'</td>'+
       '<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+r.description+'">'+(r.description||'—')+'</td>'+
       '<td><span class="badge '+(isG?'badge-g':'badge-r')+'">'+(isG?'Gelir':'Gider')+'</span></td>'+
       '<td>'+catSel+'</td>'+
