@@ -482,16 +482,25 @@ def init_db():
 
 # ── EMAIL ─────────────────────────────────────────────────────────────────────
 
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.zoho.eu")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
+
 def _smtp_send(msg):
-    """Send an email message via Gmail SMTP. Returns True on success."""
     if not MAIL_FROM or not MAIL_PASSWORD:
         log.warning("Mail credentials not configured — skipping email send")
         return False
     try:
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as s:
-            s.ehlo(); s.starttls(); s.ehlo()
-            s.login(MAIL_FROM, MAIL_PASSWORD)
-            s.sendmail(MAIL_FROM, msg["To"], msg.as_string())
+        if SMTP_PORT == 465:
+            import ssl
+            ctx = ssl.create_default_context()
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=15, context=ctx) as s:
+                s.login(MAIL_FROM, MAIL_PASSWORD)
+                s.sendmail(MAIL_FROM, msg["To"], msg.as_string())
+        else:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as s:
+                s.ehlo(); s.starttls(); s.ehlo()
+                s.login(MAIL_FROM, MAIL_PASSWORD)
+                s.sendmail(MAIL_FROM, msg["To"], msg.as_string())
         log.info("Email sent to %s", msg["To"])
         return True
     except Exception as exc:
