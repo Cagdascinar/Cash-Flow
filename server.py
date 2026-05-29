@@ -1830,6 +1830,25 @@ def today_summary():
 
     gelir_list = [row_to_dict(r) for r in rows if r["type"] == "gelir"]
     gider_list = [row_to_dict(r) for r in rows if r["type"] == "gider"]
+
+    # Supplier invoices due today → expected income entries
+    try:
+        due_invs = db.execute(
+            "SELECT * FROM supplier_invoices WHERE profile_id=? AND due_date=? AND status='bekliyor'",
+            (pid, today_str)
+        ).fetchall()
+        for inv in due_invs:
+            gelir_list.append({
+                "id": None,
+                "amount": float(inv["amount"]),
+                "category": "Tahsilat",
+                "description": "📄 " + (inv["supplier_name"] or "Fatura"),
+                "type": "gelir",
+                "is_invoice": True
+            })
+    except Exception:
+        pass
+
     today_gelir = sum(x["amount"] for x in gelir_list)
     today_gider = sum(x["amount"] for x in gider_list)
 
@@ -3905,6 +3924,10 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <button class="btn btn-ghost" onclick="exportCsv()">⬇ CSV</button>
   </div>
 
+  <div id="monthly-summary" style="display:none;overflow-x:auto;margin-bottom:12px">
+    <div id="monthly-summary-inner" style="display:flex;gap:8px;min-width:max-content;padding-bottom:4px"></div>
+  </div>
+
   <div class="ledger-wrap">
     <table id="ledger-table">
       <thead>
@@ -5828,17 +5851,61 @@ function renderLedger(){
     data.forEach(function(t){if(t.type==='gelir')totG+=t.amount;else totR+=t.amount;});
     var net=totG-totR;
     var parts=[];
-    if(totG>0) parts.push('<span>Gelir: <strong style="color:var(--g)">+'+fmtNum(totG)+'₺</strong></span>');
-    if(totR>0) parts.push('<span>Gider: <strong style="color:var(--r)">-'+fmtNum(totR)+'₺</strong></span>');
-    if(totG>0&&totR>0) parts.push('<span>Net: <strong style="color:'+(net>=0?'var(--g)':'var(--r)')+'">'+( net>=0?'+':'')+fmtNum(net)+'₺</strong></span>');
-    sumEl.innerHTML=parts.join('<span style="color:var(--border,#e5e5ea)">|</span>');
+    if(totG>0) parts.push('<span>Gelir: <strong style="color:var(--g)">+'+fmtNum(totG)+_curSym+'</strong></span>');
+    if(totR>0) parts.push('<span>Gider: <strong style="color:var(--r)">-'+fmtNum(totR)+_curSym+'</strong></span>');
+    if(totG>0&&totR>0) parts.push('<span>Net: <strong style="color:'+(net>=0?'var(--g)':'var(--r)')+'">'+( net>=0?'+':'')+fmtNum(net)+_curSym+'</strong></span>');
+    sumEl.innerHTML=parts.join('<span style="color:var(--border,#e5e5ea)"> &nbsp;|&nbsp; </span>');
     sumEl.style.display=parts.length?'flex':'none';
   }
+
+  // aylık özet
+  renderMonthlySummary(allTx);
 
   // inline editing
   [].forEach.call(document.querySelectorAll('.editable'),function(td){
     td.addEventListener('click',function(e){startEdit(td)});
   });
+}
+
+function renderMonthlySummary(txList){
+  var wrap=document.getElementById('monthly-summary');
+  var inner=document.getElementById('monthly-summary-inner');
+  if(!wrap||!inner) return;
+  if(!txList||!txList.length){ wrap.style.display='none'; return; }
+  var months={};
+  txList.forEach(function(t){
+    var m=t.date?t.date.slice(0,7):''; if(!m)return;
+    if(!months[m]) months[m]={g:0,r:0};
+    if(t.type==='gelir') months[m].g+=t.amount;
+    else months[m].r+=t.amount;
+  });
+  var keys=Object.keys(months).sort().reverse();
+  if(!keys.length){ wrap.style.display='none'; return; }
+  inner.innerHTML=keys.map(function(m){
+    var d=months[m], net=d.g-d.r;
+    var parts=m.split('-');
+    var label=(MONTHS[parseInt(parts[1])]||parts[1])+' '+parts[0];
+    var netCol=net>=0?'var(--g)':'var(--r)';
+    return '<div onclick="filterLedgerToMonth(\''+m+'\')" style="cursor:pointer;background:var(--bg2);border:1px solid var(--border,#e5e5ea);border-radius:12px;padding:10px 14px;min-width:140px;flex-shrink:0;transition:box-shadow .15s" onmouseenter="this.style.boxShadow=\'0 2px 8px rgba(0,0,0,.08)\'" onmouseleave="this.style.boxShadow=\'none\'">'
+      +'<div style="font-size:.78rem;font-weight:700;color:var(--txt);margin-bottom:6px">'+label+'</div>'
+      +(d.g>0?'<div style="font-size:.75rem;color:var(--g)">▲ '+fmtNum(d.g)+_curSym+'</div>':'')
+      +(d.r>0?'<div style="font-size:.75rem;color:var(--r)">▼ '+fmtNum(d.r)+_curSym+'</div>':'')
+      +'<div style="font-size:.78rem;font-weight:700;color:'+netCol+';margin-top:4px;border-top:1px solid var(--border,#e5e5ea);padding-top:4px">'+(net>=0?'+':'')+fmtNum(net)+_curSym+'</div>'
+      +'</div>';
+  }).join('');
+  wrap.style.display='block';
+}
+function filterLedgerToMonth(ym){
+  var fy=document.getElementById('f-year');
+  var ft=document.getElementById('f-type');
+  var fc=document.getElementById('ledger-f-cat');
+  var ls=document.getElementById('ledger-search');
+  var yr=ym.split('-')[0], mo=parseInt(ym.split('-')[1]);
+  if(fy){ fy.value=yr; }
+  if(fc) fc.value='';
+  if(ls) ls.value='';
+  filteredTx=allTx.filter(function(t){ return t.date&&t.date.startsWith(ym); });
+  renderLedger();
 }
 
 function startEdit(td){
