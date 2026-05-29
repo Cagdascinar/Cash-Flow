@@ -3658,13 +3658,13 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <div class="nl nl-desktop" data-page="cards" onclick="goPage('cards',this)">
       <span class="ico">💳</span>Kartlar
     </div>
-    <div class="nl nl-desktop" data-page="supplier" onclick="goPage('supplier',this)">
+    <div class="nl nl-desktop" data-page="supplier" data-sirket onclick="goPage('supplier',this)">
       <span class="ico">🏭</span>Tedarikçi
     </div>
-    <div class="nl nl-desktop" data-page="assets" onclick="goPage('assets',this)">
+    <div class="nl nl-desktop" data-page="assets" data-sirket onclick="goPage('assets',this)">
       <span class="ico">🚗</span>Kıymetler
     </div>
-    <div class="nl nl-desktop" data-page="cardreport" onclick="goPage('cardreport',this)">
+    <div class="nl nl-desktop" data-page="cardreport" data-sirket onclick="goPage('cardreport',this)">
       <span class="ico">📊</span>Kart Raporu
     </div>
     <div class="nl nl-desktop" data-page="settings" onclick="goPage('settings',this)">
@@ -4569,7 +4569,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       </div>
       <div class="mod-field">
         <div class="mod-label">Tutar (₺)</div>
-        <input class="mod-input" type="text" inputmode="decimal" id="sup-inv-amount" placeholder="1.234,56">
+        <input class="mod-input" type="text" inputmode="decimal" data-num id="sup-inv-amount" placeholder="1.234,56">
       </div>
     </div>
     <div class="mod-row">
@@ -4584,7 +4584,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     </div>
     <div class="mod-field">
       <div class="mod-label">Referans Faiz Oranı (%)</div>
-      <input class="mod-input" type="text" inputmode="decimal" id="sup-inv-rate" value="50" placeholder="50">
+      <input class="mod-input" type="text" inputmode="decimal" data-num id="sup-inv-rate" value="50" placeholder="50">
     </div>
     <div class="mod-field">
       <div class="mod-label">Notlar</div>
@@ -4629,7 +4629,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       </div>
       <div class="mod-field">
         <div class="mod-label">Alış Bedeli (₺)</div>
-        <input class="mod-input" type="text" inputmode="decimal" id="asset-price" placeholder="1.234,56">
+        <input class="mod-input" type="text" inputmode="decimal" data-num id="asset-price" placeholder="1.234,56">
       </div>
     </div>
     <div class="mod-row">
@@ -4688,10 +4688,10 @@ window.onload=function(){
   var gEl=document.getElementById('hero-greeting');
   if(gEl) gEl.textContent=gEl.textContent.replace('Merhaba',prefix);
   loadCats(function(){
-    loadDashboard();
     loadAllTx();
     populateYearFilter();
   });
+  loadDashboard();
   setupDrop();
   loadProfiles();
   setupNumInputs();
@@ -4760,16 +4760,33 @@ function goPage(id, el){
 var _profiles=[];
 var _curAvatar = '';
 
+var _curProfileType = 'sahis';
+
+function applyProfileType(ptype){
+  _curProfileType = ptype || 'sahis';
+  var isSirket = _curProfileType === 'sirket';
+  document.querySelectorAll('[data-sirket]').forEach(function(el){
+    el.style.display = isSirket ? '' : 'none';
+  });
+  // If currently on a sirket-only page, redirect to dashboard
+  if(!isSirket){
+    var cur = document.querySelector('.page.active');
+    if(cur && ['page-supplier','page-assets','page-cardreport'].indexOf(cur.id) !== -1){
+      goPage('dashboard', document.querySelector('[data-page=dashboard]'));
+    }
+  }
+}
+
 function loadProfiles(){
   xhr('/api/me',null,function(me){
     _curAvatar = me.avatar || '';
     if(me.profile_id) sessionStorage.setItem('cur_pid', me.profile_id);
     setAvatarDisplay(me.avatar, me.display || me.username || '?');
-    // Update dropdown header
     var n=document.getElementById('udrop-name');
     var s=document.getElementById('udrop-sub');
     if(n) n.textContent=me.display||me.username||'—';
     if(s) s.textContent='@'+me.username+(me.email?' · '+me.email:'');
+    applyProfileType(me.profile_type);
   });
   xhr('/api/profiles',null,function(list){
     _profiles=list;
@@ -4847,6 +4864,7 @@ function switchProfile(pid){
     renderDropdownProfiles();
     renderSettingsProfiles();
     showToast('Profil: '+d.name,'#6366f1');
+    applyProfileType(d.type);
     loadDashboard(); renderLedger();
   });
 }
@@ -6510,16 +6528,17 @@ function loadSupInvList(){
         daysText = '<span style="color:var(--g)">✓ Ödendi '+(inv.paid_date||'')+'</span>';
       }
       var dotColor = overdue ? 'var(--r)' : (inv.status==='odendi' ? 'var(--g)' : 'var(--y)');
-      return '<div class="sup-inv-item tappable" onclick="openPaySupInv('+inv.id+',this)">' +
-        '<div class="sup-inv-dot" style="background:'+dotColor+'"></div>' +
-        '<div class="sup-inv-info">' +
+      return '<div class="sup-inv-item" style="gap:10px">' +
+        '<div class="sup-inv-dot" style="background:'+dotColor+';flex-shrink:0"></div>' +
+        '<div class="sup-inv-info tappable" onclick="openPaySupInv('+inv.id+')" style="flex:1;min-width:0">' +
           '<div class="sup-inv-name">'+escHtml(inv.supplier_name)+'</div>' +
           '<div class="sup-inv-meta">'+(inv.invoice_no ? escHtml(inv.invoice_no)+' &bull; ' : '')+'Vade: '+inv.due_date+'</div>' +
         '</div>' +
-        '<div class="sup-inv-right">' +
+        '<div class="sup-inv-right tappable" onclick="openPaySupInv('+inv.id+')" style="text-align:right;flex-shrink:0">' +
           '<div class="sup-inv-amount">'+fmt(inv.amount)+'</div>' +
           '<div class="sup-inv-days">'+daysText+'</div>' +
         '</div>' +
+        '<button onclick="delSupInv('+inv.id+')" style="background:none;border:none;font-size:1rem;cursor:pointer;padding:4px 6px;border-radius:8px;color:var(--txt2);flex-shrink:0;-webkit-tap-highlight-color:transparent" title="Sil">🗑</button>' +
         '</div>';
     }).join('');
     // Store data for tap handler
@@ -6536,9 +6555,11 @@ function openSupInvModal(id){
   document.getElementById('sup-inv-amount').value = '';
   document.getElementById('sup-inv-date').value = new Date().toISOString().slice(0,10);
   document.getElementById('sup-inv-due').value = '';
-  document.getElementById('sup-inv-rate').value = '50';
+  var rateEl = document.getElementById('sup-inv-rate');
+  rateEl.value = '50'; rateEl.dataset.raw = '50';
   document.getElementById('sup-inv-notes').value = '';
   document.getElementById('mod-sup-inv').style.display = 'flex';
+  setTimeout(setupNumInputs, 50);
 }
 
 function closeMod(id){ document.getElementById(id).style.display='none'; }
@@ -6580,6 +6601,15 @@ function openPaySupInv(id, el){
           if(r.ok){ toast('Ödendi olarak işaretlendi'); initSupplierPage(); }
         });
   }
+}
+
+function delSupInv(id){
+  var inv = window._supInvData && window._supInvData[id];
+  var name = inv ? inv.supplier_name : 'bu fatura';
+  if(!confirm(name+' silinsin mi?')) return;
+  xhr('/api/supplier-invoices/'+id, null, function(r){
+    if(r.ok){ toast('Fatura silindi'); initSupplierPage(); }
+  }, false, true);
 }
 
 function fmtShort(n){
@@ -6656,6 +6686,7 @@ function openAssetModal(){
   document.getElementById('asset-ins-date').value='';
   document.getElementById('asset-ins-co').value='';
   document.getElementById('mod-asset').style.display='flex';
+  setTimeout(setupNumInputs, 50);
 }
 
 function onAssetTypeChange(){
