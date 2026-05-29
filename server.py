@@ -68,10 +68,12 @@ class _PGConn:
 def pg_connect(): return _PGConn()
 
 # ── MAIL CONFIG ───────────────────────────────────────────────────────────────
-MAIL_FROM     = os.environ.get("MAIL_FROM", "")
-MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "")
-BACKUP_EMAIL  = os.environ.get("BACKUP_EMAIL", MAIL_FROM)
-APP_URL       = os.environ.get("APP_URL", "https://web-production-ba700.up.railway.app")
+MAIL_FROM       = os.environ.get("MAIL_FROM", "")
+MAIL_PASSWORD   = os.environ.get("MAIL_PASSWORD", "")
+BACKUP_EMAIL    = os.environ.get("BACKUP_EMAIL", MAIL_FROM)
+APP_URL         = os.environ.get("APP_URL", "https://web-production-ba700.up.railway.app")
+TELEGRAM_TOKEN  = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME", "KirpiNakitBot")
 
 GELIR_CATS = ["Maaş", "Serbest Meslek", "Kira Geliri", "Yatırım / Temettü", "Hediye / İkramiye", "Diğer Gelir"]
 GIDER_CATS = ["Kira / Mortgage", "Market / Gıda", "Faturalar", "Ulaşım", "Yemek / Restoran",
@@ -326,6 +328,20 @@ def init_db():
             created_at  TEXT NOT NULL
         )""",
         "CREATE UNIQUE INDEX IF NOT EXISTS idx_card_daily ON card_daily_balance(card_id, date)",
+        """CREATE TABLE IF NOT EXISTS telegram_links (
+            id         SERIAL PRIMARY KEY,
+            user_id    INTEGER NOT NULL,
+            profile_id INTEGER NOT NULL DEFAULT 1,
+            tg_user_id TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS telegram_link_codes (
+            id         SERIAL PRIMARY KEY,
+            user_id    INTEGER NOT NULL,
+            profile_id INTEGER NOT NULL DEFAULT 1,
+            code       TEXT NOT NULL UNIQUE,
+            expires_at TEXT NOT NULL
+        )""",
     ]
     migrations = [
         ("users",        "email",          "TEXT NOT NULL DEFAULT ''"),
@@ -1447,6 +1463,174 @@ def save_card_daily_balance():
         )
     db.commit()
     return jsonify({"ok":True})
+
+# ── TELEGRAM BOT ──────────────────────────────────────────────────────────────
+
+def tg_send(chat_id, text, parse_mode="HTML"):
+    if not TELEGRAM_TOKEN: return
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+            json={"chat_id": chat_id, "text": text, "parse_mode": parse_mode},
+            timeout=6
+        )
+    except Exception: pass
+
+_TG_CAT_KW = [
+    # Gider kategorileri (uzun anahtar kelimeler önce — öncelikli eşleşme için)
+    ("süpermarket","Market / Gıda"),("supermarket","Market / Gıda"),
+    ("carrefour","Market / Gıda"),("migros","Market / Gıda"),("bim","Market / Gıda"),
+    ("a101","Market / Gıda"),("şok market","Market / Gıda"),("market","Market / Gıda"),("gıda","Market / Gıda"),("manav","Market / Gıda"),
+    ("restoran","Yemek / Restoran"),("starbucks","Yemek / Restoran"),("mcdonalds","Yemek / Restoran"),
+    ("burger king","Yemek / Restoran"),("pizza","Yemek / Restoran"),("döner","Yemek / Restoran"),
+    ("kahvaltı","Yemek / Restoran"),("yemek","Yemek / Restoran"),("kahve","Yemek / Restoran"),("kafe","Yemek / Restoran"),
+    ("elektrik","Faturalar"),("doğalgaz","Faturalar"),("su faturası","Faturalar"),
+    ("internet faturası","Faturalar"),("gsm","Faturalar"),("turkcell","Faturalar"),
+    ("vodafone","Faturalar"),("türk telekom","Faturalar"),("fatura","Faturalar"),
+    ("benzin","Ulaşım"),("akaryakıt","Ulaşım"),("shell","Ulaşım"),("opet","Ulaşım"),
+    ("taksi","Ulaşım"),("uber","Ulaşım"),("metro","Ulaşım"),("otobüs","Ulaşım"),
+    ("bilet","Ulaşım"),("ulaşım","Ulaşım"),("araç","Ulaşım"),
+    ("kira","Kira / Mortgage"),
+    ("eczane","Sağlık"),("hastane","Sağlık"),("doktor","Sağlık"),("ilaç","Sağlık"),("sağlık","Sağlık"),
+    ("netflix","Abonelikler"),("spotify","Abonelikler"),("youtube","Abonelikler"),
+    ("apple","Abonelikler"),("abonelik","Abonelikler"),
+    ("sinema","Eğlence"),("tiyatro","Eğlence"),("eğlence","Eğlence"),("oyun","Eğlence"),
+    ("kıyafet","Giyim"),("ayakkabı","Giyim"),("giyim","Giyim"),("mağaza","Giyim"),("zara","Giyim"),
+    ("telefon","Elektronik"),("laptop","Elektronik"),("elektronik","Elektronik"),
+    ("kurs","Eğitim"),("kitap","Eğitim"),("eğitim","Eğitim"),
+    # Gelir kategorileri
+    ("maaş","Maaş"),("maas","Maaş"),
+    ("kira geliri","Kira Geliri"),
+    ("temettü","Yatırım / Temettü"),("faiz","Yatırım / Temettü"),("yatırım","Yatırım / Temettü"),
+    ("ikramiye","Hediye / İkramiye"),("prim","Hediye / İkramiye"),("hediye","Hediye / İkramiye"),
+    ("freelance","Serbest Meslek"),("serbest","Serbest Meslek"),("danışmanlık","Serbest Meslek"),
+]
+_GELIR_CATS = {"Maaş","Kira Geliri","Yatırım / Temettü","Hediye / İkramiye","Serbest Meslek","Diğer Gelir"}
+
+def _parse_tg_msg(text):
+    text_l = text.lower().strip()
+    amt_m = re.search(r'\b(\d[\d.,]*)\s*(?:tl|₺|lira)?\b', text_l)
+    if not amt_m: return None
+    try: amount = float(amt_m.group(1).replace(',','.'))
+    except: return None
+    if amount <= 0: return None
+    no_amt = re.sub(r'\b\d[\d.,]*\s*(?:tl|₺|lira)?\b','', text_l).strip()
+    category = None
+    for kw, cat in _TG_CAT_KW:
+        if kw in no_amt:
+            category = cat; break
+    if not category:
+        category = "Diğer Gider"
+    ttype = "gelir" if category in _GELIR_CATS else "gider"
+    desc_words = [w for w in text.split() if not re.match(r'^\d[\d.,]*$', w) and w.lower() not in ('tl','₺','lira')]
+    return {"type": ttype, "amount": amount, "category": category, "description": ' '.join(desc_words) or text}
+
+@app.route("/api/telegram/webhook", methods=["POST"])
+def telegram_webhook():
+    if not TELEGRAM_TOKEN: return "ok"
+    data = request.get_json(force=True, silent=True) or {}
+    msg = data.get("message") or data.get("edited_message")
+    if not msg: return "ok"
+    chat_id = msg["chat"]["id"]
+    text = (msg.get("text") or "").strip()
+    tg_uid = str(msg["from"]["id"])
+    db = pg_connect()
+    try:
+        if text.lower().startswith("/link "):
+            code = text[6:].strip().upper()
+            pending = db.execute(
+                "SELECT user_id, profile_id FROM telegram_link_codes WHERE code=%s AND expires_at > %s",
+                (code, datetime.now().isoformat())
+            ).fetchone()
+            if pending:
+                uid, pid = pending["user_id"], pending["profile_id"]
+                existing = db.execute("SELECT id FROM telegram_links WHERE tg_user_id=%s", (tg_uid,)).fetchone()
+                if existing:
+                    db.execute("UPDATE telegram_links SET user_id=%s, profile_id=%s WHERE tg_user_id=%s", (uid, pid, tg_uid))
+                else:
+                    db.execute("INSERT INTO telegram_links (user_id,profile_id,tg_user_id,created_at) VALUES (%s,%s,%s,%s)",
+                               (uid, pid, tg_uid, datetime.now().isoformat()))
+                db.execute("DELETE FROM telegram_link_codes WHERE code=%s", (code,))
+                db.commit()
+                tg_send(chat_id, "✅ <b>Hesabınız bağlandı!</b>\n\nArtık harcamalarınızı girebilirsiniz.\n\n<b>Örnekler:</b>\n• <code>market 250</code>\n• <code>yemek 85</code>\n• <code>maaş 15000</code>\n• <code>fatura 320</code>")
+            else:
+                tg_send(chat_id, "❌ Geçersiz veya süresi dolmuş kod.\nKirpi Ayarlar sayfasından yeni kod alın.")
+            return "ok"
+        if text.lower() == "/start":
+            tg_send(chat_id, f"🦔 <b>Kirpi Bot'a hoş geldiniz!</b>\n\nHarcamalarınızı buradan girebilirsiniz.\n\n<b>Önce hesabınızı bağlayın:</b>\n1. Kirpi uygulamasında <b>Ayarlar</b> sayfasını açın\n2. <b>Telegram Bağla</b> butonuna tıklayın\n3. Oluşan kodu buraya gönderin:\n<code>/link KOD</code>")
+            return "ok"
+        if text.lower() == "/help":
+            tg_send(chat_id, "📖 <b>Kullanım:</b>\n\n<code>market 250</code>\n<code>yemek 85 tl</code>\n<code>benzin 400</code>\n<code>maaş 15000</code>\n<code>fatura 320</code>\n\nTutar + açıklama yazmanız yeterli, kategori otomatik belirlenir.")
+            return "ok"
+        link = db.execute("SELECT user_id, profile_id FROM telegram_links WHERE tg_user_id=%s", (tg_uid,)).fetchone()
+        if not link:
+            tg_send(chat_id, "⚠️ Hesabınız bağlı değil.\n/start yazın ve talimatları takip edin.")
+            return "ok"
+        uid, pid = link["user_id"], link["profile_id"]
+        parsed = _parse_tg_msg(text)
+        if not parsed:
+            tg_send(chat_id, "❓ Anlamadım.\nÖrnek: <code>market 250</code> veya <code>yemek 85 tl</code>")
+            return "ok"
+        db.execute(
+            "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+            (uid, pid, parsed["type"], parsed["amount"], parsed["category"],
+             parsed["description"], date.today().isoformat(), datetime.now().isoformat())
+        )
+        db.commit()
+        icon = "📈" if parsed["type"] == "gelir" else "📉"
+        tg_send(chat_id,
+            f"{icon} <b>Kaydedildi!</b>\n\n"
+            f"{'Gelir' if parsed['type']=='gelir' else 'Gider'}: <b>₺{parsed['amount']:,.2f}</b>\n"
+            f"Kategori: {parsed['category']}\n"
+            f"Not: {parsed['description']}"
+        )
+    except Exception as e:
+        log.error("Telegram webhook error: %s", e)
+        tg_send(chat_id, "⚠️ Bir hata oluştu, lütfen tekrar deneyin.")
+    finally:
+        db.close()
+    return "ok"
+
+@app.route("/api/telegram/link-code", methods=["POST"])
+@login_required
+def telegram_link_code():
+    uid = session["user_id"]; pid = get_pid()
+    code = secrets.token_hex(3).upper()
+    expires = (datetime.now() + timedelta(minutes=15)).isoformat()
+    db = get_db()
+    db.execute("DELETE FROM telegram_link_codes WHERE user_id=%s", (uid,))
+    db.execute("INSERT INTO telegram_link_codes (user_id,profile_id,code,expires_at) VALUES (%s,%s,%s,%s)",
+               (uid, pid, code, expires))
+    db.commit()
+    return jsonify({"ok": True, "code": code, "bot": TELEGRAM_BOT_USERNAME})
+
+@app.route("/api/telegram/status", methods=["GET"])
+@login_required
+def telegram_status():
+    uid = session["user_id"]
+    link = get_db().execute("SELECT tg_user_id, created_at FROM telegram_links WHERE user_id=%s", (uid,)).fetchone()
+    if link:
+        return jsonify({"linked": True, "since": link["created_at"]})
+    return jsonify({"linked": False})
+
+@app.route("/api/telegram/unlink", methods=["DELETE"])
+@login_required
+def telegram_unlink():
+    uid = session["user_id"]
+    get_db().execute("DELETE FROM telegram_links WHERE user_id=%s", (uid,))
+    get_db().commit()
+    return jsonify({"ok": True})
+
+@app.route("/api/telegram/setup-webhook", methods=["POST"])
+@login_required
+def setup_telegram_webhook():
+    if not TELEGRAM_TOKEN:
+        return jsonify({"ok": False, "error": "TELEGRAM_BOT_TOKEN ayarlanmamış"}), 400
+    r = requests.post(
+        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook",
+        json={"url": f"{APP_URL}/api/telegram/webhook"}, timeout=10
+    )
+    return jsonify(r.json())
 
 # ── ACCOUNTS (Banka Ürünleri) ─────────────────────────────────────────────────
 
@@ -3988,7 +4172,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       <span class="ico">📋</span>Tablo
     </div>
     <div class="nl nl-add" data-page="add" onclick="goPage('add',this)">
-      <span class="ico">💸</span>Harcama
+      <span class="ico">➕</span>Gider Ekle
     </div>
     <div class="nl" data-page="todos" onclick="goPage('todos',this)">
       <span class="ico">✅</span>Görevler
@@ -4317,8 +4501,8 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 
 <!-- ADD -->
 <div class="page" id="page-add">
-  <div class="page-title">Harcama Ekle</div>
-  <div class="page-sub">Gider veya gelir gir, ödeme yöntemini seç</div>
+  <div class="page-title">Gider / Gelir Ekle</div>
+  <div class="page-sub">Harcama veya gelir gir, ödeme yöntemini seç</div>
 
   <div class="card" style="max-width:520px">
     <div class="type-tabs">
@@ -4923,6 +5107,30 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   </div>
 
   <!-- App Info -->
+  <!-- Telegram Bot -->
+  <div class="settings-card">
+    <div class="settings-sect-title">📱 Telegram Bot</div>
+    <div id="tg-status-lbl" style="font-size:.82rem;color:var(--txt2);margin-bottom:14px">Kontrol ediliyor…</div>
+    <div id="tg-link-area">
+      <button class="btn btn-primary" style="width:100%;padding:11px;font-size:.86rem" onclick="getTgCode()">🔗 Telegram'a Bağla</button>
+    </div>
+    <div id="tg-code-area" style="display:none">
+      <div style="background:var(--bg3);border-radius:13px;padding:14px 16px;margin-bottom:12px;border:1px solid var(--border2)">
+        <div style="font-size:.7rem;color:var(--txt2);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Telegram botuna bu kodu gönderin</div>
+        <div id="tg-code-val" style="font-size:1.5rem;font-weight:900;letter-spacing:.18em;color:var(--b);font-family:monospace">—</div>
+        <div style="font-size:.7rem;color:var(--txt2);margin-top:6px">Komut: <code id="tg-cmd" style="background:var(--bg4);padding:2px 6px;border-radius:5px">/link KOD</code> &nbsp;·&nbsp; 15 dk geçerli</div>
+      </div>
+      <div style="font-size:.78rem;color:var(--txt2);line-height:1.7;margin-bottom:12px">
+        1. Telegram'da <b id="tg-botname">@KirpiNakitBot</b>'u açın veya arayın<br>
+        2. <code>/link <span id="tg-code-inline">KOD</span></code> yazıp gönderin<br>
+        3. Artık <code>market 250</code>, <code>yemek 85</code> gibi mesajlarla harcama kaydedebilirsiniz
+      </div>
+    </div>
+    <div id="tg-unlink-area" style="display:none">
+      <button class="btn" style="width:100%;padding:9px;font-size:.82rem;background:rgba(255,59,48,.08);color:var(--r);border:1px solid rgba(255,59,48,.18)" onclick="tgUnlink()">Bağlantıyı Kaldır</button>
+    </div>
+  </div>
+
   <div class="settings-card">
     <div class="settings-sect-title">Uygulama</div>
     <button class="settings-link-row" onclick="triggerInstall()">
@@ -5614,6 +5822,51 @@ function initSettingsPage(){
   var c=_CURRENCIES[_curCode]||_CURRENCIES['TRY'];
   if(el) el.textContent=_curCode+' '+c.sym;
   _syncSoundToggleUI();
+  initTelegramSection();
+}
+
+// ── TELEGRAM ─────────────────────────────────────────────────────────────────
+function initTelegramSection(){
+  xhr('/api/telegram/status',null,function(d){
+    var lbl=document.getElementById('tg-status-lbl');
+    var linkArea=document.getElementById('tg-link-area');
+    var codeArea=document.getElementById('tg-code-area');
+    var unlinkArea=document.getElementById('tg-unlink-area');
+    if(!lbl) return;
+    if(d.linked){
+      lbl.innerHTML='✅ <b>Bağlı</b> — Telegram hesabı Kirpi\'ye bağlandı';
+      lbl.style.color='var(--g)';
+      linkArea.style.display='none';
+      codeArea.style.display='none';
+      unlinkArea.style.display='';
+    } else {
+      lbl.textContent='Telegram hesabı bağlı değil';
+      lbl.style.color='var(--txt2)';
+      linkArea.style.display='';
+      codeArea.style.display='none';
+      unlinkArea.style.display='none';
+    }
+  });
+}
+function getTgCode(){
+  xhr('/api/telegram/link-code',{},function(d){
+    if(!d.ok) return;
+    var code=d.code;
+    var bot=d.bot||'KirpiNakitBot';
+    document.getElementById('tg-code-val').textContent=code;
+    document.getElementById('tg-cmd').textContent='/link '+code;
+    document.getElementById('tg-botname').textContent='@'+bot;
+    var ci=document.getElementById('tg-code-inline');
+    if(ci) ci.textContent=code;
+    document.getElementById('tg-link-area').style.display='none';
+    document.getElementById('tg-code-area').style.display='';
+  });
+}
+function tgUnlink(){
+  if(!confirm('Telegram bağlantısını kaldırmak istediğine emin misin?')) return;
+  xhr('/api/telegram/unlink',null,function(d){
+    if(d.ok){toast('Bağlantı kaldırıldı');initTelegramSection();}
+  },false,true);
 }
 
 function saveAccountInfo(){
