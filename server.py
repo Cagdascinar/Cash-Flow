@@ -4069,54 +4069,18 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     </div>
   </div>
 
-  <!-- ── ANALİZ ── -->
-  <div class="dash-section">
-    <div class="s-header" onclick="toggleSection('analytics')">
-      <div class="sh-left"><span class="sh-dot bl"></span>Analiz <span id="db-sub" style="font-size:.7rem;font-weight:400;color:var(--txt2);text-transform:none;letter-spacing:0;margin-left:6px"></span></div>
-      <span class="sh-chevron" id="chevron-analytics">▾</span>
-    </div>
-    <div class="s-body" id="sec-analytics">
-      <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:14px;gap:8px;flex-wrap:wrap">
-        <div style="display:flex;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;overflow:hidden">
-          <button id="view-month-btn" onclick="setDbView('month')"
-            style="padding:6px 14px;border:none;font-size:.78rem;font-weight:600;cursor:pointer;background:var(--b);color:#fff;transition:.15s">Aylık</button>
-          <button id="view-year-btn" onclick="setDbView('year')"
-            style="padding:6px 14px;border:none;font-size:.78rem;font-weight:600;cursor:pointer;background:transparent;color:var(--txt2);transition:.15s">Yıllık</button>
-        </div>
-        <div class="mnav" id="month-nav">
-          <button onclick="changeMonth(-1)">‹</button>
-          <div class="ml" id="mlabel" onclick="toggleDateRange()" style="cursor:pointer;user-select:none" title="Tarih aralığı seç"></div>
-          <button onclick="changeMonth(1)">›</button>
-        </div>
-        <div class="mnav" id="year-nav" style="display:none">
-          <button onclick="changeYear(-1)">‹</button>
-          <div class="ml" id="ylabel"></div>
-          <button onclick="changeYear(1)">›</button>
-        </div>
-      </div>
-      <div id="date-range-picker" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px;margin-bottom:12px;box-shadow:0 8px 24px rgba(0,0,0,.2)">
-        <div style="font-size:.72rem;color:var(--txt2);margin-bottom:8px;font-weight:600">TARİH ARALIĞI</div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <div>
-            <div style="font-size:.7rem;color:var(--txt2);margin-bottom:3px">Başlangıç</div>
-            <input type="date" id="range-start" style="background:var(--bg);border:1px solid var(--border2);color:var(--txt);padding:6px 8px;border-radius:7px;font-size:.8rem;outline:none">
-          </div>
-          <div>
-            <div style="font-size:.7rem;color:var(--txt2);margin-bottom:3px">Bitiş</div>
-            <input type="date" id="range-end" style="background:var(--bg);border:1px solid var(--border2);color:var(--txt);padding:6px 8px;border-radius:7px;font-size:.8rem;outline:none">
-          </div>
-          <div style="display:flex;gap:6px;margin-top:16px">
-            <button onclick="applyDateRange()" style="padding:6px 14px;background:var(--b);border:none;border-radius:7px;color:#fff;font-size:.78rem;cursor:pointer;font-weight:600">Uygula</button>
-            <button onclick="clearDateRange()" style="padding:6px 10px;background:transparent;border:1px solid var(--border2);border-radius:7px;color:var(--txt2);font-size:.78rem;cursor:pointer">Temizle</button>
-          </div>
-        </div>
-      </div>
-      <div class="card" style="padding:16px;margin-bottom:0">
-        <div class="chart-lbl">Aylık Gelir / Gider</div>
-        <div class="chart-wrap"><canvas id="barChart" height="210"></canvas></div>
-      </div>
-      <canvas id="donut" style="display:none"></canvas>
-    </div>
+  <!-- hidden canvases needed by JS (not rendered) -->
+  <div style="display:none">
+    <canvas id="barChart"></canvas>
+    <canvas id="donut"></canvas>
+    <div id="sec-analytics"></div>
+    <div id="db-sub"></div>
+    <div id="mlabel"></div><div id="ylabel"></div>
+    <div id="month-nav"></div><div id="year-nav"></div>
+    <div id="date-range-picker"></div>
+    <input id="range-start"><input id="range-end">
+    <button id="view-month-btn"></button><button id="view-year-btn"></button>
+    <div id="chevron-analytics"></div>
   </div>
 
 </div>
