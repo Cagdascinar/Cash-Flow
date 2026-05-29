@@ -4793,87 +4793,6 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   </div>
 </div>
 
-<!-- CARDS -->
-<div class="page" id="page-cards">
-  <div class="page-title">Kredi Kartları</div>
-  <div class="page-sub">Limit, kullanım, son ödeme tarihi ve asgari ödeme takibi</div>
-
-  <div class="grid2">
-    <!-- ADD CARD FORM -->
-    <div class="card">
-      <div class="section-title">Kart Ekle / Güncelle</div>
-      <div style="margin-bottom:12px"><label>Kart Sahibi / Kullanım Amacı</label><input class="f-input" type="text" id="card-owner" placeholder="ör. Genel Gider, Seyahat, Temsil"></div>
-      <div class="form-row">
-        <div>
-          <label>Banka Adı</label>
-          <select class="f-input" id="card-bank">
-            <option>Garanti BBVA</option><option>İş Bankası</option><option>Akbank</option>
-            <option>Yapı Kredi</option><option>Ziraat Bankası</option><option>Halkbank</option>
-            <option>Vakıfbank</option><option>QNB Finansbank</option><option>Denizbank</option>
-            <option>ING</option><option>TEB</option><option>HSBC</option><option>Diğer</option>
-          </select>
-        </div>
-        <div><label>Kart Adı / Türü</label><input class="f-input" type="text" id="card-name" placeholder="ör. Miles&Smiles, Bonus"></div>
-      </div>
-      <div class="form-row">
-        <div><label>Toplam Limit (₺)</label><input class="f-input" type="text" inputmode="decimal" data-num id="card-limit" placeholder="50.000"></div>
-        <div><label>Mevcut Borç (₺)</label><input class="f-input" type="text" inputmode="decimal" data-num id="card-used" placeholder="12.000"></div>
-      </div>
-      <div class="form-row">
-        <div>
-          <label>Son Ödeme Günü</label>
-          <select class="f-input" id="card-due">
-            <option value="1">1. günü</option><option value="5">5. günü</option>
-            <option value="7">7. günü</option><option value="10">10. günü</option>
-            <option value="12">12. günü</option><option value="14">14. günü</option>
-            <option value="15">15. günü</option><option value="18">18. günü</option>
-            <option value="20">20. günü</option><option value="22">22. günü</option>
-            <option value="25">25. günü</option><option value="28">28. günü</option>
-          </select>
-        </div>
-        <div>
-          <label>Ekstre Günü</label>
-          <select class="f-input" id="card-stmt">
-            <option value="1">1. günü</option><option value="5">5. günü</option>
-            <option value="8">8. günü</option><option value="10">10. günü</option>
-            <option value="12">12. günü</option><option value="15">15. günü</option>
-            <option value="18">18. günü</option><option value="20" selected>20. günü</option>
-            <option value="22">22. günü</option><option value="25">25. günü</option>
-          </select>
-        </div>
-      </div>
-      <div style="margin-bottom:16px">
-        <label>Asgari Ödeme Oranı</label>
-        <select class="f-input" id="card-minpct">
-          <option value="20">%20</option>
-          <option value="25" selected>%25</option>
-          <option value="30">%30</option>
-          <option value="40">%40</option>
-          <option value="100">Tamamı (%100)</option>
-        </select>
-      </div>
-      <button class="btn btn-primary" style="width:100%;padding:12px" onclick="addCard()">Kartı Kaydet</button>
-    </div>
-
-    <!-- CARDS LIST -->
-    <div class="card">
-      <div class="section-title">Kartlarım</div>
-      <div id="card-list"><div class="empty-state"><div class="icon">💳</div>Henüz kart eklenmedi</div></div>
-      <div id="card-totals" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
-        <div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:5px">
-          <span style="color:var(--txt2)">Toplam Limit</span><span id="ct-limit" style="font-weight:600"></span>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:5px">
-          <span style="color:var(--txt2)">Toplam Borç</span><span id="ct-used" style="font-weight:600;color:var(--r)"></span>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:.9rem">
-          <span style="color:var(--txt2)">Kullanılabilir</span><span id="ct-avail" style="font-weight:800;color:var(--g)"></span>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- HESAPLAR (Banka Ürünleri) -->
 <div class="page" id="page-hesaplar">
   <div class="page-title">Kartlar & Hesaplar</div>
@@ -4919,7 +4838,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
           <label id="acc-bal-lbl">Mevcut Bakiye (₺)</label>
           <input class="f-input" type="text" inputmode="decimal" data-num id="acc-balance" placeholder="0,00">
         </div>
-        <div id="acc-limit-col">
+        <div id="acc-limit-col" style="display:none">
           <label>Limit (₺)</label>
           <input class="f-input" type="text" inputmode="decimal" data-num id="acc-limit" placeholder="50.000">
         </div>
@@ -6809,12 +6728,12 @@ function loadAccounts(){
       html+='</div>';
       if(isCard&&lim>0){
         var pct=Math.min(100,Math.round((bal/lim)*100));
-        var fillColor=pct>80?'var(--r)':pct>50?'var(--o)':'var(--b)';
+        var fillColor=pct>80?'var(--r)':pct>50?'var(--y)':'var(--b)';
         html+='<div class="acc-prog-wrap"><div class="acc-prog-fill" style="width:'+pct+'%;background:'+fillColor+'"></div></div>';
         html+='<div style="font-size:.65rem;color:var(--txt2);margin-top:3px">Limit: '+fmt(lim)+' &nbsp;·&nbsp; %'+pct+' kullanım</div>';
       }
       html+='<div class="acc-actions">';
-      html+='<button class="acc-act-btn" style="background:var(--bg3);color:var(--txt2)" onclick="editAccount('+JSON.stringify(a).replace(/"/g,"&quot;")+')" >Düzenle</button>';
+      html+='<button class="acc-act-btn" style="background:var(--bg3);color:var(--txt2)" data-acc="'+encodeURIComponent(JSON.stringify(a))+'" onclick="editAccount(JSON.parse(decodeURIComponent(this.dataset.acc)))">Düzenle</button>';
       html+='<button class="acc-act-btn" style="background:rgba(255,59,48,.1);color:var(--r)" onclick="deleteAccount('+a.id+')">Sil</button>';
       html+='</div>';
       html+='</div>';
