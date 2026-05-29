@@ -179,6 +179,25 @@ def init_db():
             created_at   TEXT NOT NULL
         )""",
         "CREATE INDEX IF NOT EXISTS idx_txn_profile_date ON transactions(profile_id, date)",
+        """CREATE TABLE IF NOT EXISTS invoices (
+            id                  SERIAL PRIMARY KEY,
+            user_id             INTEGER NOT NULL DEFAULT 1,
+            profile_id          INTEGER NOT NULL DEFAULT 1,
+            project_name        TEXT NOT NULL,
+            client_name         TEXT NOT NULL DEFAULT '',
+            description         TEXT DEFAULT '',
+            amount              DOUBLE PRECISION NOT NULL DEFAULT 0,
+            currency            TEXT NOT NULL DEFAULT 'TRY',
+            invoice_date        TEXT NOT NULL,
+            due_date            TEXT NOT NULL,
+            status              TEXT NOT NULL DEFAULT 'bekliyor',
+            paid_date           TEXT DEFAULT '',
+            early_discount_pct  DOUBLE PRECISION NOT NULL DEFAULT 0,
+            early_discount_days INTEGER NOT NULL DEFAULT 0,
+            late_penalty_pct    DOUBLE PRECISION NOT NULL DEFAULT 0,
+            notes               TEXT DEFAULT '',
+            created_at          TEXT NOT NULL
+        )""",
         """CREATE TABLE IF NOT EXISTS goals (
             id             SERIAL PRIMARY KEY,
             user_id        INTEGER NOT NULL DEFAULT 1,
@@ -189,6 +208,112 @@ def init_db():
             note           TEXT DEFAULT '',
             created_at     TEXT NOT NULL
         )""",
+        """CREATE TABLE IF NOT EXISTS todos (
+            id          SERIAL PRIMARY KEY,
+            user_id     INTEGER NOT NULL DEFAULT 1,
+            profile_id  INTEGER NOT NULL DEFAULT 1,
+            text        TEXT NOT NULL,
+            date        TEXT NOT NULL,
+            done        INTEGER NOT NULL DEFAULT 0,
+            archived    INTEGER NOT NULL DEFAULT 0,
+            created_at  TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS invoices (
+            id                  SERIAL PRIMARY KEY,
+            user_id             INTEGER NOT NULL DEFAULT 1,
+            profile_id          INTEGER NOT NULL DEFAULT 1,
+            project_name        TEXT NOT NULL,
+            client_name         TEXT NOT NULL DEFAULT '',
+            description         TEXT DEFAULT '',
+            amount              DOUBLE PRECISION NOT NULL DEFAULT 0,
+            currency            TEXT NOT NULL DEFAULT 'TRY',
+            invoice_date        TEXT NOT NULL,
+            due_date            TEXT NOT NULL,
+            status              TEXT NOT NULL DEFAULT 'bekliyor',
+            paid_date           TEXT DEFAULT '',
+            early_discount_pct  DOUBLE PRECISION NOT NULL DEFAULT 0,
+            early_discount_days INTEGER NOT NULL DEFAULT 0,
+            late_penalty_pct    DOUBLE PRECISION NOT NULL DEFAULT 0,
+            notes               TEXT DEFAULT '',
+            created_at          TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS suppliers (
+            id                  SERIAL PRIMARY KEY,
+            user_id             INTEGER NOT NULL DEFAULT 1,
+            profile_id          INTEGER NOT NULL DEFAULT 1,
+            name                TEXT NOT NULL,
+            tax_no              TEXT DEFAULT '',
+            contact             TEXT DEFAULT '',
+            phone               TEXT DEFAULT '',
+            email               TEXT DEFAULT '',
+            address             TEXT DEFAULT '',
+            payment_terms_days  INTEGER NOT NULL DEFAULT 30,
+            notes               TEXT DEFAULT '',
+            created_at          TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS supplier_invoices (
+            id              SERIAL PRIMARY KEY,
+            user_id         INTEGER NOT NULL DEFAULT 1,
+            profile_id      INTEGER NOT NULL DEFAULT 1,
+            supplier_id     INTEGER NOT NULL DEFAULT 0,
+            supplier_name   TEXT NOT NULL DEFAULT '',
+            invoice_no      TEXT DEFAULT '',
+            description     TEXT DEFAULT '',
+            amount          DOUBLE PRECISION NOT NULL DEFAULT 0,
+            currency        TEXT NOT NULL DEFAULT 'TRY',
+            invoice_date    TEXT NOT NULL,
+            due_date        TEXT NOT NULL,
+            status          TEXT NOT NULL DEFAULT 'bekliyor',
+            paid_date       TEXT DEFAULT '',
+            reference_rate  DOUBLE PRECISION NOT NULL DEFAULT 50,
+            notes           TEXT DEFAULT '',
+            created_at      TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS assets (
+            id                  SERIAL PRIMARY KEY,
+            user_id             INTEGER NOT NULL DEFAULT 1,
+            profile_id          INTEGER NOT NULL DEFAULT 1,
+            name                TEXT NOT NULL,
+            asset_type          TEXT NOT NULL DEFAULT 'diger',
+            plate_no            TEXT DEFAULT '',
+            serial_no           TEXT DEFAULT '',
+            purchase_date       TEXT NOT NULL,
+            purchase_price      DOUBLE PRECISION NOT NULL DEFAULT 0,
+            useful_life_years   INTEGER NOT NULL DEFAULT 5,
+            depreciation_method TEXT NOT NULL DEFAULT 'normal',
+            depreciation_rate   DOUBLE PRECISION NOT NULL DEFAULT 20,
+            maintenance_date    TEXT DEFAULT '',
+            insurance_date      TEXT DEFAULT '',
+            insurance_company   TEXT DEFAULT '',
+            notes               TEXT DEFAULT '',
+            active              INTEGER NOT NULL DEFAULT 1,
+            created_at          TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS asset_maintenance (
+            id          SERIAL PRIMARY KEY,
+            user_id     INTEGER NOT NULL DEFAULT 1,
+            profile_id  INTEGER NOT NULL DEFAULT 1,
+            asset_id    INTEGER NOT NULL,
+            date        TEXT NOT NULL,
+            mtype       TEXT NOT NULL DEFAULT 'bakim',
+            description TEXT DEFAULT '',
+            cost        DOUBLE PRECISION NOT NULL DEFAULT 0,
+            odometer    DOUBLE PRECISION NOT NULL DEFAULT 0,
+            next_date   TEXT DEFAULT '',
+            notes       TEXT DEFAULT '',
+            created_at  TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS card_daily_balance (
+            id          SERIAL PRIMARY KEY,
+            user_id     INTEGER NOT NULL DEFAULT 1,
+            profile_id  INTEGER NOT NULL DEFAULT 1,
+            card_id     INTEGER NOT NULL,
+            date        TEXT NOT NULL,
+            balance     DOUBLE PRECISION NOT NULL DEFAULT 0,
+            notes       TEXT DEFAULT '',
+            created_at  TEXT NOT NULL
+        )""",
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_card_daily ON card_daily_balance(card_id, date)",
     ]
     migrations = [
         ("users",        "email",          "TEXT NOT NULL DEFAULT ''"),
@@ -856,6 +981,718 @@ def del_goal(gid):
     db.commit()
     return jsonify({"ok":True})
 
+# ── TODOS ────────────────────────────────────────────────────────────────────
+
+@app.route("/api/todos", methods=["GET"])
+@login_required
+def list_todos():
+    pid = get_pid(); db = get_db()
+    dt = request.args.get("date", date.today().isoformat())
+    rows = db.execute(
+        "SELECT * FROM todos WHERE profile_id=? AND date=? ORDER BY id", (pid, dt)
+    ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/todos", methods=["POST"])
+@login_required
+def add_todo():
+    uid = session["user_id"]; pid = get_pid()
+    d = request.get_json(force=True)
+    text = d.get("text","").strip()
+    dt   = d.get("date", date.today().isoformat())
+    if not text: return jsonify({"ok":False,"error":"Görev metni gerekli"}), 400
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO todos (user_id,profile_id,text,date,done,archived,created_at) VALUES (?,?,?,?,0,0,?)",
+        (uid, pid, text, dt, datetime.now().isoformat())
+    )
+    db.commit()
+    return jsonify({"ok":True,"id":cur.lastrowid})
+
+@app.route("/api/todos/<int:tid>", methods=["PUT"])
+@login_required
+def update_todo(tid):
+    pid = get_pid(); db = get_db()
+    d = request.get_json(force=True)
+    fields, params = [], []
+    for col in ("text","done","archived","date"):
+        if col in d:
+            fields.append(f"{col}=?")
+            params.append(d[col])
+    if not fields: return jsonify({"ok":False}), 400
+    params += [tid, pid]
+    db.execute(f"UPDATE todos SET {','.join(fields)} WHERE id=? AND profile_id=?", params)
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/todos/<int:tid>", methods=["DELETE"])
+@login_required
+def del_todo(tid):
+    pid = get_pid(); db = get_db()
+    db.execute("DELETE FROM todos WHERE id=? AND profile_id=?", (tid, pid))
+    db.commit()
+    return jsonify({"ok":True})
+
+# ── SUPPLIERS ────────────────────────────────────────────────────────────────
+
+@app.route("/api/suppliers", methods=["GET"])
+@login_required
+def list_suppliers():
+    pid = get_pid(); db = get_db()
+    rows = db.execute("SELECT * FROM suppliers WHERE profile_id=? ORDER BY name", (pid,)).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/suppliers", methods=["POST"])
+@login_required
+def add_supplier():
+    uid = session["user_id"]; pid = get_pid()
+    d = request.get_json(force=True)
+    name = d.get("name","").strip()
+    if not name: return jsonify({"ok":False,"error":"Tedarikçi adı zorunlu"}), 400
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO suppliers (user_id,profile_id,name,tax_no,contact,phone,email,address,payment_terms_days,notes,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        (uid, pid, name, d.get("tax_no",""), d.get("contact",""), d.get("phone",""),
+         d.get("email",""), d.get("address",""), int(d.get("payment_terms_days",30)),
+         d.get("notes",""), datetime.now().isoformat())
+    )
+    db.commit()
+    return jsonify({"ok":True,"id":cur.lastrowid})
+
+@app.route("/api/suppliers/<int:sid>", methods=["PUT"])
+@login_required
+def update_supplier(sid):
+    pid = get_pid(); db = get_db()
+    d = request.get_json(force=True)
+    fields, params = [], []
+    for col in ("name","tax_no","contact","phone","email","address","payment_terms_days","notes"):
+        if col in d:
+            fields.append(f"{col}=?")
+            params.append(d[col])
+    if not fields: return jsonify({"ok":False}), 400
+    params += [sid, pid]
+    db.execute(f"UPDATE suppliers SET {','.join(fields)} WHERE id=? AND profile_id=?", params)
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/suppliers/<int:sid>", methods=["DELETE"])
+@login_required
+def del_supplier(sid):
+    pid = get_pid(); db = get_db()
+    db.execute("DELETE FROM suppliers WHERE id=? AND profile_id=?", (sid, pid))
+    db.commit()
+    return jsonify({"ok":True})
+
+# ── SUPPLIER INVOICES ─────────────────────────────────────────────────────────
+
+@app.route("/api/supplier-invoices", methods=["GET"])
+@login_required
+def list_supplier_invoices():
+    pid = get_pid(); db = get_db()
+    status = request.args.get("status","")
+    if status:
+        rows = db.execute(
+            "SELECT * FROM supplier_invoices WHERE profile_id=? AND status=? ORDER BY due_date", (pid, status)
+        ).fetchall()
+    else:
+        rows = db.execute(
+            "SELECT * FROM supplier_invoices WHERE profile_id=? ORDER BY due_date DESC", (pid,)
+        ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/supplier-invoices", methods=["POST"])
+@login_required
+def add_supplier_invoice():
+    uid = session["user_id"]; pid = get_pid()
+    d = request.get_json(force=True)
+    sup_name = d.get("supplier_name","").strip()
+    amount   = float(d.get("amount",0))
+    inv_date = d.get("invoice_date", date.today().isoformat())
+    due_date = d.get("due_date","")
+    if not sup_name or amount <= 0 or not due_date:
+        return jsonify({"ok":False,"error":"Tedarikçi, tutar ve vade zorunlu"}), 400
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO supplier_invoices (user_id,profile_id,supplier_id,supplier_name,invoice_no,description,amount,currency,invoice_date,due_date,status,paid_date,reference_rate,notes,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (uid, pid, int(d.get("supplier_id",0)), sup_name, d.get("invoice_no",""),
+         d.get("description",""), amount, d.get("currency","TRY"), inv_date, due_date,
+         "bekliyor", "", float(d.get("reference_rate",50)), d.get("notes",""),
+         datetime.now().isoformat())
+    )
+    db.commit()
+    return jsonify({"ok":True,"id":cur.lastrowid})
+
+@app.route("/api/supplier-invoices/<int:iid>", methods=["PUT"])
+@login_required
+def update_supplier_invoice(iid):
+    pid = get_pid(); db = get_db()
+    d = request.get_json(force=True)
+    fields, params = [], []
+    for col in ("supplier_name","invoice_no","description","amount","currency","invoice_date","due_date","status","paid_date","reference_rate","notes"):
+        if col in d:
+            fields.append(f"{col}=?")
+            params.append(float(d[col]) if col in ("amount","reference_rate") else d[col])
+    if not fields: return jsonify({"ok":False}), 400
+    params += [iid, pid]
+    db.execute(f"UPDATE supplier_invoices SET {','.join(fields)} WHERE id=? AND profile_id=?", params)
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/supplier-invoices/<int:iid>", methods=["DELETE"])
+@login_required
+def del_supplier_invoice(iid):
+    pid = get_pid(); db = get_db()
+    db.execute("DELETE FROM supplier_invoices WHERE id=? AND profile_id=?", (iid, pid))
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/supplier-invoices/<int:iid>/pay", methods=["POST"])
+@login_required
+def pay_supplier_invoice(iid):
+    pid = get_pid(); db = get_db()
+    d = request.get_json(force=True)
+    paid_date = d.get("paid_date", date.today().isoformat())
+    db.execute(
+        "UPDATE supplier_invoices SET status='odendi',paid_date=? WHERE id=? AND profile_id=?",
+        (paid_date, iid, pid)
+    )
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/supplier-invoices/aging")
+@login_required
+def supplier_invoices_aging():
+    pid = get_pid(); db = get_db()
+    today_d = date.today()
+    rows = db.execute(
+        "SELECT * FROM supplier_invoices WHERE profile_id=? AND status='bekliyor' ORDER BY due_date",
+        (pid,)
+    ).fetchall()
+    buckets = {"0_30":[],"31_60":[],"61_90":[],"90plus":[]}
+    totals  = {"0_30":0.0,"31_60":0.0,"61_90":0.0,"90plus":0.0}
+    for r in rows:
+        try:
+            due = date.fromisoformat(r["due_date"])
+            days_overdue = (today_d - due).days
+        except:
+            days_overdue = 0
+        item = dict(r)
+        item["days_overdue"] = days_overdue
+        if days_overdue <= 0:
+            buckets["0_30"].append(item); totals["0_30"] += float(r["amount"])
+        elif days_overdue <= 30:
+            buckets["0_30"].append(item); totals["0_30"] += float(r["amount"])
+        elif days_overdue <= 60:
+            buckets["31_60"].append(item); totals["31_60"] += float(r["amount"])
+        elif days_overdue <= 90:
+            buckets["61_90"].append(item); totals["61_90"] += float(r["amount"])
+        else:
+            buckets["90plus"].append(item); totals["90plus"] += float(r["amount"])
+    grand_total = sum(totals.values())
+    return jsonify({"ok":True,"buckets":buckets,"totals":totals,"grand_total":grand_total})
+
+@app.route("/api/supplier-invoices/float-gain")
+@login_required
+def supplier_invoices_float_gain():
+    pid = get_pid(); db = get_db()
+    today_d = date.today()
+    rows = db.execute(
+        "SELECT * FROM supplier_invoices WHERE profile_id=? AND status='odendi' AND paid_date!=''",
+        (pid,)
+    ).fetchall()
+    results = []
+    total_gain = 0.0
+    for r in rows:
+        try:
+            due  = date.fromisoformat(r["due_date"])
+            paid = date.fromisoformat(r["paid_date"])
+            delayed_days = (paid - due).days
+            if delayed_days > 0:
+                rate = float(r["reference_rate"] or 50)
+                gain = float(r["amount"]) * (delayed_days / 365) * (rate / 100)
+                total_gain += gain
+                results.append({
+                    "supplier_name": r["supplier_name"],
+                    "amount": float(r["amount"]),
+                    "due_date": r["due_date"],
+                    "paid_date": r["paid_date"],
+                    "delayed_days": delayed_days,
+                    "reference_rate": rate,
+                    "float_gain": round(gain, 2)
+                })
+        except:
+            continue
+    results.sort(key=lambda x: x["float_gain"], reverse=True)
+    return jsonify({"ok":True,"items":results,"total_gain":round(total_gain,2)})
+
+# ── ASSETS & DEPRECIATION ─────────────────────────────────────────────────────
+
+DEPRECIATION_RATES = {
+    "arac":       {"rate": 20.0, "life": 5},
+    "bilgisayar": {"rate": 33.33, "life": 3},
+    "makine":     {"rate": 20.0, "life": 5},
+    "mobilya":    {"rate": 20.0, "life": 5},
+    "bina":       {"rate": 2.0,  "life": 50},
+    "diger":      {"rate": 20.0, "life": 5},
+}
+
+def calc_depreciation(purchase_price, purchase_date_str, rate, method="normal"):
+    today_d = date.today()
+    try:
+        p_date = date.fromisoformat(purchase_date_str)
+    except:
+        return {"book_value": purchase_price, "accumulated": 0, "annual": 0, "entries": []}
+    years_used = (today_d - p_date).days / 365.25
+    annual = purchase_price * rate / 100
+    accumulated = min(annual * years_used, purchase_price)
+    book_value   = max(purchase_price - accumulated, 0)
+    entries = []
+    for yr in range(1, int(years_used) + 2):
+        yr_dep = min(annual, purchase_price - annual * (yr - 1))
+        if yr_dep <= 0: break
+        entries.append({"year": p_date.year + yr - 1, "depreciation": round(yr_dep, 2),
+                        "cumulative": round(min(annual * yr, purchase_price), 2),
+                        "book_value": round(max(purchase_price - min(annual * yr, purchase_price), 0), 2)})
+    return {"book_value": round(book_value, 2), "accumulated": round(accumulated, 2),
+            "annual": round(annual, 2), "entries": entries}
+
+@app.route("/api/assets", methods=["GET"])
+@login_required
+def list_assets():
+    pid = get_pid(); db = get_db()
+    rows = db.execute("SELECT * FROM assets WHERE profile_id=? AND active=1 ORDER BY name", (pid,)).fetchall()
+    result = []
+    for r in rows:
+        item = dict(r)
+        dep = calc_depreciation(float(r["purchase_price"]), r["purchase_date"],
+                                float(r["depreciation_rate"]), r["depreciation_method"])
+        item["book_value"]   = dep["book_value"]
+        item["accumulated"]  = dep["accumulated"]
+        item["annual_dep"]   = dep["annual"]
+        result.append(item)
+    return jsonify(result)
+
+@app.route("/api/assets", methods=["POST"])
+@login_required
+def add_asset():
+    uid = session["user_id"]; pid = get_pid()
+    d = request.get_json(force=True)
+    name = d.get("name","").strip()
+    if not name: return jsonify({"ok":False,"error":"Varlık adı zorunlu"}), 400
+    atype = d.get("asset_type","diger")
+    defaults = DEPRECIATION_RATES.get(atype, DEPRECIATION_RATES["diger"])
+    rate = float(d.get("depreciation_rate", defaults["rate"]))
+    life = int(d.get("useful_life_years", defaults["life"]))
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO assets (user_id,profile_id,name,asset_type,plate_no,serial_no,purchase_date,purchase_price,useful_life_years,depreciation_method,depreciation_rate,maintenance_date,insurance_date,insurance_company,notes,active,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)",
+        (uid, pid, name, atype, d.get("plate_no",""), d.get("serial_no",""),
+         d.get("purchase_date", date.today().isoformat()), float(d.get("purchase_price",0)),
+         life, d.get("depreciation_method","normal"), rate,
+         d.get("maintenance_date",""), d.get("insurance_date",""), d.get("insurance_company",""),
+         d.get("notes",""), datetime.now().isoformat())
+    )
+    db.commit()
+    return jsonify({"ok":True,"id":cur.lastrowid})
+
+@app.route("/api/assets/<int:aid>", methods=["PUT"])
+@login_required
+def update_asset(aid):
+    pid = get_pid(); db = get_db()
+    d = request.get_json(force=True)
+    fields, params = [], []
+    for col in ("name","asset_type","plate_no","serial_no","purchase_date","purchase_price",
+                "useful_life_years","depreciation_method","depreciation_rate",
+                "maintenance_date","insurance_date","insurance_company","notes","active"):
+        if col in d:
+            fields.append(f"{col}=?")
+            params.append(float(d[col]) if col in ("purchase_price","depreciation_rate") else d[col])
+    if not fields: return jsonify({"ok":False}), 400
+    params += [aid, pid]
+    db.execute(f"UPDATE assets SET {','.join(fields)} WHERE id=? AND profile_id=?", params)
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/assets/<int:aid>", methods=["DELETE"])
+@login_required
+def del_asset(aid):
+    pid = get_pid(); db = get_db()
+    db.execute("UPDATE assets SET active=0 WHERE id=? AND profile_id=?", (aid, pid))
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/assets/<int:aid>/maintenance", methods=["GET"])
+@login_required
+def list_asset_maintenance(aid):
+    pid = get_pid(); db = get_db()
+    rows = db.execute(
+        "SELECT * FROM asset_maintenance WHERE profile_id=? AND asset_id=? ORDER BY date DESC",
+        (pid, aid)
+    ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/assets/<int:aid>/maintenance", methods=["POST"])
+@login_required
+def add_asset_maintenance(aid):
+    uid = session["user_id"]; pid = get_pid()
+    d = request.get_json(force=True)
+    dt = d.get("date", date.today().isoformat())
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO asset_maintenance (user_id,profile_id,asset_id,date,mtype,description,cost,odometer,next_date,notes,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        (uid, pid, aid, dt, d.get("mtype","bakim"), d.get("description",""),
+         float(d.get("cost",0)), float(d.get("odometer",0)),
+         d.get("next_date",""), d.get("notes",""), datetime.now().isoformat())
+    )
+    db.commit()
+    # Update asset maintenance_date
+    db.execute("UPDATE assets SET maintenance_date=? WHERE id=? AND profile_id=?",
+               (d.get("next_date",""), aid, pid))
+    db.commit()
+    return jsonify({"ok":True,"id":cur.lastrowid})
+
+@app.route("/api/assets/maintenance/<int:mid>", methods=["DELETE"])
+@login_required
+def del_asset_maintenance(mid):
+    pid = get_pid(); db = get_db()
+    db.execute("DELETE FROM asset_maintenance WHERE id=? AND profile_id=?", (mid, pid))
+    db.commit()
+    return jsonify({"ok":True})
+
+# ── CARD DAILY BALANCE ────────────────────────────────────────────────────────
+
+@app.route("/api/cards/daily-report", methods=["GET"])
+@login_required
+def card_daily_report():
+    pid = get_pid(); db = get_db()
+    cards = db.execute("SELECT * FROM cards WHERE profile_id=? ORDER BY bank_name", (pid,)).fetchall()
+    today_str = date.today().isoformat()
+    yesterday_str = (date.today() - __import__("datetime").timedelta(days=1)).isoformat()
+    result = []
+    for c in cards:
+        cid = c["id"]
+        today_row = db.execute(
+            "SELECT balance FROM card_daily_balance WHERE profile_id=? AND card_id=? AND date=?",
+            (pid, cid, today_str)
+        ).fetchone()
+        yest_row = db.execute(
+            "SELECT balance FROM card_daily_balance WHERE profile_id=? AND card_id=? AND date=?",
+            (pid, cid, yesterday_str)
+        ).fetchone()
+        today_bal = float(today_row["balance"]) if today_row else None
+        yest_bal  = float(yest_row["balance"])  if yest_row  else None
+        spent = None
+        if today_bal is not None and yest_bal is not None:
+            spent = today_bal - yest_bal
+        result.append({
+            "card_id": cid,
+            "bank_name": c["bank_name"],
+            "card_name": c["card_name"] or "",
+            "today_balance": today_bal,
+            "yesterday_balance": yest_bal,
+            "spent_today": round(spent, 2) if spent is not None else None
+        })
+    return jsonify({"ok":True,"cards":result,"date":today_str})
+
+@app.route("/api/cards/daily-balance", methods=["POST"])
+@login_required
+def save_card_daily_balance():
+    uid = session["user_id"]; pid = get_pid()
+    d = request.get_json(force=True)
+    cid = int(d.get("card_id",0))
+    bal = float(d.get("balance",0))
+    dt  = d.get("date", date.today().isoformat())
+    if not cid: return jsonify({"ok":False,"error":"Kart gerekli"}), 400
+    db = get_db()
+    # Upsert
+    existing = db.execute(
+        "SELECT id FROM card_daily_balance WHERE profile_id=? AND card_id=? AND date=?",
+        (pid, cid, dt)
+    ).fetchone()
+    if existing:
+        db.execute("UPDATE card_daily_balance SET balance=?,notes=? WHERE id=?",
+                   (bal, d.get("notes",""), existing["id"]))
+    else:
+        db.execute(
+            "INSERT INTO card_daily_balance (user_id,profile_id,card_id,date,balance,notes,created_at) VALUES (?,?,?,?,?,?,?)",
+            (uid, pid, cid, dt, bal, d.get("notes",""), datetime.now().isoformat())
+        )
+    db.commit()
+    return jsonify({"ok":True})
+
+# ── EXCEL EXPORT ──────────────────────────────────────────────────────────────
+
+@app.route("/api/export/excel")
+@login_required
+def export_excel():
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import (Font, PatternFill, Alignment, Border, Side,
+                                  GradientFill)
+    from openpyxl.utils import get_column_letter
+    from openpyxl.chart import BarChart, Reference
+
+    pid = get_pid(); db = get_db()
+    today_d = date.today()
+
+    NAVY   = "1A3557"
+    ORANGE = "E8773A"
+    LGRAY  = "F0F4F8"
+    WHITE  = "FFFFFF"
+    GREEN  = "1D7A46"
+    RED    = "C0392B"
+    YELLOW = "D4A017"
+
+    def hdr_font(bold=True, size=11, color=WHITE):
+        return Font(name="Calibri", bold=bold, size=size, color=color)
+    def body_font(bold=False, size=10, color="1C1C1E"):
+        return Font(name="Calibri", bold=bold, size=size, color=color)
+    def navy_fill():
+        return PatternFill("solid", fgColor=NAVY)
+    def orange_fill():
+        return PatternFill("solid", fgColor=ORANGE)
+    def gray_fill():
+        return PatternFill("solid", fgColor=LGRAY)
+    def thin_border():
+        s = Side(style="thin", color="D1D1D6")
+        return Border(left=s, right=s, top=s, bottom=s)
+    def center():
+        return Alignment(horizontal="center", vertical="center", wrap_text=True)
+    def left():
+        return Alignment(horizontal="left", vertical="center", wrap_text=True)
+
+    def write_sheet_header(ws, title, subtitle=""):
+        ws.merge_cells("A1:H1")
+        c = ws["A1"]
+        c.value = f"🦔 KIRPI — {title}"
+        c.font  = Font(name="Calibri", bold=True, size=16, color=WHITE)
+        c.fill  = navy_fill()
+        c.alignment = center()
+        ws.row_dimensions[1].height = 36
+        if subtitle:
+            ws.merge_cells("A2:H2")
+            c2 = ws["A2"]
+            c2.value = subtitle
+            c2.font  = Font(name="Calibri", size=10, color="A0AEC0")
+            c2.fill  = navy_fill()
+            c2.alignment = center()
+            ws.row_dimensions[2].height = 20
+            return 3
+        return 2
+
+    def write_col_headers(ws, row, headers, col_widths=None):
+        for ci, h in enumerate(headers, 1):
+            c = ws.cell(row=row, column=ci, value=h)
+            c.font = Font(name="Calibri", bold=True, size=10, color=WHITE)
+            c.fill = orange_fill()
+            c.alignment = center()
+            c.border = thin_border()
+        ws.row_dimensions[row].height = 22
+        if col_widths:
+            for ci, w in enumerate(col_widths, 1):
+                ws.column_dimensions[get_column_letter(ci)].width = w
+
+    def alt_fill(row_idx):
+        return gray_fill() if row_idx % 2 == 0 else PatternFill("solid", fgColor=WHITE)
+
+    wb = Workbook()
+
+    # ── Sheet 1: Tedarikçi Faturalar ──────────────────────────────────────────
+    ws1 = wb.active
+    ws1.title = "Tedarikci Faturalar"
+    data_row = write_sheet_header(ws1, "TEDARİKÇİ FATURALARI",
+                                  f"Oluşturma Tarihi: {today_d.strftime('%d.%m.%Y')}")
+    cols = ["Tedarikçi","Fatura No","Tutar","Para Birimi","Fatura Tarihi","Vade Tarihi","Durum","Notlar"]
+    write_col_headers(ws1, data_row, cols, [22,14,14,10,14,14,12,20])
+    data_row += 1
+    invoices = db.execute(
+        "SELECT * FROM supplier_invoices WHERE profile_id=? ORDER BY due_date", (pid,)
+    ).fetchall()
+    for ri, row in enumerate(invoices):
+        vals = [row["supplier_name"], row["invoice_no"], float(row["amount"]),
+                row["currency"], row["invoice_date"], row["due_date"],
+                "Ödendi" if row["status"]=="odendi" else "Bekliyor", row["notes"] or ""]
+        for ci, v in enumerate(vals, 1):
+            c = ws1.cell(row=data_row+ri, column=ci, value=v)
+            c.font   = body_font()
+            c.fill   = alt_fill(ri)
+            c.border = thin_border()
+            c.alignment = center() if ci in (3,4,5,6,7) else left()
+            if ci == 3:
+                c.number_format = '#,##0.00'
+            if ci == 7:
+                if row["status"] == "odendi":
+                    c.font = Font(name="Calibri", size=10, color=GREEN, bold=True)
+                else:
+                    try:
+                        due = date.fromisoformat(row["due_date"])
+                        if due < today_d:
+                            c.font = Font(name="Calibri", size=10, color=RED, bold=True)
+                    except:
+                        pass
+
+    # ── Sheet 2: Ödeme Yaşlandırma ────────────────────────────────────────────
+    ws2 = wb.create_sheet("Odeme Yaslandirma")
+    data_row = write_sheet_header(ws2, "ÖDEME YAŞLANDIRma RAPORU",
+                                  f"Rapor Tarihi: {today_d.strftime('%d.%m.%Y')}")
+    aging_data = {"0-30 Gün (Güncel)":[],"31-60 Gün":[],"61-90 Gün":[],"90+ Gün (Kritik)":[]}
+    aging_totals = {k:0.0 for k in aging_data}
+    pending = db.execute(
+        "SELECT * FROM supplier_invoices WHERE profile_id=? AND status='bekliyor' ORDER BY due_date",
+        (pid,)
+    ).fetchall()
+    for row in pending:
+        try:
+            due = date.fromisoformat(row["due_date"])
+            days_over = (today_d - due).days
+        except:
+            days_over = 0
+        amt = float(row["amount"])
+        item = (row["supplier_name"], float(row["amount"]), row["due_date"], days_over)
+        if days_over <= 30:
+            aging_data["0-30 Gün (Güncel)"].append(item); aging_totals["0-30 Gün (Güncel)"] += amt
+        elif days_over <= 60:
+            aging_data["31-60 Gün"].append(item); aging_totals["31-60 Gün"] += amt
+        elif days_over <= 90:
+            aging_data["61-90 Gün"].append(item); aging_totals["61-90 Gün"] += amt
+        else:
+            aging_data["90+ Gün (Kritik)"].append(item); aging_totals["90+ Gün (Kritik)"] += amt
+
+    BUCKET_COLORS = {"0-30 Gün (Güncel)":"1D7A46","31-60 Gün":"D4A017",
+                     "61-90 Gün":"E07B39","90+ Gün (Kritik)":"C0392B"}
+    cur_row = data_row
+    for bucket, items in aging_data.items():
+        ws2.merge_cells(f"A{cur_row}:F{cur_row}")
+        hc = ws2.cell(row=cur_row, column=1, value=f"  {bucket}  —  ₺{aging_totals[bucket]:,.2f}")
+        hc.font  = Font(name="Calibri", bold=True, size=11, color=WHITE)
+        hc.fill  = PatternFill("solid", fgColor=BUCKET_COLORS[bucket])
+        hc.alignment = left()
+        ws2.row_dimensions[cur_row].height = 22
+        cur_row += 1
+        if items:
+            write_col_headers(ws2, cur_row, ["Tedarikçi","Tutar","Vade","Gecikme (Gün)","",""], [22,14,14,16,1,1])
+            cur_row += 1
+            for ri, (sup, amt, due_d, days_o) in enumerate(items):
+                for ci, v in enumerate([sup, amt, due_d, days_o, "", ""], 1):
+                    c = ws2.cell(row=cur_row+ri, column=ci, value=v)
+                    c.font = body_font(bold=(ci==4 and days_o>30))
+                    c.fill = alt_fill(ri)
+                    c.border = thin_border()
+                    if ci == 2: c.number_format = '#,##0.00'
+                    if ci == 4 and days_o > 90:
+                        c.font = Font(name="Calibri", bold=True, size=10, color=RED)
+            cur_row += len(items) + 1
+        else:
+            c = ws2.cell(row=cur_row, column=1, value="  (Bu kategoride bekleyen fatura yok)")
+            c.font = Font(name="Calibri", size=9, color="888888", italic=True)
+            cur_row += 2
+
+    # ── Sheet 3: Vadeden Kazanç ───────────────────────────────────────────────
+    ws3 = wb.create_sheet("Vadeden Kazanc")
+    data_row = write_sheet_header(ws3, "VADEDEN KAZANÇ PANOSU",
+                                  "Geç ödeme ile elde edilen nakit faiz fırsatı analizi")
+    cols3 = ["Tedarikçi","Fatura Tutarı","Vade","Ödeme Tarihi","Gecikme (Gün)","Referans Oran %","Kazanım (₺)"]
+    write_col_headers(ws3, data_row, cols3, [22,14,14,14,14,14,14])
+    data_row += 1
+    paid_inv = db.execute(
+        "SELECT * FROM supplier_invoices WHERE profile_id=? AND status='odendi' AND paid_date!=''",
+        (pid,)
+    ).fetchall()
+    total_gain = 0.0
+    for ri, row in enumerate(paid_inv):
+        try:
+            due  = date.fromisoformat(row["due_date"])
+            paid = date.fromisoformat(row["paid_date"])
+            delayed = (paid - due).days
+            if delayed <= 0: continue
+            rate = float(row["reference_rate"] or 50)
+            gain = float(row["amount"]) * (delayed / 365) * (rate / 100)
+            total_gain += gain
+        except:
+            continue
+        vals = [row["supplier_name"], float(row["amount"]), row["due_date"],
+                row["paid_date"], delayed, rate, round(gain, 2)]
+        for ci, v in enumerate(vals, 1):
+            c = ws3.cell(row=data_row+ri, column=ci, value=v)
+            c.font = body_font()
+            c.fill = alt_fill(ri)
+            c.border = thin_border()
+            c.alignment = center() if ci > 1 else left()
+            if ci in (2, 7): c.number_format = '#,##0.00'
+            if ci == 7:
+                c.font = Font(name="Calibri", bold=True, size=10, color=GREEN)
+    # Total row
+    total_row = data_row + len(paid_inv) + 1
+    ws3.merge_cells(f"A{total_row}:F{total_row}")
+    tc = ws3.cell(row=total_row, column=1, value="TOPLAM KAZANIM")
+    tc.font  = Font(name="Calibri", bold=True, size=11, color=WHITE)
+    tc.fill  = navy_fill()
+    tc.alignment = center()
+    tv = ws3.cell(row=total_row, column=7, value=round(total_gain, 2))
+    tv.font   = Font(name="Calibri", bold=True, size=11, color=ORANGE)
+    tv.fill   = navy_fill()
+    tv.number_format = '#,##0.00'
+    tv.alignment = center()
+
+    # ── Sheet 4: Varlıklar & Amortisman ──────────────────────────────────────
+    ws4 = wb.create_sheet("Varliklar Amortisman")
+    data_row = write_sheet_header(ws4, "VARLIKLAR & AMORTİSMAN",
+                                  f"Türk Vergi Mevzuatına Göre Normal Amortisman ({today_d.year})")
+    cols4 = ["Varlık Adı","Tür","Alış Tarihi","Alış Bedeli","Oran %","Yıllık Amortisman","Birikmiş","Defter Değeri"]
+    write_col_headers(ws4, data_row, cols4, [22,14,14,14,10,16,14,14])
+    data_row += 1
+    assets = db.execute("SELECT * FROM assets WHERE profile_id=? AND active=1 ORDER BY name", (pid,)).fetchall()
+    for ri, row in enumerate(assets):
+        dep = calc_depreciation(float(row["purchase_price"]), row["purchase_date"],
+                                float(row["depreciation_rate"]))
+        vals = [row["name"], row["asset_type"], row["purchase_date"],
+                float(row["purchase_price"]), float(row["depreciation_rate"]),
+                dep["annual"], dep["accumulated"], dep["book_value"]]
+        for ci, v in enumerate(vals, 1):
+            c = ws4.cell(row=data_row+ri, column=ci, value=v)
+            c.font = body_font()
+            c.fill = alt_fill(ri)
+            c.border = thin_border()
+            c.alignment = center() if ci > 2 else left()
+            if ci in (4,6,7,8): c.number_format = '#,##0.00'
+
+    # ── Sheet 5: Özet ─────────────────────────────────────────────────────────
+    ws5 = wb.create_sheet("Ozet")
+    write_sheet_header(ws5, "ÖZET RAPOR", f"Tüm modüller — {today_d.strftime('%d.%m.%Y')}")
+    summary_data = [
+        ("Toplam Bekleyen Tedarikçi Faturası", sum(float(r["amount"]) for r in pending)),
+        ("Bekleyen Fatura Adedi", len(pending)),
+        ("Toplam Vadeden Kazanım", round(total_gain, 2)),
+        ("Aktif Varlık Sayısı", len(assets)),
+        ("Toplam Varlık Defter Değeri", sum(
+            calc_depreciation(float(r["purchase_price"]), r["purchase_date"],
+                              float(r["depreciation_rate"]))["book_value"] for r in assets
+        )),
+    ]
+    for ri, (label, value) in enumerate(summary_data, 1):
+        r = 3 + ri
+        c1 = ws5.cell(row=r, column=1, value=label)
+        c2 = ws5.cell(row=r, column=2, value=value)
+        c1.font  = body_font(bold=True, size=11)
+        c2.font  = Font(name="Calibri", bold=True, size=12, color=NAVY)
+        c1.fill  = alt_fill(ri)
+        c2.fill  = alt_fill(ri)
+        c1.border = thin_border(); c2.border = thin_border()
+        c1.alignment = left(); c2.alignment = center()
+        if isinstance(value, float): c2.number_format = '#,##0.00'
+        ws5.row_dimensions[r].height = 24
+    ws5.column_dimensions["A"].width = 36
+    ws5.column_dimensions["B"].width = 20
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fname = f"kirpi_rapor_{today_d.strftime('%Y%m%d')}.xlsx"
+    from flask import send_file
+    return send_file(buf, as_attachment=True, download_name=fname,
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
 @app.route("/api/goals/analysis")
 @login_required
 def goals_analysis():
@@ -1205,6 +2042,65 @@ def generate_notifications(pid, profile_type, db, today):
         ]
         for ad, aico, atitle, abody in annual:
             tax(aico, atitle, abody, ad)
+
+    # ── SUPPLIER INVOICE DUE DATES ────────────────────────────────────────────
+    sup_invs = db.execute(
+        "SELECT * FROM supplier_invoices WHERE profile_id=? AND status='bekliyor'", (pid,)
+    ).fetchall()
+    for si in sup_invs:
+        try:
+            due = date.fromisoformat(si["due_date"])
+        except:
+            continue
+        d_val = days_until(due)
+        if -5 <= d_val <= 14:
+            amt   = float(si["amount"])
+            sname = si["supplier_name"]
+            if d_val <= 0:
+                msg = f"⚠️ Gecikmiş ödeme: {sname} — ₺{amt:,.0f} ({abs(d_val)} gün gecikti)"
+                ico = "🚨"
+            elif d_val <= 2:
+                msg = f"Yarın/bugün ödeme: {sname} — ₺{amt:,.0f}"
+                ico = "⚠️"
+            else:
+                msg = f"{d_val} gün içinde: {sname} tedarikçi ödemesi ₺{amt:,.0f}"
+                ico = "🏭"
+            add(ico, "Tedarikçi Ödemesi", msg, d_val, "tedarikci")
+
+    # ── ASSET MAINTENANCE & INSURANCE ────────────────────────────────────────
+    assets_rows = db.execute(
+        "SELECT * FROM assets WHERE profile_id=? AND active=1", (pid,)
+    ).fetchall()
+    for a in assets_rows:
+        name = a["name"]
+        if a["maintenance_date"]:
+            try:
+                mdate = date.fromisoformat(a["maintenance_date"])
+                d_val = days_until(mdate)
+                if -3 <= d_val <= 21:
+                    if d_val <= 0:
+                        msg = f"{name} bakım tarihi geçti! Servis planlamanız gerekiyor."
+                        ico = "🔧"
+                    else:
+                        msg = f"{name} için {d_val} gün içinde bakım/servis planlanmış"
+                        ico = "🔧"
+                    add(ico, "Araç/Varlık Bakımı", msg, d_val, "bakim")
+            except:
+                pass
+        if a["insurance_date"]:
+            try:
+                idate = date.fromisoformat(a["insurance_date"])
+                d_val = days_until(idate)
+                if -3 <= d_val <= 30:
+                    if d_val <= 0:
+                        msg = f"{name} sigortası süresi doldu! Yenilenmesi gerekiyor."
+                        ico = "🛡️"
+                    else:
+                        msg = f"{name} sigortası {d_val} gün içinde yenilenmeli"
+                        ico = "🛡️"
+                    add(ico, "Sigorta Yenileme", msg, d_val, "sigorta")
+            except:
+                pass
 
     # Sort: urgent first, then by days
     notifs.sort(key=lambda x: (0 if x["urgency"]=="urgent" else 1 if x["urgency"]=="soon" else 2, x["days"]))
@@ -2577,6 +3473,150 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   }
   .nl-add span:not(.ico){color:var(--b);font-weight:700}
 }
+
+/* ── KIRPI WALK ANIMATION ────────────────────────────────────── */
+@keyframes kirpi-float{
+  0%,100%{transform:translateY(0) rotate(-2deg)}
+  50%{transform:translateY(-5px) rotate(2deg)}
+}
+@keyframes kirpi-walk{
+  0%{transform:scaleX(1) translateX(0)}
+  25%{transform:scaleX(1) translateX(3px) rotate(3deg)}
+  50%{transform:scaleX(-1) translateX(0)}
+  75%{transform:scaleX(-1) translateX(-3px) rotate(-3deg)}
+  100%{transform:scaleX(1) translateX(0)}
+}
+.kirpi-walk-wrap{display:inline-block;vertical-align:middle;margin-right:6px}
+.kirpi-walk-img{animation:kirpi-float 3s ease-in-out infinite;display:block}
+.nav-logo:hover .kirpi-walk-img{animation:kirpi-walk 1s steps(1) infinite}
+
+/* ── PAGE TRANSITION ─────────────────────────────────────────── */
+@keyframes page-in{
+  from{opacity:0;transform:translateY(12px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.page.active{animation:page-in .22s ease-out}
+
+/* ── TAP FEEDBACK ────────────────────────────────────────────── */
+.tappable{cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .1s,opacity .1s}
+.tappable:active{transform:scale(.97);opacity:.85}
+
+/* ── TODOS PAGE ──────────────────────────────────────────────── */
+.todo-date-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:10px 14px}
+.todo-date-lbl{font-size:.95rem;font-weight:700;color:var(--txt)}
+.todo-nav-btn{background:none;border:none;font-size:1.2rem;cursor:pointer;padding:4px 10px;border-radius:9px;color:var(--b);transition:.1s}
+.todo-nav-btn:active{background:var(--bg3)}
+.todo-add-row{display:flex;gap:8px;margin-bottom:16px}
+.todo-add-input{flex:1;background:var(--bg2);border:1.5px solid var(--border2);border-radius:12px;padding:11px 14px;font-size:.9rem;color:var(--txt);outline:none;transition:.15s;font-family:var(--font)}
+.todo-add-input:focus{border-color:var(--b);box-shadow:0 0 0 3px rgba(0,122,255,.1)}
+.todo-add-btn{background:var(--b);border:none;border-radius:12px;padding:0 18px;color:#fff;font-size:1.1rem;cursor:pointer;font-weight:700;transition:.1s}
+.todo-add-btn:active{opacity:.8;transform:scale(.96)}
+.todo-list{display:flex;flex-direction:column;gap:8px}
+.todo-item{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:13px;cursor:pointer;transition:.12s;-webkit-tap-highlight-color:transparent}
+.todo-item:active{background:var(--bg3);transform:scale(.99)}
+.todo-item.done{opacity:.55}
+.todo-item.done .todo-text{text-decoration:line-through;color:var(--txt2)}
+.todo-check{width:24px;height:24px;border-radius:50%;border:2.5px solid var(--border2);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.2s;font-size:.8rem;background:transparent}
+.todo-item.done .todo-check{background:var(--g);border-color:var(--g);color:#fff}
+.todo-text{flex:1;font-size:.9rem;font-weight:500;color:var(--txt);line-height:1.4}
+.todo-del{background:none;border:none;font-size:.85rem;color:var(--txt2);cursor:pointer;padding:4px 6px;border-radius:6px;opacity:0;transition:.15s}
+.todo-item:hover .todo-del{opacity:1}
+.todo-archive-section{margin-top:24px}
+.todo-archive-hdr{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt2);padding:0 2px 8px;border-bottom:1px solid var(--border);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+@keyframes todo-check-pop{
+  0%{transform:scale(.8)}
+  60%{transform:scale(1.2)}
+  100%{transform:scale(1)}
+}
+.todo-check.popping{animation:todo-check-pop .3s cubic-bezier(.4,0,.2,1)}
+@keyframes todo-done-slide{
+  from{max-height:80px;opacity:1}
+  to{max-height:0;opacity:0;margin-bottom:0;padding:0}
+}
+.todo-item.archiving{animation:todo-done-slide .5s ease forwards}
+
+/* ── SUPPLIER PAGE ───────────────────────────────────────────── */
+.aging-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+@media(max-width:600px){.aging-grid{grid-template-columns:repeat(2,1fr)}}
+.aging-card{border-radius:14px;padding:14px;text-align:center;border:1px solid transparent}
+.aging-card .ac-lbl{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.aging-card .ac-val{font-size:1.05rem;font-weight:800;letter-spacing:-.02em}
+.aging-card .ac-cnt{font-size:.7rem;margin-top:3px;opacity:.7}
+.aging-card.green{background:#edfaf2;border-color:#34c75930}.aging-card.green .ac-lbl{color:#1a8a3a}.aging-card.green .ac-val{color:var(--g)}
+.aging-card.yellow{background:#fffbeb;border-color:#ff950030}.aging-card.yellow .ac-lbl{color:#a06000}.aging-card.yellow .ac-val{color:var(--y)}
+.aging-card.orange{background:#fff7ed;border-color:#ea730030}.aging-card.orange .ac-lbl{color:#994700}.aging-card.orange .ac-val{color:#ea7300}
+.aging-card.red{background:#fff0ef;border-color:#ff3b3030}.aging-card.red .ac-lbl{color:#c0281e}.aging-card.red .ac-val{color:var(--r)}
+.float-gain-banner{background:linear-gradient(135deg,var(--b),var(--b2));border-radius:14px;padding:18px 20px;color:#fff;display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.fgb-icon{font-size:2rem;flex-shrink:0}
+.fgb-info{flex:1}
+.fgb-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;opacity:.8;margin-bottom:4px}
+.fgb-value{font-size:1.6rem;font-weight:900;letter-spacing:-.03em}
+.sup-inv-item{display:flex;align-items:center;gap:12px;padding:13px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:13px;margin-bottom:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:.1s}
+.sup-inv-item:active{background:var(--bg3)}
+.sup-inv-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.sup-inv-info{flex:1;min-width:0}
+.sup-inv-name{font-size:.86rem;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sup-inv-meta{font-size:.71rem;color:var(--txt2);margin-top:2px}
+.sup-inv-right{text-align:right;flex-shrink:0}
+.sup-inv-amount{font-size:.9rem;font-weight:700}
+.sup-inv-days{font-size:.68rem;margin-top:3px;font-weight:600}
+
+/* ── ASSETS PAGE ─────────────────────────────────────────────── */
+.asset-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:.12s}
+.asset-card:active{background:var(--bg3);transform:scale(.99)}
+.asset-card-top{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.asset-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0}
+.asset-icon.arac{background:#eef3ff;border:1px solid #007aff20}
+.asset-icon.bilgisayar{background:#f0fdf4;border:1px solid #34c75920}
+.asset-icon.makine{background:#fffbeb;border:1px solid #ff950020}
+.asset-icon.diger{background:#f5f5f5;border:1px solid #d1d1d6}
+.asset-name{font-size:.95rem;font-weight:700;color:var(--txt)}
+.asset-type-badge{font-size:.62rem;font-weight:700;padding:2px 8px;border-radius:8px;background:var(--bg3);color:var(--txt2);margin-top:3px;display:inline-block}
+.asset-dep-bar-bg{height:6px;background:var(--bg3);border-radius:4px;overflow:hidden;margin-bottom:8px}
+.asset-dep-bar-fill{height:100%;background:linear-gradient(90deg,var(--b),var(--b2));border-radius:4px;transition:width .7s cubic-bezier(.4,0,.2,1)}
+.asset-nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.asset-num-cell .anc-lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--txt2);font-weight:600;margin-bottom:3px}
+.asset-num-cell .anc-val{font-size:.85rem;font-weight:700;color:var(--txt)}
+.asset-alert{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:9px;font-size:.76rem;font-weight:600;margin-top:10px}
+.asset-alert.warn{background:#fff7ed;color:#994700;border:1px solid #ff950028}
+.asset-alert.danger{background:#fff0ef;color:#c0281e;border:1px solid #ff3b3028}
+
+/* ── CARD DAILY REPORT ───────────────────────────────────────── */
+.cdr-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:12px}
+.cdr-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.cdr-bank{font-size:.9rem;font-weight:700;color:var(--txt)}
+.cdr-date{font-size:.72rem;color:var(--txt2)}
+.cdr-nums{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.cdr-cell .dc-lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;color:var(--txt2);font-weight:600;margin-bottom:5px}
+.cdr-cell .dc-val{font-size:1rem;font-weight:800;letter-spacing:-.02em}
+.cdr-cell.spent .dc-val{color:var(--r)}
+.cdr-cell.today .dc-val{color:var(--b)}
+.cdr-cell.yest .dc-val{color:var(--txt2)}
+.cdr-input-row{display:flex;gap:8px;margin-top:12px;border-top:1px solid var(--border);padding-top:12px}
+.cdr-bal-input{flex:1;background:var(--bg);border:1.5px solid var(--border2);border-radius:10px;padding:9px 12px;font-size:.88rem;color:var(--txt);outline:none;font-family:var(--font)}
+.cdr-bal-input:focus{border-color:var(--b)}
+.cdr-save-btn{background:var(--b);border:none;border-radius:10px;padding:0 16px;color:#fff;font-size:.85rem;font-weight:600;cursor:pointer;transition:.1s}
+.cdr-save-btn:active{opacity:.8}
+
+/* ── MODAL BASE ──────────────────────────────────────────────── */
+.mod-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);z-index:1000;display:flex;align-items:flex-end;justify-content:center}
+@media(min-width:600px){.mod-backdrop{align-items:center}}
+.mod-sheet{background:var(--bg);border-radius:20px 20px 0 0;width:100%;max-width:540px;padding:20px 20px 32px;max-height:88vh;overflow-y:auto}
+@media(min-width:600px){.mod-sheet{border-radius:20px;padding:24px}}
+.mod-handle{width:36px;height:4px;background:var(--bg4);border-radius:2px;margin:0 auto 18px}
+.mod-title{font-size:1.05rem;font-weight:800;color:var(--txt);margin-bottom:16px}
+.mod-field{margin-bottom:12px}
+.mod-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--txt2);margin-bottom:5px}
+.mod-input{width:100%;background:var(--bg2);border:1.5px solid var(--border2);border-radius:11px;padding:11px 13px;font-size:.9rem;color:var(--txt);outline:none;box-sizing:border-box;font-family:var(--font);transition:.15s}
+.mod-input:focus{border-color:var(--b);box-shadow:0 0 0 3px rgba(0,122,255,.1)}
+.mod-row{display:flex;gap:8px}
+.mod-row .mod-field{flex:1}
+.mod-actions{display:flex;gap:8px;margin-top:16px}
+.mod-btn{flex:1;padding:13px;border:none;border-radius:12px;font-size:.9rem;font-weight:700;cursor:pointer;transition:.1s}
+.mod-btn:active{opacity:.8;transform:scale(.98)}
+.mod-btn.primary{background:var(--b);color:#fff}
+.mod-btn.danger{background:var(--r);color:#fff}
+.mod-btn.cancel{background:var(--bg3);color:var(--txt)}
 </style>
 </head>
 <body>
@@ -2584,9 +3624,9 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 
 <!-- ── SIDEBAR NAV ── -->
 <nav>
-  <div class="nav-logo">
+  <div class="nav-logo" onclick="goPage('dashboard',document.querySelector('[data-page=dashboard]'))" style="cursor:pointer">
     <div class="brand">
-      <img src="/icon.svg" style="width:32px;height:32px;border-radius:8px"> Kirpi
+      <div class="kirpi-walk-wrap"><img src="/icon.svg" class="kirpi-walk-img" style="width:32px;height:32px;border-radius:8px"> </div>Kirpi
     </div>
     <div class="sub">Nakit Akışı Takibi</div>
   </div>
@@ -2603,6 +3643,9 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <div class="nl" data-page="recurring" onclick="goPage('recurring',this)">
       <span class="ico">🔁</span>Düzenli
     </div>
+    <div class="nl" data-page="todos" onclick="goPage('todos',this)">
+      <span class="ico">✅</span>Görevler
+    </div>
     <div class="nl" data-page="budget" onclick="goPage('budget',this)">
       <span class="ico">🎯</span>Tasarruf
     </div>
@@ -2614,6 +3657,15 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     </div>
     <div class="nl nl-desktop" data-page="cards" onclick="goPage('cards',this)">
       <span class="ico">💳</span>Kartlar
+    </div>
+    <div class="nl nl-desktop" data-page="supplier" onclick="goPage('supplier',this)">
+      <span class="ico">🏭</span>Tedarikçi
+    </div>
+    <div class="nl nl-desktop" data-page="assets" onclick="goPage('assets',this)">
+      <span class="ico">🚗</span>Kıymetler
+    </div>
+    <div class="nl nl-desktop" data-page="cardreport" onclick="goPage('cardreport',this)">
+      <span class="ico">📊</span>Kart Raporu
     </div>
     <div class="nl nl-desktop" data-page="settings" onclick="goPage('settings',this)">
       <span class="ico">⚙️</span>Ayarlar
@@ -2629,7 +3681,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 
 <!-- TOP HEADER -->
 <div class="top-header">
-  <div class="top-header-logo">🦔 Kirpi</div>
+  <div class="top-header-logo tappable" onclick="goPage('dashboard',document.querySelector('[data-page=dashboard]'))" style="cursor:pointer">🦔 Kirpi</div>
   <div class="top-header-right">
     <div class="notif-bell-wrap">
       <button class="notif-bell" id="notif-bell" onclick="toggleNotifPanel()" title="Bildirimler">🔔</button>
@@ -3405,6 +4457,208 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   </div>
 </div>
 
+<!-- ── GÖREVLER (TODOS) ──────────────────────────────────────── -->
+<div class="page" id="page-todos">
+  <div class="page-title">Görevler</div>
+  <div class="page-sub">Bugünün yapılacakları</div>
+
+  <div class="todo-date-nav">
+    <button class="todo-nav-btn tappable" onclick="todoChangeDate(-1)">‹</button>
+    <div class="todo-date-lbl" id="todo-date-lbl">—</div>
+    <button class="todo-nav-btn tappable" onclick="todoChangeDate(1)">›</button>
+  </div>
+
+  <div class="todo-add-row">
+    <input class="todo-add-input" id="todo-input" placeholder="Yeni görev ekle…" onkeydown="if(event.key==='Enter')addTodo()">
+    <button class="todo-add-btn tappable" onclick="addTodo()">＋</button>
+  </div>
+
+  <div class="todo-list" id="todo-active-list"></div>
+
+  <div class="todo-archive-section" id="todo-archive-section" style="display:none">
+    <div class="todo-archive-hdr">📦 Arşiv — Tamamlananlar <span id="todo-archive-count" style="background:var(--bg3);color:var(--txt2);padding:2px 8px;border-radius:8px;font-size:.68rem"></span></div>
+    <div class="todo-list" id="todo-archive-list"></div>
+  </div>
+</div>
+
+<!-- ── TEDARİKÇİ & ÖDEME YAŞLANDIRma ───────────────────────── -->
+<div class="page" id="page-supplier">
+  <div class="page-title">Tedarikçi & Ödemeler</div>
+  <div class="page-sub">Fatura takibi, yaşlandırma ve vadeden kazanım</div>
+
+  <div class="float-gain-banner" id="sup-float-banner">
+    <div class="fgb-icon">💹</div>
+    <div class="fgb-info">
+      <div class="fgb-label">Vadeden Toplam Kazanım</div>
+      <div class="fgb-value" id="sup-float-value">₺0</div>
+    </div>
+    <button onclick="exportExcel()" style="background:rgba(255,255,255,.25);border:1.5px solid rgba(255,255,255,.4);border-radius:10px;color:#fff;padding:8px 14px;font-size:.8rem;font-weight:700;cursor:pointer" class="tappable">📥 Excel</button>
+  </div>
+
+  <div class="aging-grid">
+    <div class="aging-card green tappable"><div class="ac-lbl">0–30 Gün</div><div class="ac-val" id="ag-0-30">₺0</div><div class="ac-cnt" id="ag-0-30-cnt">0 fatura</div></div>
+    <div class="aging-card yellow tappable"><div class="ac-lbl">31–60 Gün</div><div class="ac-val" id="ag-31-60">₺0</div><div class="ac-cnt" id="ag-31-60-cnt">0 fatura</div></div>
+    <div class="aging-card orange tappable"><div class="ac-lbl">61–90 Gün</div><div class="ac-val" id="ag-61-90">₺0</div><div class="ac-cnt" id="ag-61-90-cnt">0 fatura</div></div>
+    <div class="aging-card red tappable"><div class="ac-lbl">90+ Gün</div><div class="ac-val" id="ag-90plus">₺0</div><div class="ac-cnt" id="ag-90plus-cnt">0 fatura</div></div>
+  </div>
+
+  <div style="display:flex;gap:8px;margin-bottom:14px">
+    <button class="btn tappable" id="sup-tab-pending" onclick="setSupTab('pending')" style="flex:1;background:var(--b);color:#fff;border:none">Bekleyenler</button>
+    <button class="btn btn-ghost tappable" id="sup-tab-paid" onclick="setSupTab('paid')" style="flex:1">Ödenmiş</button>
+    <button class="btn btn-ghost tappable" onclick="openSupInvModal()" style="flex:0 0 auto;padding:0 16px">＋</button>
+  </div>
+
+  <div id="sup-inv-list"></div>
+</div>
+
+<!-- ── KIYMETLER (ASSETS) ────────────────────────────────────── -->
+<div class="page" id="page-assets">
+  <div class="page-title">Varlıklar & Amortisman</div>
+  <div class="page-sub">Araçlar, makineler, bilgisayarlar ve diğer sabit kıymetler</div>
+
+  <div style="display:flex;gap:8px;margin-bottom:16px">
+    <button class="btn btn-primary tappable" style="flex:1" onclick="openAssetModal()">＋ Varlık Ekle</button>
+    <button class="btn btn-ghost tappable" onclick="exportExcel()" style="padding:0 16px">📥 Excel</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+    <div style="background:linear-gradient(135deg,#eef3ff,#e6ecff);border:1px solid #007aff20;border-radius:14px;padding:14px">
+      <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#004dcc;margin-bottom:5px">Toplam Defter Değeri</div>
+      <div style="font-size:1.1rem;font-weight:900;color:var(--b)" id="asset-total-book">₺0</div>
+    </div>
+    <div style="background:linear-gradient(135deg,#fff7ed,#fff0e0);border:1px solid #ff950020;border-radius:14px;padding:14px">
+      <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#994700;margin-bottom:5px">Yıllık Amortisman</div>
+      <div style="font-size:1.1rem;font-weight:900;color:var(--y)" id="asset-total-dep">₺0</div>
+    </div>
+  </div>
+
+  <div id="asset-list"></div>
+</div>
+
+<!-- ── KART GÜNLÜK RAPORU ─────────────────────────────────────── -->
+<div class="page" id="page-cardreport">
+  <div class="page-title">Günlük Kart Raporu</div>
+  <div class="page-sub">Dünkü ve bugünkü bakiyeyi karşılaştır</div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div style="font-size:.82rem;color:var(--txt2);font-weight:600" id="cdr-report-date">—</div>
+    <button class="btn btn-ghost tappable" onclick="loadCardReport()" style="padding:6px 14px;font-size:.82rem">↻ Yenile</button>
+  </div>
+
+  <div id="card-daily-report-list"></div>
+
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px;margin-top:8px">
+    <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--txt2);margin-bottom:10px">ℹ️ Nasıl kullanılır?</div>
+    <div style="font-size:.82rem;color:var(--txt2);line-height:1.7">Her gün kartınızın mevcut bakiyesini girin. Sistem otomatik olarak bir önceki günle karşılaştırarak günlük harcamayı hesaplar.</div>
+  </div>
+</div>
+
+<!-- ── MODALS ──────────────────────────────────────────────────── -->
+<div id="mod-sup-inv" class="mod-backdrop" style="display:none" onclick="if(event.target===this)closeMod('mod-sup-inv')">
+  <div class="mod-sheet">
+    <div class="mod-handle"></div>
+    <div class="mod-title" id="mod-sup-inv-title">Tedarikçi Faturası</div>
+    <div class="mod-field">
+      <div class="mod-label">Tedarikçi Adı / Ticari Ünvan</div>
+      <input class="mod-input" id="sup-inv-name" placeholder="ABC Ticaret Ltd. Şti.">
+    </div>
+    <div class="mod-row">
+      <div class="mod-field">
+        <div class="mod-label">Fatura No</div>
+        <input class="mod-input" id="sup-inv-no" placeholder="FTR-2024-001">
+      </div>
+      <div class="mod-field">
+        <div class="mod-label">Tutar (₺)</div>
+        <input class="mod-input" type="number" id="sup-inv-amount" placeholder="0">
+      </div>
+    </div>
+    <div class="mod-row">
+      <div class="mod-field">
+        <div class="mod-label">Fatura Tarihi</div>
+        <input class="mod-input" type="date" id="sup-inv-date">
+      </div>
+      <div class="mod-field">
+        <div class="mod-label">Vade Tarihi</div>
+        <input class="mod-input" type="date" id="sup-inv-due">
+      </div>
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Referans Faiz Oranı (%)</div>
+      <input class="mod-input" type="number" id="sup-inv-rate" value="50" placeholder="50">
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Notlar</div>
+      <input class="mod-input" id="sup-inv-notes" placeholder="İsteğe bağlı">
+    </div>
+    <div class="mod-actions">
+      <button class="mod-btn cancel" onclick="closeMod('mod-sup-inv')">İptal</button>
+      <button class="mod-btn primary" id="sup-inv-save-btn" onclick="saveSupInv()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<div id="mod-asset" class="mod-backdrop" style="display:none" onclick="if(event.target===this)closeMod('mod-asset')">
+  <div class="mod-sheet">
+    <div class="mod-handle"></div>
+    <div class="mod-title">Varlık Ekle</div>
+    <div class="mod-field">
+      <div class="mod-label">Varlık Adı</div>
+      <input class="mod-input" id="asset-name" placeholder="Ford Transit 2021">
+    </div>
+    <div class="mod-row">
+      <div class="mod-field">
+        <div class="mod-label">Tür</div>
+        <select class="mod-input" id="asset-type" onchange="onAssetTypeChange()">
+          <option value="arac">🚗 Araç</option>
+          <option value="bilgisayar">💻 Bilgisayar</option>
+          <option value="makine">⚙️ Makine</option>
+          <option value="mobilya">🪑 Mobilya</option>
+          <option value="bina">🏢 Bina</option>
+          <option value="diger">📦 Diğer</option>
+        </select>
+      </div>
+      <div class="mod-field">
+        <div class="mod-label">Plaka / Seri No</div>
+        <input class="mod-input" id="asset-plate" placeholder="34 ABC 123">
+      </div>
+    </div>
+    <div class="mod-row">
+      <div class="mod-field">
+        <div class="mod-label">Alış Tarihi</div>
+        <input class="mod-input" type="date" id="asset-purchase-date">
+      </div>
+      <div class="mod-field">
+        <div class="mod-label">Alış Bedeli (₺)</div>
+        <input class="mod-input" type="number" id="asset-price" placeholder="0">
+      </div>
+    </div>
+    <div class="mod-row">
+      <div class="mod-field">
+        <div class="mod-label">Amortisman Oranı %</div>
+        <input class="mod-input" type="number" id="asset-dep-rate" placeholder="20">
+      </div>
+      <div class="mod-field">
+        <div class="mod-label">Sonraki Bakım</div>
+        <input class="mod-input" type="date" id="asset-maint-date">
+      </div>
+    </div>
+    <div class="mod-row">
+      <div class="mod-field">
+        <div class="mod-label">Sigorta Bitiş</div>
+        <input class="mod-input" type="date" id="asset-ins-date">
+      </div>
+      <div class="mod-field">
+        <div class="mod-label">Sigorta Şirketi</div>
+        <input class="mod-input" id="asset-ins-co" placeholder="Allianz">
+      </div>
+    </div>
+    <div class="mod-actions">
+      <button class="mod-btn cancel" onclick="closeMod('mod-asset')">İptal</button>
+      <button class="mod-btn primary" onclick="saveAsset()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
 </div><!-- /main -->
 </div><!-- /shell -->
 <div id="toast"></div>
@@ -3486,6 +4740,10 @@ function goPage(id, el){
     if(id==='cards') loadCards();
     if(id==='settings') initSettingsPage();
     if(id==='budget') loadGoalsPage();
+    if(id==='todos') initTodosPage();
+    if(id==='supplier') initSupplierPage();
+    if(id==='assets') initAssetsPage();
+    if(id==='cardreport') loadCardReport();
   }
 
   if(prev){
@@ -4033,6 +5291,7 @@ function loadTodayWidgets(){
 
 var _heroPeriod='month';
 var _heroYear=new Date().getFullYear();
+var _dashReqId=0;
 
 function setHeroPeriod(p){
   _heroPeriod=p;
@@ -4071,7 +5330,9 @@ function loadDashboard(){
   } else {
     url='/api/summary?period='+_heroPeriod;
   }
+  var reqId = ++_dashReqId;
   xhr(url,null,function(d){
+    if(reqId !== _dashReqId) return; // discard stale response
     summaryData=d;
     renderStats(d);
     drawBar(d.bar);
@@ -5062,6 +6323,421 @@ if(isIOS() && !isInStandaloneMode() && !localStorage.getItem('install-dismissed'
     setTimeout(function(){ showInstallBanner(); }, 2000);
   });
 }
+
+// ── TODOS ─────────────────────────────────────────────────────────────────────
+var _todoDate = new Date().toISOString().slice(0,10);
+var _todos = [];
+
+function initTodosPage(){
+  _todoDate = new Date().toISOString().slice(0,10);
+  loadTodos();
+}
+
+function todoChangeDate(delta){
+  var d = new Date(_todoDate);
+  d.setDate(d.getDate() + delta);
+  _todoDate = d.toISOString().slice(0,10);
+  loadTodos();
+}
+
+function loadTodos(){
+  var lbl = document.getElementById('todo-date-lbl');
+  var parts = _todoDate.split('-');
+  var months = ['','Ocak','Subat','Mart','Nisan','Mayis','Haziran','Temmuz','Agustos','Eylul','Ekim','Kasim','Aralik'];
+  var today = new Date().toISOString().slice(0,10);
+  var label = parts[2]+' '+months[parseInt(parts[1])]+' '+parts[0];
+  if(_todoDate === today) label = 'Bugün — '+label;
+  if(lbl) lbl.textContent = label;
+
+  xhr('/api/todos?date='+_todoDate, null, function(items){
+    _todos = items || [];
+    renderTodos();
+  });
+}
+
+function renderTodos(){
+  var active = _todos.filter(function(t){return !t.archived && !t.done});
+  var done   = _todos.filter(function(t){return t.done || t.archived});
+  var al = document.getElementById('todo-active-list');
+  var arl = document.getElementById('todo-archive-list');
+  var ars = document.getElementById('todo-archive-section');
+  var arc = document.getElementById('todo-archive-count');
+
+  if(al) al.innerHTML = active.length ? active.map(todoItemHTML).join('') :
+    '<div style="text-align:center;padding:28px 16px;color:var(--txt2);font-size:.85rem">🦔 Görev yok. Ekle!</div>';
+
+  if(arl) arl.innerHTML = done.map(function(t){return todoItemHTML(t,true)}).join('');
+  if(ars) ars.style.display = done.length ? 'block' : 'none';
+  if(arc) arc.textContent = done.length;
+}
+
+function todoItemHTML(t, archived){
+  var doneClass = (t.done || t.archived) ? 'done' : '';
+  var check = (t.done || t.archived) ? '✓' : '';
+  return '<div class="todo-item '+doneClass+'" id="todo-'+t.id+'" onclick="toggleTodo('+t.id+')">' +
+    '<div class="todo-check">' + check + '</div>' +
+    '<div class="todo-text">' + escHtml(t.text) + '</div>' +
+    '<button class="todo-del" onclick="event.stopPropagation();delTodo('+t.id+')" title="Sil">🗑</button>' +
+    '</div>';
+}
+
+function addTodo(){
+  var inp = document.getElementById('todo-input');
+  var text = inp.value.trim();
+  if(!text) return;
+  xhr('/api/todos', {method:'POST',body:JSON.stringify({text:text,date:_todoDate})}, function(r){
+    if(r.ok){ inp.value=''; loadTodos(); }
+  });
+}
+
+function toggleTodo(id){
+  var t = _todos.find(function(x){return x.id===id});
+  if(!t) return;
+  var el = document.getElementById('todo-'+id);
+  if(el){
+    var chk = el.querySelector('.todo-check');
+    if(chk){ chk.classList.add('popping'); setTimeout(function(){chk.classList.remove('popping')},300); }
+  }
+  if(!t.done && !t.archived){
+    xhr('/api/todos/'+id, {method:'PUT',body:JSON.stringify({done:1})}, function(r){
+      if(r.ok){
+        if(el){ el.classList.add('archiving'); }
+        setTimeout(function(){
+          xhr('/api/todos/'+id, {method:'PUT',body:JSON.stringify({archived:1})}, function(){
+            loadTodos();
+          });
+        }, 450);
+      }
+    });
+  } else {
+    xhr('/api/todos/'+id, {method:'PUT',body:JSON.stringify({done:0,archived:0})}, function(r){
+      if(r.ok) loadTodos();
+    });
+  }
+}
+
+function delTodo(id){
+  xhr('/api/todos/'+id, {method:'DELETE'}, function(r){
+    if(r.ok) loadTodos();
+  });
+}
+
+function escHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── SUPPLIER INVOICES ─────────────────────────────────────────────────────────
+var _supTab = 'pending';
+var _editingSupInvId = null;
+
+function initSupplierPage(){
+  loadSupAging();
+  loadSupFloatGain();
+  loadSupInvList();
+}
+
+function setSupTab(tab){
+  _supTab = tab;
+  var pb = document.getElementById('sup-tab-pending');
+  var pd = document.getElementById('sup-tab-paid');
+  if(pb) pb.style.cssText = tab==='pending' ?
+    'flex:1;background:var(--b);color:#fff;border:none' :
+    'flex:1;background:transparent;border:1px solid var(--border2);color:var(--txt)';
+  if(pd) pd.style.cssText = tab==='paid' ?
+    'flex:1;background:var(--b);color:#fff;border:none' :
+    'flex:1;background:transparent;border:1px solid var(--border2);color:var(--txt)';
+  loadSupInvList();
+}
+
+function loadSupAging(){
+  xhr('/api/supplier-invoices/aging', null, function(d){
+    if(!d.ok) return;
+    var b = d.buckets; var t = d.totals;
+    var e0 = document.getElementById('ag-0-30');
+    var e1 = document.getElementById('ag-31-60');
+    var e2 = document.getElementById('ag-61-90');
+    var e3 = document.getElementById('ag-90plus');
+    if(e0) e0.textContent = fmtShort(t['0_30']);
+    document.getElementById('ag-0-30-cnt').textContent = b['0_30'].length+' fatura';
+    if(e1) e1.textContent = fmtShort(t['31_60']);
+    document.getElementById('ag-31-60-cnt').textContent = b['31_60'].length+' fatura';
+    if(e2) e2.textContent = fmtShort(t['61_90']);
+    document.getElementById('ag-61-90-cnt').textContent = b['61_90'].length+' fatura';
+    if(e3) e3.textContent = fmtShort(t['90plus']);
+    document.getElementById('ag-90plus-cnt').textContent = b['90plus'].length+' fatura';
+  });
+}
+
+function loadSupFloatGain(){
+  xhr('/api/supplier-invoices/float-gain', null, function(d){
+    if(!d.ok) return;
+    var el = document.getElementById('sup-float-value');
+    if(el) el.textContent = fmt(d.total_gain);
+  });
+}
+
+function loadSupInvList(){
+  var status = _supTab === 'pending' ? 'bekliyor' : 'odendi';
+  xhr('/api/supplier-invoices?status='+status, null, function(items){
+    var el = document.getElementById('sup-inv-list');
+    if(!el) return;
+    if(!items || !items.length){
+      el.innerHTML = '<div style="text-align:center;padding:28px 16px;color:var(--txt2);font-size:.85rem">🏭 '+
+        (status==='bekliyor' ? 'Bekleyen fatura yok' : 'Ödenmiş fatura yok')+'</div>';
+      return;
+    }
+    var today = new Date().toISOString().slice(0,10);
+    el.innerHTML = items.map(function(inv){
+      var overdue = inv.status==='bekliyor' && inv.due_date < today;
+      var daysText = '';
+      if(inv.status==='bekliyor'){
+        var due = new Date(inv.due_date);
+        var now = new Date();
+        var diff = Math.round((due-now)/(1000*60*60*24));
+        if(diff < 0) daysText = '<span style="color:var(--r)">'+Math.abs(diff)+' gün gecikti</span>';
+        else if(diff === 0) daysText = '<span style="color:var(--y)">Bugün son gün!</span>';
+        else daysText = '<span style="color:var(--txt2)">'+diff+' gün kaldı</span>';
+      } else {
+        daysText = '<span style="color:var(--g)">✓ Ödendi '+(inv.paid_date||'')+'</span>';
+      }
+      var dotColor = overdue ? 'var(--r)' : (inv.status==='odendi' ? 'var(--g)' : 'var(--y)');
+      return '<div class="sup-inv-item tappable" onclick="openPaySupInv('+inv.id+',this)">' +
+        '<div class="sup-inv-dot" style="background:'+dotColor+'"></div>' +
+        '<div class="sup-inv-info">' +
+          '<div class="sup-inv-name">'+escHtml(inv.supplier_name)+'</div>' +
+          '<div class="sup-inv-meta">'+(inv.invoice_no ? escHtml(inv.invoice_no)+' &bull; ' : '')+'Vade: '+inv.due_date+'</div>' +
+        '</div>' +
+        '<div class="sup-inv-right">' +
+          '<div class="sup-inv-amount">'+fmt(inv.amount)+'</div>' +
+          '<div class="sup-inv-days">'+daysText+'</div>' +
+        '</div>' +
+        '</div>';
+    }).join('');
+    // Store data for tap handler
+    window._supInvData = {};
+    items.forEach(function(inv){ window._supInvData[inv.id] = inv; });
+  });
+}
+
+function openSupInvModal(id){
+  _editingSupInvId = id || null;
+  document.getElementById('mod-sup-inv-title').textContent = id ? 'Faturayı Düzenle' : 'Tedarikçi Faturası';
+  document.getElementById('sup-inv-name').value = '';
+  document.getElementById('sup-inv-no').value = '';
+  document.getElementById('sup-inv-amount').value = '';
+  document.getElementById('sup-inv-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('sup-inv-due').value = '';
+  document.getElementById('sup-inv-rate').value = '50';
+  document.getElementById('sup-inv-notes').value = '';
+  document.getElementById('mod-sup-inv').style.display = 'flex';
+}
+
+function closeMod(id){ document.getElementById(id).style.display='none'; }
+
+function saveSupInv(){
+  var body = {
+    supplier_name: document.getElementById('sup-inv-name').value.trim(),
+    invoice_no: document.getElementById('sup-inv-no').value.trim(),
+    amount: parseFloat(document.getElementById('sup-inv-amount').value)||0,
+    invoice_date: document.getElementById('sup-inv-date').value,
+    due_date: document.getElementById('sup-inv-due').value,
+    reference_rate: parseFloat(document.getElementById('sup-inv-rate').value)||50,
+    notes: document.getElementById('sup-inv-notes').value.trim()
+  };
+  if(!body.supplier_name || !body.amount || !body.due_date){
+    showToast('Tedarikçi, tutar ve vade zorunlu','error'); return;
+  }
+  var url = _editingSupInvId ? '/api/supplier-invoices/'+_editingSupInvId : '/api/supplier-invoices';
+  var method = _editingSupInvId ? 'PUT' : 'POST';
+  xhr(url, {method:method, body:JSON.stringify(body)}, function(r){
+    if(r.ok){
+      closeMod('mod-sup-inv');
+      showToast('Kaydedildi','success');
+      initSupplierPage();
+    }
+  });
+}
+
+function openPaySupInv(id, el){
+  var inv = window._supInvData && window._supInvData[id];
+  if(!inv) return;
+  if(inv.status === 'odendi'){
+    showToast(inv.supplier_name+' zaten ödenmiş','info'); return;
+  }
+  if(confirm(inv.supplier_name+' — '+fmt(inv.amount)+' ödenmiş olarak işaretlensin mi?')){
+    xhr('/api/supplier-invoices/'+id+'/pay',
+        {method:'POST',body:JSON.stringify({paid_date:new Date().toISOString().slice(0,10)})},
+        function(r){
+          if(r.ok){ showToast('Ödendi olarak işaretlendi','success'); initSupplierPage(); }
+        });
+  }
+}
+
+function fmtShort(n){
+  if(!n) return '₺0';
+  if(n>=1000000) return '₺'+(n/1000000).toFixed(1)+'M';
+  if(n>=1000) return '₺'+(n/1000).toFixed(0)+'K';
+  return '₺'+Math.round(n);
+}
+
+// ── ASSETS ───────────────────────────────────────────────────────────────────
+function initAssetsPage(){
+  loadAssets();
+}
+
+function loadAssets(){
+  xhr('/api/assets', null, function(items){
+    var el = document.getElementById('asset-list');
+    if(!el) return;
+    if(!items || !items.length){
+      el.innerHTML = '<div style="text-align:center;padding:28px 16px;color:var(--txt2);font-size:.85rem">🚗 Henüz varlık eklenmedi</div>';
+      document.getElementById('asset-total-book').textContent = '₺0';
+      document.getElementById('asset-total-dep').textContent = '₺0';
+      return;
+    }
+    var totalBook = 0, totalDep = 0;
+    items.forEach(function(a){ totalBook += a.book_value||0; totalDep += a.annual_dep||0; });
+    document.getElementById('asset-total-book').textContent = fmt(totalBook);
+    document.getElementById('asset-total-dep').textContent = fmt(totalDep);
+
+    var icons = {arac:'🚗',bilgisayar:'💻',makine:'⚙️',mobilya:'🪑',bina:'🏢',diger:'📦'};
+    var typeNames = {arac:'Araç',bilgisayar:'Bilgisayar',makine:'Makine',mobilya:'Mobilya',bina:'Bina',diger:'Diğer'};
+    el.innerHTML = items.map(function(a){
+      var pct = a.purchase_price > 0 ? Math.min(100, Math.round(a.accumulated/a.purchase_price*100)) : 0;
+      var alerts = '';
+      if(a.maintenance_date){
+        var daysToMaint = Math.round((new Date(a.maintenance_date)-new Date())/(1000*60*60*24));
+        if(daysToMaint < 0) alerts += '<div class="asset-alert danger">🔧 Bakım tarihi geçti! ('+Math.abs(daysToMaint)+' gün)</div>';
+        else if(daysToMaint <= 30) alerts += '<div class="asset-alert warn">🔧 Bakıma '+daysToMaint+' gün kaldı</div>';
+      }
+      if(a.insurance_date){
+        var daysToIns = Math.round((new Date(a.insurance_date)-new Date())/(1000*60*60*24));
+        if(daysToIns < 0) alerts += '<div class="asset-alert danger">🛡️ Sigorta süresi doldu!</div>';
+        else if(daysToIns <= 30) alerts += '<div class="asset-alert warn">🛡️ Sigortaya '+daysToIns+' gün kaldı</div>';
+      }
+      return '<div class="asset-card tappable">' +
+        '<div class="asset-card-top">' +
+          '<div class="asset-icon '+(a.asset_type||'diger')+'">'+(icons[a.asset_type]||'📦')+'</div>' +
+          '<div>' +
+            '<div class="asset-name">'+escHtml(a.name)+'</div>' +
+            '<span class="asset-type-badge">'+(typeNames[a.asset_type]||'Diğer')+'</span>' +
+            (a.plate_no ? ' <span class="asset-type-badge">'+escHtml(a.plate_no)+'</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="asset-dep-bar-bg"><div class="asset-dep-bar-fill" style="width:'+pct+'%"></div></div>' +
+        '<div class="asset-nums">' +
+          '<div class="asset-num-cell"><div class="anc-lbl">Alış Bedeli</div><div class="anc-val">'+fmt(a.purchase_price)+'</div></div>' +
+          '<div class="asset-num-cell"><div class="anc-lbl">Defter Değeri</div><div class="anc-val" style="color:var(--b)">'+fmt(a.book_value)+'</div></div>' +
+          '<div class="asset-num-cell"><div class="anc-lbl">Amortisman %'+a.depreciation_rate+'</div><div class="anc-val" style="color:var(--y)">'+fmt(a.annual_dep)+'/yıl</div></div>' +
+        '</div>' +
+        alerts +
+        '</div>';
+    }).join('');
+  });
+}
+
+function openAssetModal(){
+  document.getElementById('asset-name').value='';
+  document.getElementById('asset-type').value='arac';
+  document.getElementById('asset-plate').value='';
+  document.getElementById('asset-purchase-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('asset-price').value='';
+  document.getElementById('asset-dep-rate').value='20';
+  document.getElementById('asset-maint-date').value='';
+  document.getElementById('asset-ins-date').value='';
+  document.getElementById('asset-ins-co').value='';
+  document.getElementById('mod-asset').style.display='flex';
+}
+
+function onAssetTypeChange(){
+  var type = document.getElementById('asset-type').value;
+  var rates = {arac:20,bilgisayar:33.33,makine:20,mobilya:20,bina:2,diger:20};
+  document.getElementById('asset-dep-rate').value = rates[type]||20;
+}
+
+function saveAsset(){
+  var body = {
+    name: document.getElementById('asset-name').value.trim(),
+    asset_type: document.getElementById('asset-type').value,
+    plate_no: document.getElementById('asset-plate').value.trim(),
+    purchase_date: document.getElementById('asset-purchase-date').value,
+    purchase_price: parseFloat(document.getElementById('asset-price').value)||0,
+    depreciation_rate: parseFloat(document.getElementById('asset-dep-rate').value)||20,
+    maintenance_date: document.getElementById('asset-maint-date').value||'',
+    insurance_date: document.getElementById('asset-ins-date').value||'',
+    insurance_company: document.getElementById('asset-ins-co').value.trim()
+  };
+  if(!body.name || !body.purchase_price){
+    showToast('Varlık adı ve alış bedeli zorunlu','error'); return;
+  }
+  xhr('/api/assets', {method:'POST',body:JSON.stringify(body)}, function(r){
+    if(r.ok){
+      closeMod('mod-asset');
+      showToast('Varlık eklendi','success');
+      loadAssets();
+    }
+  });
+}
+
+// ── CARD DAILY REPORT ─────────────────────────────────────────────────────────
+function loadCardReport(){
+  var today = new Date().toISOString().slice(0,10);
+  var el = document.getElementById('cdr-report-date');
+  if(el){
+    var parts = today.split('-');
+    var months2 = ['','Ocak','Subat','Mart','Nisan','Mayis','Haziran','Temmuz','Agustos','Eylul','Ekim','Kasim','Aralik'];
+    el.textContent = parts[2]+' '+months2[parseInt(parts[1])]+' '+parts[0]+' Raporu';
+  }
+  xhr('/api/cards/daily-report', null, function(d){
+    if(!d.ok) return;
+    var el2 = document.getElementById('card-daily-report-list');
+    if(!el2) return;
+    if(!d.cards || !d.cards.length){
+      el2.innerHTML = '<div style="text-align:center;padding:28px 16px;color:var(--txt2)">💳 Önce Kartlar sayfasından kart ekleyin</div>';
+      return;
+    }
+    el2.innerHTML = d.cards.map(function(c){
+      var name = c.bank_name + (c.card_name ? ' — '+c.card_name : '');
+      var spentHtml = c.spent_today !== null ?
+        (c.spent_today > 0 ? '<div class="dc-val" style="color:var(--r)">'+fmt(c.spent_today)+'</div>' :
+         c.spent_today < 0 ? '<div class="dc-val" style="color:var(--g)">'+fmt(Math.abs(c.spent_today))+' iade</div>' :
+         '<div class="dc-val" style="color:var(--txt2)">₺0</div>') :
+        '<div class="dc-val" style="color:var(--txt2)">—</div>';
+      return '<div class="cdr-card">' +
+        '<div class="cdr-card-top"><div class="cdr-bank">💳 '+escHtml(name)+'</div></div>' +
+        '<div class="cdr-nums">' +
+          '<div class="cdr-cell yest"><div class="dc-lbl">Dünkü</div><div class="dc-val">'+(c.yesterday_balance!==null?fmt(c.yesterday_balance):'—')+'</div></div>' +
+          '<div class="cdr-cell today"><div class="dc-lbl">Bugünkü</div><div class="dc-val">'+(c.today_balance!==null?fmt(c.today_balance):'Girilmedi')+'</div></div>' +
+          '<div class="cdr-cell spent"><div class="dc-lbl">Harcama</div>'+spentHtml+'</div>' +
+        '</div>' +
+        '<div class="cdr-input-row">' +
+          '<input class="cdr-bal-input" type="number" id="cdr-bal-'+c.card_id+'" placeholder="Bugünkü bakiye" value="'+(c.today_balance!==null?c.today_balance:'')+'">' +
+          '<button class="cdr-save-btn tappable" onclick="saveCardBalance('+c.card_id+')">Kaydet</button>' +
+        '</div>' +
+        '</div>';
+    }).join('');
+  });
+}
+
+function saveCardBalance(cardId){
+  var inp = document.getElementById('cdr-bal-'+cardId);
+  if(!inp) return;
+  var val = parseFloat(inp.value);
+  if(isNaN(val)){ showToast('Geçerli tutar girin','error'); return; }
+  xhr('/api/cards/daily-balance', {method:'POST',body:JSON.stringify({
+    card_id: cardId,
+    balance: val,
+    date: new Date().toISOString().slice(0,10)
+  })}, function(r){
+    if(r.ok){ showToast('Bakiye kaydedildi','success'); loadCardReport(); }
+  });
+}
+
+// ── EXCEL EXPORT ──────────────────────────────────────────────────────────────
+function exportExcel(){
+  showToast('Excel hazırlanıyor...','info');
+  window.location.href = '/api/export/excel';
+}
 </script>
 
 <!-- INSTALL BANNER -->
@@ -5528,6 +7204,8 @@ data.forEach(function(v,i){{
     ctx.fillText(labels[i]?labels[i].slice(5):'',x+bw*0.4,H-pad.b+14);
   }}
 }});
+
+
 </script>
 </body></html>"""
 
