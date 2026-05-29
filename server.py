@@ -3925,6 +3925,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     </div>
   </div>
   <div id="ledger-count" style="font-size:.78rem;color:var(--txt2);margin-top:10px;text-align:right"></div>
+  <div id="ledger-summary" style="display:none;margin-top:8px;padding:12px 16px;background:var(--bg2);border-radius:14px;display:flex;gap:20px;flex-wrap:wrap;font-size:.83rem;border:1px solid var(--border,#e5e5ea)"></div>
 </div>
 
 <!-- ADD -->
@@ -5377,7 +5378,20 @@ function filterLedgerTo(type){
   goPage('ledger',ledgerEl);
   setTimeout(function(){
     var sel=document.getElementById('f-type');
+    var cat=document.getElementById('ledger-f-cat');
+    if(cat) cat.value='';
     if(sel){sel.value=type;filterLedger();}
+  },200);
+}
+function filterLedgerToCat(type, cat){
+  var ledgerEl=document.querySelector('[data-page="ledger"]');
+  goPage('ledger',ledgerEl);
+  setTimeout(function(){
+    var selType=document.getElementById('f-type');
+    var selCat=document.getElementById('ledger-f-cat');
+    if(selType) selType.value=type;
+    if(selCat) selCat.value=cat;
+    filterLedger();
   },200);
 }
 
@@ -5509,6 +5523,7 @@ function rr(ctx,x,y,w,h,r){
 }
 
 // ── DONUT ────────────────────────────────────────────────────────────────────
+var _donutSlices=[], _donutCX=0, _donutCY=0, _donutR=0, _donutr=0;
 function drawDonut(cats){
   var cv=document.getElementById('donut');
   var W=cv.parentElement.clientWidth||400, H=190;
@@ -5516,30 +5531,49 @@ function drawDonut(cats){
   var ctx=cv.getContext('2d');
   ctx.clearRect(0,0,W,H);
   var keys=Object.keys(cats).filter(function(k){return cats[k]>0});
+  _donutSlices=[];
   if(!keys.length){
     ctx.fillStyle='#475569';ctx.font='13px Inter,system-ui';ctx.textAlign='center';
-    ctx.fillText('Bu ay gider yok',W/2,H/2);return;
+    ctx.fillText('Bu dönem gider yok',W/2,H/2);return;
   }
   var total=keys.reduce(function(s,k){return s+cats[k]},0);
   var cx=H/2,cy=H/2,R=cy-14,r=cy*0.46,a=-Math.PI/2;
+  _donutCX=cx; _donutCY=cy; _donutR=R; _donutr=r;
   keys.forEach(function(k,i){
     var sl=cats[k]/total*2*Math.PI;
+    _donutSlices.push({cat:k,start:a,end:a+sl,color:CLRS[i%CLRS.length]});
     ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,R,a,a+sl);ctx.closePath();
     ctx.fillStyle=CLRS[i%CLRS.length];ctx.fill();a+=sl;
   });
-  ctx.beginPath();ctx.arc(cx,cy,r,0,2*Math.PI);ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg2')||'#111318';ctx.fill();
-  ctx.fillStyle='#e2e8f0';ctx.font='bold 12px Inter,system-ui';ctx.textAlign='center';
+  ctx.beginPath();ctx.arc(cx,cy,r,0,2*Math.PI);ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg2')||'#fff';ctx.fill();
+  ctx.fillStyle='#334155';ctx.font='bold 12px Inter,system-ui';ctx.textAlign='center';
   ctx.fillText(fmtK(total)+'₺',cx,cy-3);
   ctx.fillStyle='#64748b';ctx.font='9px Inter,system-ui';ctx.fillText('toplam',cx,cy+10);
   var lx=H+12,ly=10,lh=20;
   keys.slice(0,8).forEach(function(k,i){
     ctx.fillStyle=CLRS[i%CLRS.length];ctx.beginPath();ctx.arc(lx+5,ly+i*lh+6,4,0,2*Math.PI);ctx.fill();
     var pct=Math.round(cats[k]/total*100);
-    ctx.fillStyle='#e2e8f0';ctx.font='10px Inter,system-ui';ctx.textAlign='left';
+    ctx.fillStyle='#334155';ctx.font='10px Inter,system-ui';ctx.textAlign='left';
     var lbl=k.length>13?k.slice(0,13)+'…':k;
     ctx.fillText(lbl,lx+14,ly+i*lh+10);
     ctx.fillStyle='#64748b';ctx.textAlign='right';ctx.fillText(pct+'%',W-2,ly+i*lh+10);
   });
+  cv.style.cursor='pointer';
+  cv.onclick=function(e){
+    var rect=cv.getBoundingClientRect();
+    var mx=(e.clientX-rect.left)*(cv.width/rect.width);
+    var my=(e.clientY-rect.top)*(cv.height/rect.height);
+    var dx=mx-_donutCX, dy=my-_donutCY, dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist<_donutr||dist>_donutR) return;
+    var angle=Math.atan2(dy,dx);
+    if(angle<-Math.PI/2) angle+=2*Math.PI;
+    for(var i=0;i<_donutSlices.length;i++){
+      var s=_donutSlices[i];
+      var sa=s.start<-Math.PI/2?s.start+2*Math.PI:s.start;
+      var ea=s.end<-Math.PI/2?s.end+2*Math.PI:s.end;
+      if(angle>=sa&&angle<=ea){ filterLedgerToCat('gider',s.cat); return; }
+    }
+  };
 }
 
 // ── GOALS / TASARRUF PAGE ─────────────────────────────────────────────────────
@@ -5740,6 +5774,20 @@ function renderLedger(){
     '</tr>';
   }).join('');
   document.getElementById('ledger-count').textContent=data.length+' işlem';
+
+  // alt toplam
+  var sumEl=document.getElementById('ledger-summary');
+  if(sumEl){
+    var totG=0,totR=0;
+    data.forEach(function(t){if(t.type==='gelir')totG+=t.amount;else totR+=t.amount;});
+    var net=totG-totR;
+    var parts=[];
+    if(totG>0) parts.push('<span>Gelir: <strong style="color:var(--g)">+'+fmtNum(totG)+'₺</strong></span>');
+    if(totR>0) parts.push('<span>Gider: <strong style="color:var(--r)">-'+fmtNum(totR)+'₺</strong></span>');
+    if(totG>0&&totR>0) parts.push('<span>Net: <strong style="color:'+(net>=0?'var(--g)':'var(--r)')+'">'+( net>=0?'+':'')+fmtNum(net)+'₺</strong></span>');
+    sumEl.innerHTML=parts.join('<span style="color:var(--border,#e5e5ea)">|</span>');
+    sumEl.style.display=parts.length?'flex':'none';
+  }
 
   // inline editing
   [].forEach.call(document.querySelectorAll('.editable'),function(td){
