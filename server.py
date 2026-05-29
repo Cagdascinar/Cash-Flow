@@ -3470,34 +3470,40 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .settings-profile-item .sp-active{font-size:.68rem;color:var(--g);font-weight:700;padding:2px 8px;background:#22c55e15;border-radius:8px;border:1px solid #22c55e25}
 
 /* ── HERO BALANCE CARD ────────────────────────────────────── */
-.hero-card{background:linear-gradient(160deg,#ffffff 0%,#f0f0f8 100%);border:1px solid rgba(0,0,0,.08);border-radius:22px;padding:22px 20px 18px;margin-bottom:4px;position:relative;overflow:hidden;box-shadow:0 4px 24px rgba(0,122,255,.08)}
-.hero-card::before{content:'';position:absolute;top:-60px;right:-50px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,#007aff0e,transparent 70%)}
-.hero-card::after{content:'';position:absolute;bottom:-50px;left:-30px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,#34c7590a,transparent 70%)}
+.hero-card{background:linear-gradient(145deg,#0d1f3c 0%,#16305a 55%,#1a3565 100%);border:none;border-radius:26px;padding:26px 22px 22px;margin-bottom:16px;position:relative;overflow:hidden;box-shadow:0 14px 52px rgba(8,28,80,.5),0 2px 10px rgba(0,0,0,.2)}
+.hero-card::before{content:'';position:absolute;top:-70px;right:-60px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(99,160,255,.18),transparent 70%)}
+.hero-card::after{content:'';position:absolute;bottom:-60px;left:-40px;width:210px;height:210px;border-radius:50%;background:radial-gradient(circle,rgba(52,199,89,.13),transparent 70%)}
 .hero-top-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;position:relative}
-.hero-greeting{font-size:.82rem;color:var(--txt2);font-weight:500}
+.hero-greeting{font-size:.82rem;color:rgba(255,255,255,.55);font-weight:500}
 .hero-kirpi{font-size:1.8rem;line-height:1;transition:transform .4s cubic-bezier(.34,1.56,.64,1),opacity .3s;user-select:none}
 .hero-kirpi.bounce{animation:kirpi-bounce .5s cubic-bezier(.34,1.56,.64,1)}
 @keyframes kirpi-bounce{0%{transform:scale(1)}40%{transform:scale(1.35)}100%{transform:scale(1)}}
-.hero-period-tabs{display:flex;gap:4px;background:rgba(0,0,0,.07);border-radius:9px;padding:3px;margin-bottom:8px;position:relative;width:fit-content}
-.hero-period-tab{padding:4px 12px;border-radius:7px;font-size:.7rem;font-weight:600;color:var(--txt2);cursor:pointer;transition:.18s;border:none;background:transparent}
-.hero-period-tab.active{background:#ffffff;color:var(--txt);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.hero-period-tabs{display:flex;gap:4px;background:rgba(255,255,255,.1);border-radius:9px;padding:3px;margin-bottom:8px;position:relative;width:fit-content}
+.hero-period-tab{padding:4px 14px;border-radius:7px;font-size:.7rem;font-weight:600;color:rgba(255,255,255,.45);cursor:pointer;transition:.18s;border:none;background:transparent}
+.hero-period-tab.active{background:#fff;color:#0d1f3c;box-shadow:0 1px 6px rgba(0,0,0,.2)}
 .hero-year-nav{display:none;align-items:center;gap:8px;margin-bottom:8px}
-.hero-year-btn{width:26px;height:26px;border-radius:50%;border:none;background:rgba(0,0,0,.07);color:var(--txt);font-size:.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
-.hero-year-btn:hover{background:rgba(0,122,255,.12);color:var(--b)}
-.hero-year-val{font-size:.82rem;font-weight:700;color:var(--txt);min-width:38px;text-align:center}
-.hero-bal-lbl{font-size:.63rem;text-transform:uppercase;letter-spacing:.13em;color:var(--b2);margin-bottom:5px;font-weight:700;position:relative}
-.hero-balance{font-size:2.5rem;font-weight:900;letter-spacing:-.04em;line-height:1;margin-bottom:4px;color:var(--txt);position:relative}
-.hero-net-sub{font-size:.72rem;color:var(--txt2);margin-bottom:14px;min-height:14px;position:relative}
+.hero-year-btn{width:26px;height:26px;border-radius:50%;border:none;background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);font-size:.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+.hero-year-btn:hover{background:rgba(255,255,255,.2);color:#fff}
+.hero-year-val{font-size:.82rem;font-weight:700;color:rgba(255,255,255,.88);min-width:38px;text-align:center}
+.hero-bal-lbl{font-size:.63rem;text-transform:uppercase;letter-spacing:.14em;color:rgba(255,255,255,.42);margin-bottom:6px;font-weight:700;position:relative}
+.hero-balance{font-size:2.7rem;font-weight:900;letter-spacing:-.05em;line-height:1;margin-bottom:4px;color:#fff;position:relative;text-shadow:0 2px 16px rgba(0,0,0,.25)}
+.hero-net-sub{font-size:.72rem;color:rgba(255,255,255,.42);margin-bottom:16px;min-height:14px;position:relative}
 .hero-chips{display:flex;gap:7px;flex-wrap:wrap;position:relative}
-.hero-chip{display:flex;align-items:center;gap:4px;padding:5px 12px;border-radius:20px;font-size:.76rem;font-weight:600}
-.hero-chip.gn{background:#34c75914;color:#1a8a3a;border:1px solid #34c75928}
-.hero-chip.rd{background:#ff3b3014;color:#c0281e;border:1px solid #ff3b3028}
-.hero-chip.nt{background:#007aff12;color:var(--b);border:1px solid #007aff28}
+.hero-chip{display:flex;align-items:center;gap:4px;padding:6px 14px;border-radius:20px;font-size:.76rem;font-weight:600}
+.hero-chip.gn{background:rgba(52,199,89,.22);color:#5edc80;border:1px solid rgba(52,199,89,.35)}
+.hero-chip.rd{background:rgba(255,59,48,.22);color:#ff7e78;border:1px solid rgba(255,59,48,.35)}
+.hero-chip.nt{background:rgba(255,255,255,.13);color:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.22)}
 
 /* ── CLICKABLE CHIP ──────────────────────────────────────────── */
 .hero-chip{cursor:pointer;transition:.15s}
-.hero-chip:hover{opacity:.8;transform:translateY(-1px)}
+.hero-chip:hover{opacity:.85;transform:translateY(-1px)}
 .hero-chip:active{opacity:.6}
+
+/* ── DASH SECTION CARDS ─────────────────────────────────────── */
+.dash-section{background:var(--bg2);border:1px solid var(--border);border-radius:18px;margin-bottom:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,.05)}
+.dash-section .s-header{padding:14px 16px;border-bottom:1px solid var(--border);border-radius:0}
+.dash-section .s-body{padding:12px 14px 14px;margin-bottom:0;border-radius:0 0 18px 18px}
+.dash-section .s-body.collapsed{padding-top:0;padding-bottom:0}
 
 /* ── TODAY SUBTOTAL ROW ──────────────────────────────────────── */
 .today-subtotal{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:10px;margin-top:8px;font-size:.85rem;font-weight:700}
@@ -3914,30 +3920,34 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   </div>
 
   <!-- ── GÜNÜN GELİRLERİ ── -->
-  <div class="s-header" onclick="toggleSection('gelir')">
-    <div class="sh-left"><span class="sh-dot gn"></span><span id="gelir-section-lbl">Günün Gelirleri</span></div>
-    <input type="date" id="today-date-pick" onclick="event.stopPropagation()" onchange="changeTodayDate(this.value)"
-      style="background:var(--bg3);border:1px solid var(--border2);color:var(--txt2);padding:3px 8px;border-radius:7px;font-size:.72rem;outline:none;cursor:pointer">
-    <span class="sh-badge" id="gelir-badge" style="display:none">0</span>
-    <span class="sh-chevron" id="chevron-gelir">▾</span>
-  </div>
-  <div class="s-body" id="sec-gelir">
-    <div id="today-gelir-list"><div class="empty-pay"><div class="ep-ico">📅</div><div class="ep-txt">Yükleniyor…</div></div></div>
-    <div class="today-subtotal today-subtotal-gn" id="today-gelir-total" style="display:none">
-      <span>Toplam Gelir</span><span id="today-gelir">—</span>
+  <div class="dash-section">
+    <div class="s-header" onclick="toggleSection('gelir')">
+      <div class="sh-left"><span class="sh-dot gn"></span><span id="gelir-section-lbl">Günün Gelirleri</span></div>
+      <input type="date" id="today-date-pick" onclick="event.stopPropagation()" onchange="changeTodayDate(this.value)"
+        style="background:var(--bg3);border:1px solid var(--border2);color:var(--txt2);padding:3px 8px;border-radius:7px;font-size:.72rem;outline:none;cursor:pointer">
+      <span class="sh-badge" id="gelir-badge" style="display:none">0</span>
+      <span class="sh-chevron" id="chevron-gelir">▾</span>
+    </div>
+    <div class="s-body" id="sec-gelir">
+      <div id="today-gelir-list"><div class="empty-pay"><div class="ep-ico">📅</div><div class="ep-txt">Yükleniyor…</div></div></div>
+      <div class="today-subtotal today-subtotal-gn" id="today-gelir-total" style="display:none">
+        <span>Toplam Gelir</span><span id="today-gelir">—</span>
+      </div>
     </div>
   </div>
 
   <!-- ── GÜNÜN GİDERLERİ ── -->
-  <div class="s-header" onclick="toggleSection('gider')">
-    <div class="sh-left"><span class="sh-dot rd"></span><span id="gider-section-lbl">Günün Giderleri</span></div>
-    <span class="sh-badge" id="gider-badge" style="display:none">0</span>
-    <span class="sh-chevron" id="chevron-gider">▾</span>
-  </div>
-  <div class="s-body" id="sec-gider">
-    <div id="today-gider-list"><div class="empty-pay"><div class="ep-ico">📅</div><div class="ep-txt">Yükleniyor…</div></div></div>
-    <div class="today-subtotal today-subtotal-rd" id="today-gider-total" style="display:none">
-      <span>Toplam Gider</span><span id="today-gider">—</span>
+  <div class="dash-section">
+    <div class="s-header" onclick="toggleSection('gider')">
+      <div class="sh-left"><span class="sh-dot rd"></span><span id="gider-section-lbl">Günün Giderleri</span></div>
+      <span class="sh-badge" id="gider-badge" style="display:none">0</span>
+      <span class="sh-chevron" id="chevron-gider">▾</span>
+    </div>
+    <div class="s-body" id="sec-gider">
+      <div id="today-gider-list"><div class="empty-pay"><div class="ep-ico">📅</div><div class="ep-txt">Yükleniyor…</div></div></div>
+      <div class="today-subtotal today-subtotal-rd" id="today-gider-total" style="display:none">
+        <span>Toplam Gider</span><span id="today-gider">—</span>
+      </div>
     </div>
   </div>
 
@@ -3948,71 +3958,76 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   </div>
 
   <!-- ── KREDİ KARTLARI ── -->
-  <div class="s-header" onclick="toggleSection('cc')">
-    <div class="sh-left"><span class="sh-dot pp"></span>Kredi Kartları</div>
-    <span class="sh-chevron" id="chevron-cc">▾</span>
-  </div>
-  <div class="s-body" id="sec-cc">
-    <div id="cc-overview"><div class="empty-cc">Yükleniyor…</div></div>
+  <div class="dash-section">
+    <div class="s-header" onclick="toggleSection('cc')">
+      <div class="sh-left"><span class="sh-dot pp"></span>Kredi Kartları</div>
+      <span class="sh-chevron" id="chevron-cc">▾</span>
+    </div>
+    <div class="s-body" id="sec-cc">
+      <div id="cc-overview"><div class="empty-cc">Yükleniyor…</div></div>
+    </div>
   </div>
 
   <!-- ── FİNANSAL DURUM ── -->
-  <div class="s-header" onclick="toggleSection('health')">
-    <div class="sh-left"><span class="sh-dot cy"></span>Finansal Durum</div>
-    <div id="health-badge" class="health-badge" style="color:var(--txt2);border-color:var(--border2);font-size:.7rem;padding:3px 10px">—</div>
-    <span class="sh-chevron" id="chevron-health">▾</span>
-  </div>
-  <div class="s-body" id="sec-health">
-    <div class="card motiv-card" style="margin-bottom:0">
+  <div class="dash-section">
+    <div class="s-header" onclick="toggleSection('health')">
+      <div class="sh-left"><span class="sh-dot cy"></span>Finansal Durum</div>
+      <div id="health-badge" class="health-badge" style="color:var(--txt2);border-color:var(--border2);font-size:.7rem;padding:3px 10px">—</div>
+      <span class="sh-chevron" id="chevron-health">▾</span>
+    </div>
+    <div class="s-body" id="sec-health">
       <div class="motiv-bar-bg"><div id="motiv-fill" class="motiv-bar-fill" style="width:0%"></div></div>
       <div id="motiv-msgs" class="motiv-msgs"><div style="color:var(--txt2);font-size:.83rem">Yükleniyor…</div></div>
     </div>
   </div>
 
   <!-- ── ANALİZ ── -->
-  <div class="s-header" onclick="toggleSection('analytics')">
-    <div class="sh-left"><span class="sh-dot bl"></span>Analiz <span id="db-sub" style="font-size:.7rem;font-weight:400;color:var(--txt2);text-transform:none;letter-spacing:0;margin-left:6px"></span></div>
-    <span class="sh-chevron" id="chevron-analytics">▾</span>
-  </div>
-  <div class="s-body" id="sec-analytics">
-    <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:14px;gap:8px;flex-wrap:wrap">
-      <div style="display:flex;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;overflow:hidden">
-        <button id="view-month-btn" onclick="setDbView('month')"
-          style="padding:6px 14px;border:none;font-size:.78rem;font-weight:600;cursor:pointer;background:var(--b);color:#fff;transition:.15s">Aylık</button>
-        <button id="view-year-btn" onclick="setDbView('year')"
-          style="padding:6px 14px;border:none;font-size:.78rem;font-weight:600;cursor:pointer;background:transparent;color:var(--txt2);transition:.15s">Yıllık</button>
-      </div>
-      <div class="mnav" id="month-nav">
-        <button onclick="changeMonth(-1)">‹</button>
-        <div class="ml" id="mlabel" onclick="toggleDateRange()" style="cursor:pointer;user-select:none" title="Tarih aralığı seç"></div>
-        <button onclick="changeMonth(1)">›</button>
-      </div>
-      <div class="mnav" id="year-nav" style="display:none">
-        <button onclick="changeYear(-1)">‹</button>
-        <div class="ml" id="ylabel"></div>
-        <button onclick="changeYear(1)">›</button>
-      </div>
+  <div class="dash-section">
+    <div class="s-header" onclick="toggleSection('analytics')">
+      <div class="sh-left"><span class="sh-dot bl"></span>Analiz <span id="db-sub" style="font-size:.7rem;font-weight:400;color:var(--txt2);text-transform:none;letter-spacing:0;margin-left:6px"></span></div>
+      <span class="sh-chevron" id="chevron-analytics">▾</span>
     </div>
-    <div id="date-range-picker" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px;margin-bottom:12px;box-shadow:0 8px 24px rgba(0,0,0,.5)">
-      <div style="font-size:.72rem;color:var(--txt2);margin-bottom:8px;font-weight:600">TARİH ARALIĞI</div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <div>
-          <div style="font-size:.7rem;color:var(--txt2);margin-bottom:3px">Başlangıç</div>
-          <input type="date" id="range-start" style="background:var(--bg);border:1px solid var(--border2);color:var(--txt);padding:6px 8px;border-radius:7px;font-size:.8rem;outline:none">
+    <div class="s-body" id="sec-analytics">
+      <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:14px;gap:8px;flex-wrap:wrap">
+        <div style="display:flex;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;overflow:hidden">
+          <button id="view-month-btn" onclick="setDbView('month')"
+            style="padding:6px 14px;border:none;font-size:.78rem;font-weight:600;cursor:pointer;background:var(--b);color:#fff;transition:.15s">Aylık</button>
+          <button id="view-year-btn" onclick="setDbView('year')"
+            style="padding:6px 14px;border:none;font-size:.78rem;font-weight:600;cursor:pointer;background:transparent;color:var(--txt2);transition:.15s">Yıllık</button>
         </div>
-        <div>
-          <div style="font-size:.7rem;color:var(--txt2);margin-bottom:3px">Bitiş</div>
-          <input type="date" id="range-end" style="background:var(--bg);border:1px solid var(--border2);color:var(--txt);padding:6px 8px;border-radius:7px;font-size:.8rem;outline:none">
+        <div class="mnav" id="month-nav">
+          <button onclick="changeMonth(-1)">‹</button>
+          <div class="ml" id="mlabel" onclick="toggleDateRange()" style="cursor:pointer;user-select:none" title="Tarih aralığı seç"></div>
+          <button onclick="changeMonth(1)">›</button>
         </div>
-        <div style="display:flex;gap:6px;margin-top:16px">
-          <button onclick="applyDateRange()" style="padding:6px 14px;background:var(--b);border:none;border-radius:7px;color:#fff;font-size:.78rem;cursor:pointer;font-weight:600">Uygula</button>
-          <button onclick="clearDateRange()" style="padding:6px 10px;background:transparent;border:1px solid var(--border2);border-radius:7px;color:var(--txt2);font-size:.78rem;cursor:pointer">Temizle</button>
+        <div class="mnav" id="year-nav" style="display:none">
+          <button onclick="changeYear(-1)">‹</button>
+          <div class="ml" id="ylabel"></div>
+          <button onclick="changeYear(1)">›</button>
         </div>
       </div>
-    </div>
-    <div class="grid2">
-      <div class="card"><div class="chart-lbl">Aylık Gelir / Gider</div><div class="chart-wrap"><canvas id="barChart" height="190"></canvas></div></div>
-      <div class="card"><div class="chart-lbl">Gider Dağılımı</div><div class="chart-wrap"><canvas id="donut" height="190"></canvas></div></div>
+      <div id="date-range-picker" style="display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px;margin-bottom:12px;box-shadow:0 8px 24px rgba(0,0,0,.2)">
+        <div style="font-size:.72rem;color:var(--txt2);margin-bottom:8px;font-weight:600">TARİH ARALIĞI</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <div>
+            <div style="font-size:.7rem;color:var(--txt2);margin-bottom:3px">Başlangıç</div>
+            <input type="date" id="range-start" style="background:var(--bg);border:1px solid var(--border2);color:var(--txt);padding:6px 8px;border-radius:7px;font-size:.8rem;outline:none">
+          </div>
+          <div>
+            <div style="font-size:.7rem;color:var(--txt2);margin-bottom:3px">Bitiş</div>
+            <input type="date" id="range-end" style="background:var(--bg);border:1px solid var(--border2);color:var(--txt);padding:6px 8px;border-radius:7px;font-size:.8rem;outline:none">
+          </div>
+          <div style="display:flex;gap:6px;margin-top:16px">
+            <button onclick="applyDateRange()" style="padding:6px 14px;background:var(--b);border:none;border-radius:7px;color:#fff;font-size:.78rem;cursor:pointer;font-weight:600">Uygula</button>
+            <button onclick="clearDateRange()" style="padding:6px 10px;background:transparent;border:1px solid var(--border2);border-radius:7px;color:var(--txt2);font-size:.78rem;cursor:pointer">Temizle</button>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="padding:16px;margin-bottom:0">
+        <div class="chart-lbl">Aylık Gelir / Gider</div>
+        <div class="chart-wrap"><canvas id="barChart" height="210"></canvas></div>
+      </div>
+      <canvas id="donut" style="display:none"></canvas>
     </div>
   </div>
 
@@ -4060,7 +4075,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
         <tr>
           <th style="width:36px"><input type="checkbox" id="chk-all" onchange="toggleAllChk(this.checked)"></th>
           <th class="sortable" onclick="sortBy('date')">Tarih <span class="sort-ico" id="sort-date">↕</span></th>
-          <th>Tür</th>
+          <th class="sortable" onclick="sortBy('type')">Tür <span class="sort-ico" id="sort-type">↕</span></th>
           <th class="sortable" onclick="sortBy('category')">Kategori <span class="sort-ico" id="sort-category">↕</span></th>
           <th>Açıklama</th>
           <th class="sortable" onclick="sortBy('amount')" style="text-align:right">Tutar <span class="sort-ico" id="sort-amount">↕</span></th>
@@ -5743,7 +5758,7 @@ function renderStats(d){
   // For all-time show cumulative balance, for period show net
   var heroVal=(_heroPeriod==='all')?d.balance:d.net;
   b.textContent=fmt(heroVal);
-  b.style.color=heroVal>=0?'var(--txt)':'var(--r)';
+  b.style.color=heroVal>=0?'#fff':'#ff7e78';
   document.getElementById('s-gelir').textContent=fmt(d.gelir);
   document.getElementById('s-gider').textContent=fmt(d.gider);
   var netEl=document.getElementById('s-net');
