@@ -4287,11 +4287,15 @@ def admin_panel():
 
     rows_html = ""
     for u in recent_users:
+        uname = html_escape(u['username'])
         rows_html += f"""<tr>
-        <td>{html_escape(u['username'])}</td>
+        <td>{uname}</td>
         <td>{html_escape(u['display_name'])}</td>
         <td>{html_escape(u['email'])}</td>
         <td style="color:#64748b;font-size:.8rem">{u['created_at'][:10]}</td>
+        <td><form method="POST" action="/admin/delete-user/{uname}" onsubmit="return confirm('{uname} kullanıcısını ve tüm verilerini silmek istediğinize emin misiniz?')">
+          <button type="submit" style="background:#ef444420;color:#ef4444;border:1px solid #ef444440;border-radius:6px;padding:4px 10px;font-size:.75rem;cursor:pointer">Sil</button>
+        </form></td>
         </tr>"""
 
     chart_labels = [r['d'] for r in reversed(list(txn_by_day))]
@@ -4341,7 +4345,7 @@ canvas{{width:100%!important;height:200px!important}}
 <div class="card">
   <h2>👥 Son Kayıt Olan Kullanıcılar</h2>
   <table>
-    <thead><tr><th>Kullanıcı Adı</th><th>Ad Soyad</th><th>Email</th><th>Kayıt Tarihi</th></tr></thead>
+    <thead><tr><th>Kullanıcı Adı</th><th>Ad Soyad</th><th>Email</th><th>Kayıt Tarihi</th><th></th></tr></thead>
     <tbody>{rows_html}</tbody>
   </table>
 </div>
@@ -4384,6 +4388,23 @@ data.forEach(function(v,i){{
 
 </script>
 </body></html>"""
+
+@app.route("/admin/delete-user/<username>", methods=["POST"])
+@admin_required
+def admin_delete_user(username):
+    with pg_connect() as con:
+        user = con.execute("SELECT id FROM users WHERE username=%s", (username,)).fetchone()
+        if not user:
+            return "Kullanıcı bulunamadı", 404
+        uid = user["id"]
+        for tbl in ["telegram_links","telegram_link_codes","telegram_pending",
+                    "card_daily_balance","asset_maintenance","assets",
+                    "supplier_invoices","suppliers","invoices","accounts",
+                    "investments","recurring","todos","goals","budgets",
+                    "transactions","cards","profiles","password_reset_tokens"]:
+            con.execute(f"DELETE FROM {tbl} WHERE user_id=%s", (uid,))
+        con.execute("DELETE FROM users WHERE id=%s", (uid,))
+    return redirect("/admin")
 
 if __name__ == "__main__":
     init_db()
