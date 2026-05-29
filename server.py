@@ -5245,7 +5245,10 @@ function renderTxList(listId, txns, type){
   el.innerHTML=txns.map(function(t){
     var cls=type==='gelir'?'gn':'rd';
     var lbl=type==='gelir'?'+':'-';
-    return '<div class="tx-day-item" onclick="goToTx('+t.id+')">'+
+    var action=t.is_invoice
+      ? 'goPage(\'supplier\',document.querySelector(\'[data-page=supplier]\'))'
+      : 'goToTx('+t.id+')';
+    return '<div class="tx-day-item" onclick="'+action+'">'+
       '<div class="tx-day-icon '+cls+'">'+lbl+'</div>'+
       '<div class="tx-day-info">'+
         '<div class="tx-day-cat">'+t.category+'</div>'+
