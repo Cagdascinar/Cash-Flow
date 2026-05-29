@@ -178,6 +178,18 @@ def init_db():
             active       INTEGER NOT NULL DEFAULT 1,
             created_at   TEXT NOT NULL
         )""",
+        """CREATE TABLE IF NOT EXISTS accounts (
+            id              SERIAL PRIMARY KEY,
+            user_id         INTEGER NOT NULL DEFAULT 1,
+            profile_id      INTEGER NOT NULL DEFAULT 1,
+            name            TEXT NOT NULL,
+            bank            TEXT NOT NULL DEFAULT '',
+            type            TEXT NOT NULL DEFAULT 'hesap',
+            initial_balance DOUBLE PRECISION NOT NULL DEFAULT 0,
+            color           TEXT NOT NULL DEFAULT '#007aff',
+            active          INTEGER NOT NULL DEFAULT 1,
+            created_at      TEXT NOT NULL
+        )""",
         "CREATE INDEX IF NOT EXISTS idx_txn_profile_date ON transactions(profile_id, date)",
         """CREATE TABLE IF NOT EXISTS invoices (
             id                  SERIAL PRIMARY KEY,
@@ -331,7 +343,9 @@ def init_db():
         ("recurring",    "profile_id",      "INTEGER NOT NULL DEFAULT 1"),
         ("recurring",    "days_of_month",   "TEXT NOT NULL DEFAULT ''"),
         ("profiles",     "avatar",          "TEXT NOT NULL DEFAULT ''"),
+        ("transactions", "account_id",      "INTEGER DEFAULT NULL"),
         ("users",        "avatar",          "TEXT NOT NULL DEFAULT ''"),
+        ("accounts",     "limit_",          "DOUBLE PRECISION NOT NULL DEFAULT 0"),
     ]
     with pg_connect() as con:
         for stmt in stmts:
@@ -862,12 +876,13 @@ def add_transaction():
     d = request.get_json(force=True)
     ttype = d.get("type"); amount = float(d.get("amount", 0))
     cat = d.get("category",""); desc = d.get("description",""); dt = d.get("date", today_str())
+    account_id = d.get("account_id") or None
     if ttype not in ("gelir","gider") or amount <= 0 or not cat:
         return jsonify({"ok": False, "error": "Geçersiz veri"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?,?)",
-        (uid, pid, ttype, amount, cat, desc, dt, datetime.now().isoformat()))
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        (uid, pid, ttype, amount, cat, desc, dt, account_id, datetime.now().isoformat()))
     db.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
 
@@ -1431,6 +1446,90 @@ def save_card_daily_balance():
             (uid, pid, cid, dt, bal, d.get("notes",""), datetime.now().isoformat())
         )
     db.commit()
+    return jsonify({"ok":True})
+
+# ── ACCOUNTS (Banka Ürünleri) ─────────────────────────────────────────────────
+
+@app.route("/api/accounts", methods=["GET"])
+@login_required
+def list_accounts():
+    pid = get_pid(); db = get_db()
+    rows = db.execute(
+        "SELECT * FROM accounts WHERE profile_id=? AND active=1 ORDER BY bank,name", (pid,)
+    ).fetchall()
+    result = []
+    for r in rows:
+        acc = row_to_dict(r)
+        gelir = db.execute(
+            "SELECT COALESCE(SUM(amount),0) FROM transactions WHERE profile_id=? AND account_id=? AND type='gelir'",
+            (pid, r["id"])
+        ).fetchone()[0] or 0
+        gider = db.execute(
+            "SELECT COALESCE(SUM(amount),0) FROM transactions WHERE profile_id=? AND account_id=? AND type='gider'",
+            (pid, r["id"])
+        ).fetchone()[0] or 0
+        acc["tagged_gelir"] = float(gelir)
+        acc["tagged_gider"] = float(gider)
+        init = float(acc.get("initial_balance") or 0)
+        limit_ = float(acc.get("limit_") or 0)
+        atype = acc.get("type","hesap")
+        if atype in ("kredi_karti","kmh"):
+            # For credit products: debt grows with gider, shrinks with gelir
+            acc["computed_balance"] = init + float(gider) - float(gelir)
+            acc["available"] = limit_ - acc["computed_balance"] if limit_ > 0 else None
+        else:
+            acc["computed_balance"] = init + float(gelir) - float(gider)
+            acc["available"] = None
+        result.append(acc)
+    return jsonify(result)
+
+@app.route("/api/accounts", methods=["POST"])
+@login_required
+def add_account():
+    uid = session["user_id"]; pid = get_pid()
+    d = request.get_json(force=True)
+    name = d.get("name","").strip()
+    bank = d.get("bank","").strip()
+    atype = d.get("type","vadesiz")
+    initial = float(d.get("initial_balance",0))
+    limit_ = float(d.get("limit_",0))
+    color = d.get("color","#007aff")
+    if not name or not bank:
+        return jsonify({"ok":False,"error":"Banka ve ürün adı gerekli"}), 400
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO accounts (user_id,profile_id,name,bank,type,initial_balance,limit_,color,active,created_at) VALUES (?,?,?,?,?,?,?,?,1,?)",
+        (uid, pid, name, bank, atype, initial, limit_, color, datetime.now().isoformat())
+    )
+    db.commit()
+    return jsonify({"ok":True,"id":cur.lastrowid})
+
+@app.route("/api/accounts/<int:aid>", methods=["PUT"])
+@login_required
+def update_account(aid):
+    pid = get_pid()
+    d = request.get_json(force=True)
+    fields = []; params = []
+    for col in ("name","bank","type","color"):
+        if col in d:
+            fields.append(f"{col}=?"); params.append(d[col])
+    for col in ("initial_balance","limit_"):
+        if col in d:
+            fields.append(f"{col}=?"); params.append(float(d[col]))
+    if "active" in d:
+        fields.append("active=?"); params.append(int(d["active"]))
+    if not fields: return jsonify({"ok":False}), 400
+    params += [aid, pid]
+    get_db().execute(f"UPDATE accounts SET {','.join(fields)} WHERE id=? AND profile_id=?", params)
+    get_db().commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/accounts/<int:aid>", methods=["DELETE"])
+@login_required
+def delete_account(aid):
+    pid = get_pid()
+    get_db().execute("DELETE FROM accounts WHERE id=? AND profile_id=?", (aid, pid))
+    get_db().commit()
     return jsonify({"ok":True})
 
 # ── EXCEL EXPORT ──────────────────────────────────────────────────────────────
@@ -3842,6 +3941,31 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .mod-btn.primary{background:var(--b);color:#fff}
 .mod-btn.danger{background:var(--r);color:#fff}
 .mod-btn.cancel{background:var(--bg3);color:var(--txt)}
+
+/* ── ACCOUNTS PAGE ───────────────────────────────────────────── */
+.acc-type-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
+.acc-type-chip{padding:7px 14px;border-radius:20px;border:1.5px solid var(--border2);background:var(--bg3);color:var(--txt2);font-size:.78rem;font-weight:700;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent;white-space:nowrap}
+.acc-type-chip.active{background:var(--b);border-color:var(--b);color:#fff}
+.color-dot{width:26px;height:26px;border-radius:50%;border:3px solid transparent;cursor:pointer;transition:.12s;-webkit-tap-highlight-color:transparent;flex-shrink:0}
+.color-dot.active{box-shadow:0 0 0 2px var(--bg2),0 0 0 4px var(--txt)}
+.acc-list-item{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:14px 16px;margin-bottom:10px;position:relative;overflow:hidden}
+.acc-list-item::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:16px 0 0 16px}
+.acc-list-top{display:flex;align-items:flex-start;gap:10px}
+.acc-list-dot{width:36px;height:36px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1rem;color:#fff}
+.acc-list-info{flex:1;min-width:0}
+.acc-list-bank{font-size:.9rem;font-weight:800;color:var(--txt)}
+.acc-list-name{font-size:.75rem;color:var(--txt2);margin-top:1px}
+.acc-type-tag{font-size:.62rem;padding:2px 7px;border-radius:8px;font-weight:700;margin-top:4px;display:inline-block}
+.acc-balance-row{display:flex;justify-content:space-between;align-items:flex-end;margin-top:10px}
+.acc-balance-main{font-size:1.15rem;font-weight:800;letter-spacing:-.02em}
+.acc-balance-lbl{font-size:.65rem;color:var(--txt2);margin-top:1px}
+.acc-avail-lbl{font-size:.7rem;color:var(--txt2);text-align:right}
+.acc-avail-val{font-size:.85rem;font-weight:700;text-align:right}
+.acc-prog-wrap{background:var(--bg3);border-radius:4px;height:5px;width:100%;margin-top:8px;overflow:hidden}
+.acc-prog-fill{border-radius:4px;height:5px;transition:width .4s}
+.acc-actions{display:flex;gap:6px;margin-top:10px;border-top:1px solid var(--border);padding-top:10px}
+.acc-act-btn{flex:1;padding:7px;border:none;border-radius:9px;font-size:.75rem;font-weight:700;cursor:pointer;transition:.1s;-webkit-tap-highlight-color:transparent}
+.acc-act-btn:active{opacity:.75}
 </style>
 </head>
 <body>
@@ -3889,6 +4013,9 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <div class="nl nl-desktop" data-page="cards" onclick="goPage('cards',this)">
       <span class="ico">💳</span>Kartlar
     </div>
+    <div class="nl nl-desktop" data-page="hesaplar" onclick="goPage('hesaplar',this)">
+      <span class="ico">🏦</span>Hesaplar
+    </div>
 
     <div class="nav-sect">Firma</div>
     <div class="nl nl-desktop" data-page="supplier" data-sirket onclick="goPage('supplier',this)">
@@ -3932,6 +4059,9 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     </div>
     <div class="more-tile" onclick="goPageFromSheet('cards')">
       <div class="mt-ico">💳</div><div class="mt-lbl">Kartlar</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('hesaplar')">
+      <div class="mt-ico">🏦</div><div class="mt-lbl">Hesaplar</div>
     </div>
     <div class="more-tile" onclick="goPageFromSheet('import')">
       <div class="mt-ico">📂</div><div class="mt-lbl">İçe Aktar</div>
@@ -4206,7 +4336,13 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       <div><label>Tarih</label><input class="f-input" type="date" id="f-date"></div>
     </div>
     <div style="margin-bottom:12px"><label>Kategori</label><select class="f-input" id="f-cat"></select></div>
-    <div style="margin-bottom:20px"><label>Açıklama</label><input class="f-input" type="text" id="f-desc" placeholder="örn. Ocak maaşı"></div>
+    <div style="margin-bottom:12px"><label>Açıklama</label><input class="f-input" type="text" id="f-desc" placeholder="örn. Ocak maaşı"></div>
+    <div style="margin-bottom:20px">
+      <label>Ödeme Yöntemi</label>
+      <select class="f-input" id="f-account">
+        <option value="">— Nakit / Belirtme —</option>
+      </select>
+    </div>
     <button class="btn btn-green" id="add-btn" style="width:100%;padding:13px" onclick="addTx()">Kaydet</button>
   </div>
 </div>
@@ -4549,6 +4685,87 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
         <div style="display:flex;justify-content:space-between;font-size:.9rem">
           <span style="color:var(--txt2)">Kullanılabilir</span><span id="ct-avail" style="font-weight:800;color:var(--g)"></span>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HESAPLAR (Banka Ürünleri) -->
+<div class="page" id="page-hesaplar">
+  <div class="page-title">Banka Ürünleri</div>
+  <div class="page-sub">Kredi kartı, KMH, vadesiz ve tasarruf hesaplarını ekle — masraf eklerken ödeme yöntemini seç</div>
+
+  <div class="grid2">
+    <!-- ADD FORM -->
+    <div class="card">
+      <div class="section-title" id="acc-form-title">Ürün Ekle</div>
+      <input type="hidden" id="acc-edit-id" value="">
+
+      <div style="margin-bottom:14px">
+        <label>Ürün Türü</label>
+        <div class="acc-type-chips">
+          <button type="button" class="acc-type-chip" data-type="kredi_karti" onclick="selectAccType(this)">💳 Kredi Kartı</button>
+          <button type="button" class="acc-type-chip" data-type="kmh" onclick="selectAccType(this)">🔄 KMH</button>
+          <button type="button" class="acc-type-chip active" data-type="vadesiz" onclick="selectAccType(this)">🏦 Vadesiz</button>
+          <button type="button" class="acc-type-chip" data-type="tasarruf" onclick="selectAccType(this)">💰 Tasarruf</button>
+          <button type="button" class="acc-type-chip" data-type="diger" onclick="selectAccType(this)">📋 Diğer</button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label>Banka</label>
+        <select class="f-input" id="acc-bank">
+          <option value="">— Banka seç —</option>
+          <option>Garanti BBVA</option><option>İş Bankası</option><option>Akbank</option>
+          <option>Yapı Kredi</option><option>Ziraat Bankası</option><option>Halkbank</option>
+          <option>Vakıfbank</option><option>QNB Finansbank</option><option>Denizbank</option>
+          <option>ING</option><option>TEB</option><option>HSBC</option><option>Odeabank</option>
+          <option>Şekerbank</option><option>Fibabanka</option><option>Burgan Bank</option>
+          <option>Diğer</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <label>Ürün / Hesap Adı</label>
+        <input class="f-input" type="text" id="acc-name" placeholder="ör. Bonus Card, 5465 Hesabı, Flexi Card">
+      </div>
+
+      <div class="form-row">
+        <div>
+          <label id="acc-bal-lbl">Mevcut Bakiye (₺)</label>
+          <input class="f-input" type="text" inputmode="decimal" data-num id="acc-balance" placeholder="0,00">
+        </div>
+        <div id="acc-limit-col">
+          <label>Limit (₺)</label>
+          <input class="f-input" type="text" inputmode="decimal" data-num id="acc-limit" placeholder="50.000">
+        </div>
+      </div>
+
+      <div style="margin-bottom:18px">
+        <label>Renk</label>
+        <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:7px">
+          <button type="button" class="color-dot active" data-color="#007aff" onclick="selectAccColor(this)" style="background:#007aff"></button>
+          <button type="button" class="color-dot" data-color="#34c759" onclick="selectAccColor(this)" style="background:#34c759"></button>
+          <button type="button" class="color-dot" data-color="#ff9500" onclick="selectAccColor(this)" style="background:#ff9500"></button>
+          <button type="button" class="color-dot" data-color="#ff3b30" onclick="selectAccColor(this)" style="background:#ff3b30"></button>
+          <button type="button" class="color-dot" data-color="#5856d6" onclick="selectAccColor(this)" style="background:#5856d6"></button>
+          <button type="button" class="color-dot" data-color="#af52de" onclick="selectAccColor(this)" style="background:#af52de"></button>
+          <button type="button" class="color-dot" data-color="#ff2d55" onclick="selectAccColor(this)" style="background:#ff2d55"></button>
+          <button type="button" class="color-dot" data-color="#1c1c1e" onclick="selectAccColor(this)" style="background:#1c1c1e"></button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" style="flex:1;padding:12px" onclick="saveAccount()">Kaydet</button>
+        <button class="btn btn-ghost" id="acc-cancel-btn" style="display:none;padding:12px 16px" onclick="resetAccForm()">İptal</button>
+      </div>
+    </div>
+
+    <!-- ACCOUNTS LIST -->
+    <div class="card">
+      <div class="section-title">Hesaplarım</div>
+      <div id="acc-list">
+        <div class="empty-state"><div class="icon">🏦</div>Henüz hesap eklenmedi</div>
       </div>
     </div>
   </div>
@@ -5017,6 +5234,8 @@ function goPage(id, el){
     if(id==='recurring') initRecurringPage();
     if(id==='invest') initInvestPage();
     if(id==='cards') loadCards();
+    if(id==='hesaplar') loadAccounts();
+    if(id==='add') loadAccountsDropdown();
     if(id==='settings') initSettingsPage();
     if(id==='budget') loadGoalsPage();
     if(id==='todos') initTodosPage();
@@ -6204,18 +6423,194 @@ function deleteGoal(id){
   },false,true);
 }
 
+// ── ACCOUNTS (Banka Ürünleri) ─────────────────────────────────────────────────
+var _accColor='#007aff';
+var _accType='vadesiz';
+
+function selectAccType(btn){
+  document.querySelectorAll('.acc-type-chip').forEach(function(b){b.classList.remove('active')});
+  btn.classList.add('active');
+  _accType=btn.getAttribute('data-type');
+  var isCard=(_accType==='kredi_karti'||_accType==='kmh');
+  var lbl=document.getElementById('acc-bal-lbl');
+  var limitCol=document.getElementById('acc-limit-col');
+  if(lbl) lbl.textContent=isCard?'Mevcut Borç (₺)':'Mevcut Bakiye (₺)';
+  if(limitCol) limitCol.style.display=isCard?'':'none';
+}
+
+function selectAccColor(btn){
+  document.querySelectorAll('.color-dot').forEach(function(b){b.classList.remove('active')});
+  btn.classList.add('active');
+  _accColor=btn.getAttribute('data-color');
+}
+
+function resetAccForm(){
+  document.getElementById('acc-edit-id').value='';
+  document.getElementById('acc-form-title').textContent='Ürün Ekle';
+  document.getElementById('acc-bank').value='';
+  document.getElementById('acc-name').value='';
+  document.getElementById('acc-balance').value='';
+  document.getElementById('acc-limit').value='';
+  document.getElementById('acc-cancel-btn').style.display='none';
+  // reset type to vadesiz
+  document.querySelectorAll('.acc-type-chip').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-type')==='vadesiz');
+  });
+  _accType='vadesiz';
+  // reset color to blue
+  document.querySelectorAll('.color-dot').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-color')==='#007aff');
+  });
+  _accColor='#007aff';
+  selectAccType(document.querySelector('.acc-type-chip[data-type="vadesiz"]'));
+}
+
+function saveAccount(){
+  var bank=document.getElementById('acc-bank').value;
+  var name=document.getElementById('acc-name').value.trim();
+  var bal=getNumVal(document.getElementById('acc-balance'))||0;
+  var lim=getNumVal(document.getElementById('acc-limit'))||0;
+  var eid=document.getElementById('acc-edit-id').value;
+  if(!bank||bank===''){toast('Banka seçin');return}
+  if(!name){toast('Ürün adı girin');return}
+  var body={bank:bank,name:name,type:_accType,initial_balance:bal,limit_:lim,color:_accColor};
+  if(eid){
+    xhr('/api/accounts/'+eid,body,function(r){
+      if(r.ok){toast('Güncellendi ✓');resetAccForm();loadAccounts();loadAccountsDropdown();}
+    },true);
+  } else {
+    xhr('/api/accounts',body,function(r){
+      if(r.ok){toast('Hesap eklendi ✓');resetAccForm();loadAccounts();loadAccountsDropdown();}
+    });
+  }
+}
+
+function editAccount(a){
+  document.getElementById('acc-edit-id').value=a.id;
+  document.getElementById('acc-form-title').textContent='Hesabı Güncelle';
+  document.getElementById('acc-bank').value=a.bank;
+  document.getElementById('acc-name').value=a.name;
+  setNumVal(document.getElementById('acc-balance'), a.initial_balance||0);
+  setNumVal(document.getElementById('acc-limit'), a.limit_||0);
+  document.getElementById('acc-cancel-btn').style.display='';
+  _accType=a.type||'vadesiz';
+  document.querySelectorAll('.acc-type-chip').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-type')===_accType);
+  });
+  selectAccType(document.querySelector('.acc-type-chip[data-type="'+_accType+'"]'));
+  _accColor=a.color||'#007aff';
+  document.querySelectorAll('.color-dot').forEach(function(b){
+    b.classList.toggle('active', b.getAttribute('data-color')===_accColor);
+  });
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function deleteAccount(id){
+  if(!confirm('Bu hesabı silmek istediğine emin misin?')) return;
+  xhr('/api/accounts/'+id,null,function(r){
+    if(r.ok){toast('Silindi','#ff3b30');loadAccounts();loadAccountsDropdown();}
+  },false,true);
+}
+
+var _ACC_LABELS={kredi_karti:'Kredi Kartı',kmh:'KMH',vadesiz:'Vadesiz',tasarruf:'Tasarruf',diger:'Diğer'};
+var _ACC_ICONS={kredi_karti:'💳',kmh:'🔄',vadesiz:'🏦',tasarruf:'💰',diger:'📋'};
+
+function loadAccounts(){
+  xhr('/api/accounts',null,function(list){
+    var el=document.getElementById('acc-list');
+    if(!el) return;
+    if(!list||!list.length){
+      el.innerHTML='<div class="empty-state"><div class="icon">🏦</div>Henüz hesap eklenmedi</div>';
+      return;
+    }
+    var html='';
+    list.forEach(function(a){
+      var isCard=(a.type==='kredi_karti'||a.type==='kmh');
+      var bal=a.computed_balance||0;
+      var lim=a.limit_||0;
+      var balColor=isCard?(bal>0?'var(--r)':'var(--g)'):'var(--g)';
+      if(!isCard&&bal<0) balColor='var(--r)';
+      var icon=_ACC_ICONS[a.type]||'🏦';
+      var label=_ACC_LABELS[a.type]||'Hesap';
+      var tagBg=isCard?'rgba(255,59,48,.12)':'rgba(52,199,89,.12)';
+      var tagColor=isCard?'var(--r)':'var(--g)';
+      html+='<div class="acc-list-item" style="border-left:4px solid '+a.color+'">';
+      html+='<div class="acc-list-top">';
+      html+='<div class="acc-list-dot" style="background:'+a.color+'">'+icon+'</div>';
+      html+='<div class="acc-list-info">';
+      html+='<div class="acc-list-bank">'+a.bank+'</div>';
+      html+='<div class="acc-list-name">'+a.name+'</div>';
+      html+='<span class="acc-type-tag" style="background:'+tagBg+';color:'+tagColor+'">'+label+'</span>';
+      html+='</div>';
+      html+='</div>';
+      html+='<div class="acc-balance-row">';
+      if(isCard){
+        var debt=bal>0?bal:0;
+        html+='<div><div class="acc-balance-lbl">Borç</div>';
+        html+='<div class="acc-balance-main" style="color:'+balColor+'">'+fmt(debt)+'</div></div>';
+        if(lim>0){
+          var avail=lim-debt;
+          html+='<div style="text-align:right"><div class="acc-avail-lbl">Kullanılabilir</div>';
+          html+='<div class="acc-avail-val" style="color:var(--g)">'+fmt(avail>0?avail:0)+'</div></div>';
+        }
+      } else {
+        html+='<div><div class="acc-balance-lbl">Bakiye</div>';
+        html+='<div class="acc-balance-main" style="color:'+balColor+'">'+fmt(bal)+'</div></div>';
+      }
+      html+='</div>';
+      if(isCard&&lim>0){
+        var pct=Math.min(100,Math.round((bal/lim)*100));
+        var fillColor=pct>80?'var(--r)':pct>50?'var(--o)':'var(--b)';
+        html+='<div class="acc-prog-wrap"><div class="acc-prog-fill" style="width:'+pct+'%;background:'+fillColor+'"></div></div>';
+        html+='<div style="font-size:.65rem;color:var(--txt2);margin-top:3px">Limit: '+fmt(lim)+' &nbsp;·&nbsp; %'+pct+' kullanım</div>';
+      }
+      html+='<div class="acc-actions">';
+      html+='<button class="acc-act-btn" style="background:var(--bg3);color:var(--txt2)" onclick="editAccount('+JSON.stringify(a).replace(/"/g,"&quot;")+')" >Düzenle</button>';
+      html+='<button class="acc-act-btn" style="background:rgba(255,59,48,.1);color:var(--r)" onclick="deleteAccount('+a.id+')">Sil</button>';
+      html+='</div>';
+      html+='</div>';
+    });
+    el.innerHTML=html;
+  });
+}
+
+function loadAccountsDropdown(){
+  var sel=document.getElementById('f-account');
+  if(!sel) return;
+  xhr('/api/accounts',null,function(list){
+    var prev=sel.value;
+    sel.innerHTML='<option value="">— Nakit / Belirtme —</option>';
+    (list||[]).forEach(function(a){
+      var icon=_ACC_ICONS[a.type]||'🏦';
+      var opt=document.createElement('option');
+      opt.value=a.id;
+      opt.textContent=icon+' '+a.bank+' · '+a.name;
+      sel.appendChild(opt);
+    });
+    if(prev) sel.value=prev;
+  });
+}
+
+function setNumVal(el, v){
+  if(!el) return;
+  el.value=v?v.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}):'';
+}
+
 // ── ADD TX ────────────────────────────────────────────────────────────────────
 function addTx(){
   var amount=getNumVal(document.getElementById('f-amount'));
   var cat=document.getElementById('f-cat').value;
   var desc=document.getElementById('f-desc').value;
   var dt=document.getElementById('f-date').value;
+  var accSel=document.getElementById('f-account');
+  var accId=accSel&&accSel.value?parseInt(accSel.value):null;
   if(!amount||amount<=0){toast('Tutar giriniz');return}
-  xhr('/api/transactions',{type:curTab,amount:amount,category:cat,description:desc,date:dt},function(r){
+  xhr('/api/transactions',{type:curTab,amount:amount,category:cat,description:desc,date:dt,account_id:accId},function(r){
     if(r.ok){
       toast('İşlem eklendi ✓');
       document.getElementById('f-amount').value='';
       document.getElementById('f-desc').value='';
+      if(accSel) accSel.value='';
       loadDashboard();loadAllTx();
     }
   });
