@@ -3394,9 +3394,11 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
     display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;height:100vh;z-index:100}
 .main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh}
 @media(max-width:768px){
-  nav{width:100%;height:56px;flex-direction:row;border-right:none;border-bottom:1px solid var(--border);
-      position:fixed;bottom:0;top:auto;z-index:200}
-  .main{margin-left:0;margin-bottom:56px}
+  nav{width:100%;height:auto;flex-direction:row;border-right:none;border-top:1px solid rgba(0,0,0,.07);border-bottom:none;
+      position:fixed;bottom:0;top:auto;z-index:200;
+      padding-bottom:env(safe-area-inset-bottom,0px);
+      box-shadow:0 -4px 24px rgba(0,0,0,.09)}
+  .main{margin-left:0;margin-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
   .nav-logo{display:none}
 }
 
@@ -3416,68 +3418,71 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
   box-shadow:inset 3px 0 0 var(--b)}
 .nl .ico{font-size:1.1rem;width:22px;text-align:center;flex-shrink:0}
 
-/* ── MOBILE NAV ── */
+/* ── MOBILE NAV — Duolingo style ── */
 @media(max-width:768px){
-  .nav-links{flex-direction:row;padding:0;gap:0;justify-content:space-around;align-items:center;height:100%}
+  .nav-links{flex-direction:row;padding:0 4px;gap:0;justify-content:space-around;align-items:center;height:64px}
   .nav-sect{display:none}
-  .nl{flex-direction:column;gap:1px;font-size:.6rem;padding:4px 6px;min-width:48px;flex:1;
-      max-width:72px;border-radius:0;box-shadow:none;background:transparent!important}
-  .nl .ico{font-size:1.22rem;width:auto;transition:transform .18s cubic-bezier(.34,1.56,.64,1)}
-  .nl span:not(.ico){color:var(--txt2);transition:color .15s;font-weight:500}
-  /* Active: blue dot above label + icon pops */
-  .nl.active .ico{transform:scale(1.12)}
-  .nl.active span:not(.ico){color:var(--b);font-weight:700}
-  .nl::after{content:'';display:block;width:18px;height:3px;border-radius:2px;
-             background:transparent;margin:1px auto 0;transition:background .2s}
-  .nl.active::after{background:var(--b)}
-  .nl-add::after,.nl-more::after{display:none}
+  .nl{flex-direction:column;gap:2px;font-size:.58rem;padding:6px 2px;min-width:52px;flex:1;
+      max-width:76px;border-radius:0;box-shadow:none!important;background:transparent!important;align-items:center}
+  /* Icon inside a pill */
+  .nl .ico{font-size:1.3rem;width:44px;height:30px;display:flex;align-items:center;justify-content:center;
+           border-radius:14px;background:transparent;transition:all .2s cubic-bezier(.34,1.4,.64,1)}
+  .nl span:not(.ico){color:var(--txt2);transition:color .15s;font-weight:600;letter-spacing:.01em}
+  /* Active: pill fills with blue tint, icon scales, label turns blue */
+  .nl.active .ico{background:rgba(0,122,255,.13);transform:scale(1.08)}
+  .nl.active span:not(.ico){color:var(--b);font-weight:800}
+  .nl::after{display:none}
 }
 
-/* ── ADD BUTTON (mobile center) ── */
+/* ── ADD BUTTON (mobile center floating) ── */
 @media(max-width:768px){
-  .nl-add{flex:0 0 64px;position:relative}
+  .nl-add{flex:0 0 68px;position:relative}
   .nl-add .ico{
-    background:linear-gradient(135deg,#007aff,#5856d6);
+    background:linear-gradient(145deg,#007aff 0%,#5856d6 100%);
     color:#fff;border-radius:50%;
-    width:46px;height:46px;
+    width:52px;height:52px;
     display:flex;align-items:center;justify-content:center;
-    font-size:1.4rem;
-    box-shadow:0 4px 18px rgba(0,122,255,.45);
-    margin-top:-20px;
-    border:3px solid var(--bg);
+    font-size:1.5rem;
+    box-shadow:0 6px 24px rgba(0,122,255,.45),0 2px 8px rgba(0,0,0,.12);
+    margin-top:-22px;
+    border:3.5px solid var(--bg);
+    background-clip:padding-box;
+    transition:transform .18s cubic-bezier(.34,1.56,.64,1),box-shadow .18s;
   }
-  .nl-add span:not(.ico){color:var(--b);font-weight:700}
-  /* More button */
-  .nl-more .ico{font-size:1.4rem}
+  .nl-add:active .ico{transform:scale(.93)}
+  .nl-add.active .ico{background:linear-gradient(145deg,#007aff,#5856d6)}
+  .nl-add span:not(.ico){color:var(--b);font-weight:800;font-size:.58rem}
+  .nl-more .ico{font-size:1.25rem}
+  .nl-more.active .ico{background:rgba(0,122,255,.13)}
 }
 
 /* ── MORE SHEET ── */
 .more-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);
                z-index:9000;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
 .more-sheet{position:fixed;bottom:0;left:0;right:0;
-            background:var(--bg2);border-radius:22px 22px 0 0;
-            z-index:9001;padding:0 0 env(safe-area-inset-bottom,12px);
-            box-shadow:0 -6px 32px rgba(0,0,0,.18);
-            transform:translateY(100%);transition:transform .32s cubic-bezier(.4,0,.2,1);
-            max-height:80vh;overflow-y:auto}
+            background:var(--bg2);border-radius:28px 28px 0 0;
+            z-index:9001;padding:0 0 env(safe-area-inset-bottom,16px);
+            box-shadow:0 -8px 40px rgba(0,0,0,.18);
+            transform:translateY(100%);transition:transform .34s cubic-bezier(.4,0,.2,1);
+            max-height:82vh;overflow-y:auto}
 .more-sheet.open{transform:translateY(0)}
 .more-backdrop.open{display:block}
-.more-sheet-handle{width:38px;height:4px;border-radius:2px;background:var(--border2);
-                   margin:12px auto 16px}
-.more-sheet-title{font-size:.72rem;font-weight:700;text-transform:uppercase;
-                  letter-spacing:.1em;color:var(--txt2);padding:0 20px 10px}
-.more-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
-           background:var(--border);margin:0 0 2px}
-.more-tile{display:flex;flex-direction:column;align-items:center;gap:6px;
-           padding:18px 8px 16px;background:var(--bg2);cursor:pointer;
-           transition:.12s;-webkit-tap-highlight-color:transparent}
-.more-tile:active{background:var(--bg3)}
-.more-tile .mt-ico{font-size:1.6rem;line-height:1}
-.more-tile .mt-lbl{font-size:.72rem;font-weight:600;color:var(--txt);text-align:center}
+.more-sheet-handle{width:40px;height:4px;border-radius:3px;background:var(--bg4);
+                   margin:14px auto 6px}
+.more-sheet-title{font-size:.68rem;font-weight:800;text-transform:uppercase;
+                  letter-spacing:.12em;color:var(--txt2);padding:8px 20px 12px;opacity:.6}
+.more-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 14px 8px}
+.more-tile{display:flex;flex-direction:column;align-items:center;gap:7px;
+           padding:16px 8px 14px;background:var(--bg3);border-radius:18px;cursor:pointer;
+           transition:.14s;-webkit-tap-highlight-color:transparent;border:1px solid var(--border)}
+.more-tile:active{background:var(--bg4);transform:scale(.96)}
+.more-tile .mt-ico{font-size:1.7rem;line-height:1}
+.more-tile .mt-lbl{font-size:.72rem;font-weight:700;color:var(--txt);text-align:center}
 .more-tile[data-sirket]{display:none}
 
-.nav-bottom{padding:16px;border-top:1px solid var(--border);font-size:.72rem;color:var(--txt2);line-height:1.6}
-@media(max-width:768px){.nav-bottom{display:none}}
+.nav-bottom{display:flex;align-items:center;gap:10px;padding:14px 16px;border-top:1px solid var(--border);cursor:pointer;transition:.12s}
+.nav-bottom:hover{background:var(--bg3)}
+@media(max-width:768px){.nav-bottom{display:none!important}}
 
 /* ── PAGE ── */
 .main{display:flex;flex-direction:column}
@@ -4220,11 +4225,11 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       <span class="ico">⚙️</span>Ayarlar
     </div>
   </div>
-  <div class="nav-bottom" style="display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer" onclick="goPage('settings',document.querySelector('[data-page=settings]'))">
-    <div id="sidebar-profile-avatar" style="width:34px;height:34px;border-radius:50%;background:var(--bg3);border:1.5px solid var(--border2);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1rem"></div>
+  <div class="nav-bottom" onclick="goPage('settings',document.querySelector('[data-page=settings]'))">
+    <div id="sidebar-profile-avatar" style="width:36px;height:36px;border-radius:50%;background:var(--bg3);border:1.5px solid var(--border2);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1rem"></div>
     <div style="min-width:0">
-      <div id="sidebar-profile-name" style="font-size:.78rem;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
-      <div style="font-size:.65rem;color:var(--txt2);opacity:.6">v1.0 · Ayarlar</div>
+      <div id="sidebar-profile-name" style="font-size:.8rem;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
+      <div style="font-size:.68rem;color:var(--txt2);opacity:.55">Ayarlar ›</div>
     </div>
   </div>
 </nav>
@@ -5068,7 +5073,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <a class="settings-link-row" href="/kullanim-kosullari" target="_blank">
       <span>📄 Kullanım Koşulları</span><span style="color:var(--txt2);font-size:.8rem">›</span>
     </a>
-    <div style="font-size:.72rem;color:var(--txt2);margin-top:12px;text-align:center">Kirpi v1.0 • 🦔</div>
+    <div style="font-size:.72rem;color:var(--txt2);margin-top:12px;text-align:center;opacity:.5">🦔 Kirpi</div>
   </div>
 </div>
 
