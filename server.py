@@ -1,5 +1,7 @@
 import json, os, csv, io, re, requests, secrets, smtplib, threading, time, logging
 import psycopg2, psycopg2.extras
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from datetime import datetime, date, timedelta
 from functools import wraps
 from email.mime.multipart import MIMEMultipart
@@ -14,6 +16,32 @@ log = logging.getLogger("kirpi")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri=os.environ.get("REDIS_URL", "memory://"),
+)
+
+# ── CSRF ──────────────────────────────────────────────────────────────────────
+
+def get_csrf_token():
+    if "csrf_token" not in session:
+        session["csrf_token"] = secrets.token_hex(32)
+    return session["csrf_token"]
+
+def _csrf_input():
+    return f'<input type="hidden" name="csrf_token" value="{get_csrf_token()}">'
+
+def validate_csrf():
+    submitted = request.form.get("csrf_token", "")
+    expected  = session.get("csrf_token", "")
+    return bool(expected and secrets.compare_digest(submitted, expected))
+
+@app.errorhandler(429)
+def too_many_requests(e):
+    return AUTH_HTML_render("login", "⛔ Çok fazla deneme yaptınız. Lütfen birkaç dakika bekleyin."), 429
 # ── DATABASE ──────────────────────────────────────────────────────────────────
 def _pg_url():
     url = os.environ.get("DATABASE_URL", "")
@@ -596,10 +624,13 @@ def login_required(f):
     return decorated
 
 @app.route("/register", methods=["GET", "POST"])
+@limiter.limit("5 per hour", methods=["POST"])
 def register():
     if session.get("user_id"):
         return redirect("/")
     if request.method == "POST":
+        if not validate_csrf():
+            return AUTH_HTML_render("register", "Geçersiz istek. Lütfen sayfayı yenileyin."), 403
         username = request.form.get("username","").strip().lower()
         display  = request.form.get("display_name","").strip()
         email    = request.form.get("email","").strip().lower()
@@ -638,10 +669,13 @@ def register():
     return AUTH_HTML_render("register")
 
 @app.route("/login", methods=["GET", "POST"])
+@limiter.limit("20 per minute", methods=["POST"])
 def login():
     if session.get("user_id"):
         return redirect("/")
     if request.method == "POST":
+        if not validate_csrf():
+            return AUTH_HTML_render("login", "Geçersiz istek. Lütfen sayfayı yenileyin."), 403
         username = request.form.get("username","").strip().lower()
         password = request.form.get("password","")
         with pg_connect() as con:
@@ -670,8 +704,11 @@ def login():
     return AUTH_HTML_render("login", msg)
 
 @app.route("/forgot-password", methods=["GET", "POST"])
+@limiter.limit("5 per hour", methods=["POST"])
 def forgot_password():
     if request.method == "POST":
+        if not validate_csrf():
+            return AUTH_HTML_render("forgot", "Geçersiz istek. Lütfen sayfayı yenileyin."), 403
         identifier = request.form.get("identifier","").strip().lower()
         with pg_connect() as con:
             row = con.execute(
@@ -700,6 +737,8 @@ def reset_password(token):
     if not tok or datetime.fromisoformat(tok["expires_at"]) < datetime.now():
         return AUTH_HTML_render("reset_invalid", "Bu link geçersiz veya süresi dolmuş.")
     if request.method == "POST":
+        if not validate_csrf():
+            return AUTH_HTML_render("reset", "Geçersiz istek. Lütfen sayfayı yenileyin.", token=token), 403
         password = request.form.get("password","")
         confirm  = request.form.get("confirm","")
         if len(password) < 6:
@@ -726,8 +765,11 @@ def verify_email(token):
     return redirect("/login?verified=1")
 
 @app.route("/resend-verify", methods=["GET", "POST"])
+@limiter.limit("5 per hour", methods=["POST"])
 def resend_verify():
     if request.method == "POST":
+        if not validate_csrf():
+            return AUTH_HTML_render("resend_verify", "Geçersiz istek. Lütfen sayfayı yenileyin."), 403
         email = request.form.get("email","").strip().lower()
         with pg_connect() as con:
             row = con.execute("SELECT * FROM users WHERE email=? AND email_verified=0", (email,)).fetchone()
@@ -3353,6 +3395,7 @@ def AUTH_HTML_render(mode, msg="", token=None):
       </div>
     </div>''' + msg_html + '''
     <form method="POST" action="/register">
+      <!-- CSRF_FIELD -->
       <input type="hidden" name="profile_type" id="reg-type-val" value="sahis">
       <label id="reg-name-label">Ad Soyad</label>
       <input type="text" name="display_name" id="reg-name" placeholder="Ad Soyad" autocomplete="name">
@@ -3407,6 +3450,7 @@ def AUTH_HTML_render(mode, msg="", token=None):
       </div>
     </div>
     <form method="POST" action="/login">
+      <!-- CSRF_FIELD -->
       <label id="login-uname-label">Kullanıcı Adı</label>
       <input type="text" name="username" required autocomplete="username">
       <label>Şifre</label>
@@ -3435,6 +3479,7 @@ def AUTH_HTML_render(mode, msg="", token=None):
     <p style="text-align:center;color:#64748b;font-size:.82rem;margin-bottom:20px">Kullanıcı adın veya email adresin ile şifre sıfırlama linki alabilirsin.</p>
     {msg_html}
     <form method="POST" action="/forgot-password">
+      <!-- CSRF_FIELD -->
       <label>Kullanıcı Adı veya Email</label>
       <input type="text" name="identifier" required placeholder="kullanici_adi veya ornek@gmail.com" autocomplete="username email">
       <button class="btn" type="submit">Sıfırlama Linki Gönder</button>
@@ -3456,6 +3501,7 @@ def AUTH_HTML_render(mode, msg="", token=None):
     <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:20px;text-align:center">Yeni Şifre Belirle</h2>
     {msg_html}
     <form method="POST" action="/reset-password/{token}">
+      <!-- CSRF_FIELD -->
       <label>Yeni Şifre <span style="color:#64748b">(en az 6 karakter)</span></label>
       <input type="password" name="password" required autocomplete="new-password">
       <label>Şifre Tekrar</label>
@@ -3467,8 +3513,9 @@ def AUTH_HTML_render(mode, msg="", token=None):
         form = f"""
     <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:8px;text-align:center">Doğrulama Maili Gönder</h2>
     <p style="text-align:center;color:#64748b;font-size:.82rem;margin-bottom:20px">Kayıt emailini girerek yeni doğrulama linki alabilirsin.</p>
-    {{msg_html}}
+    {msg_html}
     <form method="POST" action="/resend-verify">
+      <!-- CSRF_FIELD -->
       <label>Email Adresi</label>
       <input type="email" name="email" required placeholder="ornek@gmail.com" autocomplete="email">
       <button class="btn" type="submit">Doğrulama Maili Gönder</button>
@@ -3486,7 +3533,8 @@ def AUTH_HTML_render(mode, msg="", token=None):
 
     return (AUTH_HTML
         .replace("__MODE_TITLE__", page_title)
-        .replace("  <!-- __FORM_CONTENT__ -->", form))
+        .replace("  <!-- __FORM_CONTENT__ -->", form)
+        .replace("<!-- CSRF_FIELD -->", _csrf_input()))
 
 HTML = r"""<!DOCTYPE html>
 <html lang="tr">
