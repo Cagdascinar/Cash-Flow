@@ -4469,6 +4469,23 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <button class="btn btn-ghost" style="width:100%" onclick="document.getElementById('add-profile-form-settings').style.display='block'">+ Yeni Profil Ekle</button>
   </div>
 
+  <!-- Ses -->
+  <div class="settings-card">
+    <div class="settings-sect-title">Ses</div>
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:.88rem;font-weight:600;color:var(--txt)">🔔 Tıklama Sesi</div>
+        <div style="font-size:.75rem;color:var(--txt2)">Kirpi'ye özgü premium ses tonu</div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <span id="sound-lbl" style="font-size:.8rem;color:var(--txt2)">Açık</span>
+        <div id="sound-toggle" onclick="toggleSound(!_soundEnabled)" style="width:44px;height:26px;border-radius:13px;background:var(--g);cursor:pointer;position:relative;transition:background .2s">
+          <div id="sound-knob" style="width:22px;height:22px;border-radius:50%;background:#fff;position:absolute;top:2px;left:20px;transition:left .2s;box-shadow:0 1px 4px rgba(0,0,0,.25)"></div>
+        </div>
+      </label>
+    </div>
+  </div>
+
   <!-- Para Birimi -->
   <div class="settings-card">
     <div class="settings-sect-title">Para Birimi</div>
@@ -4740,6 +4757,11 @@ window.onload=function(){
   setupNumInputs();
   loadNotifications();
   requestBrowserNotifPermission();
+  // Buton/kart tıklamalarında ses
+  document.addEventListener('click',function(e){
+    var t=e.target.closest('button,.btn,.tappable,.tx-day-item,.hero-chip,.aging-card,.asset-card,.todo-item,.sup-inv-item,.settings-link-row');
+    if(t) playClick();
+  },true);
 };
 
 function updateMonthLabel(){
@@ -4776,6 +4798,7 @@ function goPage(id, el){
         next.classList.add('active');
       });
     });
+    playClick();
     if(id==='ledger') renderLedger();
     if(id==='dashboard') loadDashboard();
     if(id==='recurring') initRecurringPage();
@@ -5089,6 +5112,7 @@ function initSettingsPage(){
   var el=document.getElementById('cur-label');
   var c=_CURRENCIES[_curCode]||_CURRENCIES['TRY'];
   if(el) el.textContent=_curCode+' '+c.sym;
+  _syncSoundToggleUI();
 }
 
 function saveAccountInfo(){
@@ -5417,6 +5441,50 @@ function loadDashboard(){
   loadTodayWidgets();
 }
 
+// ── SES SİSTEMİ ──────────────────────────────────────────────────────────────
+var _soundEnabled=(localStorage.getItem('kirpi_sound')!=='0');
+var _audioCtx=null;
+function _getACtx(){
+  if(!_audioCtx||_audioCtx.state==='closed')
+    _audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  if(_audioCtx.state==='suspended') _audioCtx.resume();
+  return _audioCtx;
+}
+function playClick(){
+  if(!_soundEnabled) return;
+  try{
+    var ctx=_getACtx(), t=ctx.currentTime;
+    var master=ctx.createGain();
+    master.gain.setValueAtTime(0.13,t);
+    master.gain.exponentialRampToValueAtTime(0.001,t+0.18);
+    master.connect(ctx.destination);
+    // C6 (1047Hz) temel ton
+    var o1=ctx.createOscillator(); o1.type='sine';
+    o1.frequency.setValueAtTime(1047,t);
+    o1.frequency.exponentialRampToValueAtTime(900,t+0.18);
+    o1.connect(master); o1.start(t); o1.stop(t+0.18);
+    // G6 (1568Hz) harmonik – sıcaklık katar
+    var o2=ctx.createOscillator(); o2.type='sine';
+    o2.frequency.setValueAtTime(1568,t);
+    var g2=ctx.createGain(); g2.gain.value=0.35;
+    o2.connect(g2); g2.connect(master); o2.start(t); o2.stop(t+0.10);
+  }catch(e){}
+}
+function toggleSound(on){
+  _soundEnabled=on;
+  localStorage.setItem('kirpi_sound',on?'1':'0');
+  _syncSoundToggleUI();
+  if(on) setTimeout(playClick,80);
+}
+function _syncSoundToggleUI(){
+  var lbl=document.getElementById('sound-lbl');
+  var tog=document.getElementById('sound-toggle');
+  var knob=document.getElementById('sound-knob');
+  if(lbl) lbl.textContent=_soundEnabled?'Açık':'Kapalı';
+  if(tog) tog.style.background=_soundEnabled?'var(--g)':'#c7c7cc';
+  if(knob) knob.style.left=_soundEnabled?'20px':'2px';
+}
+
 var _CURRENCIES={
   'TRY':{sym:'₺',locale:'tr-TR',pos:'before'},
   'USD':{sym:'$',locale:'en-US',pos:'before'},
@@ -5592,6 +5660,7 @@ function renderMotivation(d){
 }
 
 // ── BAR CHART ─────────────────────────────────────────────────────────────────
+var _barCols=[], _barYear=new Date().getFullYear();
 function drawBar(data){
   var cv=document.getElementById('barChart');
   var W=cv.parentElement.clientWidth||400, H=190;
@@ -5602,6 +5671,7 @@ function drawBar(data){
   data.forEach(function(d){if(d.gelir>maxVal)maxVal=d.gelir;if(d.gider>maxVal)maxVal=d.gider});
   if(!maxVal)maxVal=1;
   var p={t:10,r:10,b:28,l:52}, cw=W-p.l-p.r, ch=H-p.t-p.b, gap=cw/12, bw=gap*0.28;
+  _barCols=[]; _barYear=(_heroPeriod==='year')?_heroYear:curYear;
   ctx.strokeStyle='#d1d1d6'; ctx.lineWidth=1;
   [0,.25,.5,.75,1].forEach(function(f){
     var y=p.t+ch*(1-f);
@@ -5611,6 +5681,7 @@ function drawBar(data){
   });
   data.forEach(function(d,i){
     var x=p.l+i*gap+gap/2;
+    _barCols.push({month:i+1, x:x, halfGap:gap/2});
     var gh=ch*(d.gelir/maxVal), eh=ch*(d.gider/maxVal);
     if(d.gelir>0){ctx.fillStyle='#30d15870';ctx.beginPath();rr(ctx,x-bw-2,p.t+ch-gh,bw,gh,3);ctx.fill()}
     if(d.gider>0){ctx.fillStyle='#ff453a70';ctx.beginPath();rr(ctx,x+2,p.t+ch-eh,bw,eh,3);ctx.fill()}
@@ -5621,6 +5692,19 @@ function drawBar(data){
     ctx.fillStyle='#475569';ctx.font='9px Inter,system-ui';ctx.textAlign='center';
     ctx.fillText(MONTHS[i+1].slice(0,3),x,H-6);
   });
+  cv.style.cursor='pointer';
+  cv.onclick=function(e){
+    var rect=cv.getBoundingClientRect();
+    var mx=(e.clientX-rect.left)*(cv.width/rect.width);
+    for(var i=0;i<_barCols.length;i++){
+      if(Math.abs(mx-_barCols[i].x)<=_barCols[i].halfGap){
+        var mo=String(_barCols[i].month).padStart(2,'0');
+        filterLedgerToMonth(_barYear+'-'+mo);
+        playClick();
+        return;
+      }
+    }
+  };
 }
 function rr(ctx,x,y,w,h,r){
   if(h<=0)return;
