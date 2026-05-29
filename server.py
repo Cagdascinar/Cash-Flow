@@ -8569,3 +8569,21 @@ if __name__ == "__main__":
 init_db()
 _backup_thread = threading.Thread(target=_daily_backup_loop, daemon=True)
 _backup_thread.start()
+
+def _register_tg_webhook():
+    if not TELEGRAM_TOKEN or not APP_URL:
+        return
+    try:
+        import time as _time
+        _time.sleep(3)  # gunicorn'un tam ayağa kalkmasını bekle
+        r = requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook",
+            json={"url": f"{APP_URL}/api/telegram/webhook"},
+            timeout=10
+        )
+        log.info("Telegram webhook: %s", r.json())
+    except Exception as e:
+        log.warning("Telegram webhook kayıt hatası: %s", e)
+
+_tg_thread = threading.Thread(target=_register_tg_webhook, daemon=True)
+_tg_thread.start()
