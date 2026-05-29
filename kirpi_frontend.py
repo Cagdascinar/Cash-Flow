@@ -227,9 +227,9 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
 .more-sheet.open{transform:translateY(0)}
 .more-backdrop.open{display:block}
 .more-sheet-handle{width:40px;height:4px;border-radius:3px;background:var(--bg4);
-                   margin:14px auto 6px}
-.more-sheet-title{font-size:.68rem;font-weight:800;text-transform:uppercase;
-                  letter-spacing:.12em;color:var(--txt2);padding:8px 20px 12px;opacity:.6}
+                   margin:14px auto 6px;cursor:grab}
+.more-sect-label{font-size:.62rem;font-weight:800;text-transform:uppercase;
+                 letter-spacing:.12em;color:var(--txt2);padding:10px 20px 6px;opacity:.5}
 .more-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 14px 8px}
 .more-tile{display:flex;flex-direction:column;align-items:center;gap:7px;
            padding:16px 8px 14px;background:var(--bg3);border-radius:18px;cursor:pointer;
@@ -238,6 +238,7 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
 .more-tile .mt-ico{font-size:1.7rem;line-height:1}
 .more-tile .mt-lbl{font-size:.72rem;font-weight:700;color:var(--txt);text-align:center}
 .more-tile[data-sirket]{display:none}
+.more-tile[data-sirket].sirket-visible{display:flex}
 
 .nav-bottom{display:flex;align-items:center;gap:10px;padding:14px 16px;border-top:1px solid var(--border);cursor:pointer;transition:.12s}
 .nav-bottom:hover{background:var(--bg3)}
@@ -265,6 +266,23 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
 .stat .val{font-size:1.8rem;font-weight:800;letter-spacing:-.03em;line-height:1}
 .stat .sub{font-size:.75rem;color:var(--txt2);margin-top:6px}
 .stat .glow{position:absolute;width:60px;height:60px;border-radius:50%;filter:blur(25px);opacity:.35;right:-5px;top:-5px}
+/* Rate cards — dark by default, lighten in light mode */
+.rate-card{border-color:#3b82f622}
+.rate-usd{background:linear-gradient(135deg,#1e3a5f,#162a47)}
+.rate-eur{background:linear-gradient(135deg,#1a2f1a,#122012)}
+.rate-gbp{background:linear-gradient(135deg,#2a2010,#1c1508)}
+.rate-gold{background:linear-gradient(135deg,#271a08,#1c1205)}
+.rate-usd .val,.rate-eur .val,.rate-gbp .val,.rate-gold .val{color:#fff}
+.rate-usd .lbl,.rate-eur .lbl,.rate-gbp .lbl,.rate-gold .lbl{color:rgba(255,255,255,.7)}
+:root:not([data-theme="dark"]) .rate-usd{background:linear-gradient(135deg,#e8f0ff,#d6e4ff);border-color:#3b82f630}
+:root:not([data-theme="dark"]) .rate-eur{background:linear-gradient(135deg,#e8f9ef,#d4f5e2);border-color:#22c55e30}
+:root:not([data-theme="dark"]) .rate-gbp{background:linear-gradient(135deg,#fff8e6,#fff0c4);border-color:#f59e0b30}
+:root:not([data-theme="dark"]) .rate-gold{background:linear-gradient(135deg,#fff4e0,#ffe8b8);border-color:#f59e0b40}
+:root:not([data-theme="dark"]) .rate-usd .val{color:#1e3a5f}
+:root:not([data-theme="dark"]) .rate-eur .val{color:#1a5c2a}
+:root:not([data-theme="dark"]) .rate-gbp .val,:root:not([data-theme="dark"]) .rate-gold .val{color:#7a4a00}
+:root:not([data-theme="dark"]) .rate-usd .lbl,:root:not([data-theme="dark"]) .rate-eur .lbl,
+:root:not([data-theme="dark"]) .rate-gbp .lbl,:root:not([data-theme="dark"]) .rate-gold .lbl{color:rgba(0,0,0,.55)}
 .stat-bal{background:linear-gradient(135deg,#1e2845,#161c33);border-color:#6366f133}
 .stat-bal .glow{background:var(--b)}
 .stat-g{background:linear-gradient(135deg,#0d2118,#0a1a12);border-color:#22c55e22}
@@ -1004,8 +1022,9 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 <!-- ── MORE SHEET (mobile) ── -->
 <div class="more-backdrop" id="more-backdrop" onclick="closeMoreSheet()"></div>
 <div class="more-sheet" id="more-sheet">
-  <div class="more-sheet-handle"></div>
-  <div class="more-sheet-title">Tüm Sayfalar</div>
+  <div class="more-sheet-handle" id="more-sheet-handle"></div>
+
+  <div class="more-sect-label">Araçlar</div>
   <div class="more-grid">
     <div class="more-tile" onclick="goPageFromSheet('recurring')">
       <div class="mt-ico">🔁</div><div class="mt-lbl">Düzenli</div>
@@ -1022,22 +1041,30 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <div class="more-tile" onclick="goPageFromSheet('import')">
       <div class="mt-ico">📂</div><div class="mt-lbl">İçe Aktar</div>
     </div>
-    <div class="more-tile" onclick="goPageFromSheet('settings')">
-      <div class="mt-ico">⚙️</div><div class="mt-lbl">Ayarlar</div>
-    </div>
-    <div class="more-tile" data-sirket onclick="goPageFromSheet('supplier')">
-      <div class="mt-ico">🏭</div><div class="mt-lbl">Tedarikçi</div>
-    </div>
-    <div class="more-tile" data-sirket onclick="goPageFromSheet('assets')">
-      <div class="mt-ico">🚗</div><div class="mt-lbl">Kıymetler</div>
-    </div>
-    <div class="more-tile" data-sirket onclick="goPageFromSheet('cardreport')">
-      <div class="mt-ico">📊</div><div class="mt-lbl">Kart Raporu</div>
-    </div>
     <div class="more-tile" onclick="toggleDarkMode();closeMoreSheet()">
       <div class="mt-ico" id="dark-mode-sheet-ico">🌙</div><div class="mt-lbl" id="dark-mode-sheet-lbl">Karanlık</div>
     </div>
   </div>
+
+  <div class="more-sect-label" data-sirket style="display:none">Firma</div>
+  <div class="more-grid" id="more-sirket-grid" style="display:none">
+    <div class="more-tile" onclick="goPageFromSheet('supplier')">
+      <div class="mt-ico">🏭</div><div class="mt-lbl">Tedarikçi</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('assets')">
+      <div class="mt-ico">🚗</div><div class="mt-lbl">Kıymetler</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('cardreport')">
+      <div class="mt-ico">📊</div><div class="mt-lbl">Kart Raporu</div>
+    </div>
+  </div>
+
+  <div class="more-grid" style="margin-top:4px">
+    <div class="more-tile" onclick="goPageFromSheet('settings')" style="grid-column:1/-1;flex-direction:row;justify-content:center;gap:10px;padding:12px">
+      <div class="mt-ico" style="font-size:1.2rem">⚙️</div><div class="mt-lbl" style="font-size:.8rem">Ayarlar</div>
+    </div>
+  </div>
+  <div style="height:env(safe-area-inset-bottom,8px)"></div>
 </div>
 
 <!-- ── MAIN ── -->
@@ -1243,8 +1270,10 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     </select>
     <select class="filter-sel" id="ledger-f-cat" onchange="filterLedger()"><option value="">Tüm Kategoriler</option></select>
     <select class="filter-sel" id="f-year" onchange="onYearFilterChange()"></select>
-    <button class="btn btn-ghost" onclick="exportCsv()">⬇ CSV</button>
-    <button class="btn btn-ghost" onclick="exportPDF()" title="Aylık PDF Raporu">📄 PDF</button>
+    <div style="display:flex;gap:6px;flex-shrink:0">
+      <button class="btn btn-ghost" onclick="exportCsv()" title="CSV İndir" style="padding:7px 10px">⬇</button>
+      <button class="btn btn-ghost" onclick="exportPDF()" title="PDF Rapor" style="padding:7px 10px">📄</button>
+    </div>
   </div>
   <div class="ledger-toolbar" style="margin-top:-6px;margin-bottom:10px">
     <span style="font-size:.78rem;color:var(--txt2);white-space:nowrap">Tarih aralığı:</span>
@@ -1370,25 +1399,25 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 
   <!-- LIVE RATES -->
   <div class="grid4" style="margin-bottom:20px">
-    <div class="stat" style="background:linear-gradient(135deg,#1e3a5f,#162a47);border-color:#3b82f633">
+    <div class="stat rate-card rate-usd">
       <div class="glow" style="background:#3b82f6"></div>
       <div class="lbl">🇺🇸 USD/TRY</div>
       <div class="val" id="rate-usd">—</div>
       <div class="sub" id="rate-updated"></div>
     </div>
-    <div class="stat" style="background:linear-gradient(135deg,#1a2f1a,#122012);border-color:#22c55e33">
+    <div class="stat rate-card rate-eur">
       <div class="glow" style="background:#22c55e"></div>
       <div class="lbl">🇪🇺 EUR/TRY</div>
       <div class="val" id="rate-eur">—</div>
       <div class="sub"></div>
     </div>
-    <div class="stat" style="background:linear-gradient(135deg,#2a2010,#1c1508);border-color:#f59e0b33">
+    <div class="stat rate-card rate-gbp">
       <div class="glow" style="background:#f59e0b"></div>
       <div class="lbl">🇬🇧 GBP/TRY</div>
       <div class="val" id="rate-gbp">—</div>
       <div class="sub"></div>
     </div>
-    <div class="stat" style="background:linear-gradient(135deg,#271a08,#1c1205);border-color:#f59e0b55">
+    <div class="stat rate-card rate-gold">
       <div class="glow" style="background:#f59e0b"></div>
       <div class="lbl">🥇 Altın (g/TRY)</div>
       <div class="val" id="rate-gold">—</div>
@@ -2241,6 +2270,31 @@ function closeMoreSheet(){
   sh.classList.remove('open');
   document.body.style.overflow='';
 }
+// Swipe-down to close more-sheet
+(function(){
+  var sh, startY=0, dragging=false;
+  document.addEventListener('DOMContentLoaded',function(){
+    sh=document.getElementById('more-sheet');
+    if(!sh) return;
+    sh.addEventListener('touchstart',function(e){
+      if(e.touches[0].clientY < sh.getBoundingClientRect().top + 60){
+        startY=e.touches[0].clientY; dragging=true;
+      }
+    },{passive:true});
+    sh.addEventListener('touchmove',function(e){
+      if(!dragging) return;
+      var dy=e.touches[0].clientY - startY;
+      if(dy>0) sh.style.transform='translateY('+dy+'px)';
+    },{passive:true});
+    sh.addEventListener('touchend',function(e){
+      if(!dragging) return;
+      dragging=false;
+      var dy=e.changedTouches[0].clientY - startY;
+      sh.style.transform='';
+      if(dy>80) closeMoreSheet();
+    });
+  });
+})();
 function goPageFromSheet(id){
   closeMoreSheet();
   var el=document.querySelector('[data-page='+id+']');
@@ -2256,10 +2310,15 @@ var _curProfileType = 'sahis';
 function applyProfileType(ptype){
   _curProfileType = ptype || 'sahis';
   var isSirket = _curProfileType === 'sirket';
+  // Nav sidebar items
   document.querySelectorAll('[data-sirket]').forEach(function(el){
-    el.style.display = isSirket ? '' : 'none';
+    if(!el.classList.contains('more-tile') && el.id !== 'more-sirket-grid'){
+      el.style.display = isSirket ? '' : 'none';
+    }
   });
-  // If currently on a sirket-only page, redirect to dashboard
+  // More-sheet sirket section
+  var sirketGrid = document.getElementById('more-sirket-grid');
+  if(sirketGrid) sirketGrid.style.display = isSirket ? 'grid' : 'none';
   if(!isSirket){
     var cur = document.querySelector('.page.active');
     if(cur && ['page-supplier','page-assets','page-cardreport'].indexOf(cur.id) !== -1){
