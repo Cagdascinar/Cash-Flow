@@ -9,6 +9,7 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 from flask import Flask, request, jsonify, g, session, redirect, url_for
+from markupsafe import escape as html_escape
 from werkzeug.security import generate_password_hash, check_password_hash
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -16,6 +17,11 @@ log = logging.getLogger("kirpi")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+)
 
 limiter = Limiter(
     get_remote_address,
@@ -42,6 +48,33 @@ def validate_csrf():
 @app.errorhandler(429)
 def too_many_requests(e):
     return AUTH_HTML_render("login", "⛔ Çok fazla deneme yaptınız. Lütfen birkaç dakika bekleyin."), 429
+
+def _error_page(code, title, msg):
+    return f"""<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{code} — Kirpi</title>
+<style>*{{box-sizing:border-box;margin:0;padding:0}}
+body{{background:#f2f2f7;color:#1c1c1e;font-family:'Inter',system-ui,sans-serif;
+  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}}
+.box{{background:#fff;border-radius:20px;padding:40px 36px;text-align:center;max-width:380px;
+  box-shadow:0 4px 24px rgba(0,0,0,.08);border:1px solid #d1d1d6}}
+.code{{font-size:3rem;font-weight:900;color:#007aff;margin-bottom:8px}}
+h1{{font-size:1.2rem;font-weight:700;margin-bottom:10px}}
+p{{font-size:.88rem;color:#6d6d72;margin-bottom:24px;line-height:1.6}}
+a{{display:inline-block;background:#007aff;color:#fff;padding:11px 24px;
+  border-radius:10px;text-decoration:none;font-weight:700;font-size:.9rem}}
+a:hover{{background:#0062cc}}</style></head>
+<body><div class="box"><div class="code">{code}</div>
+<h1>{title}</h1><p>{msg}</p>
+<a href="/">Ana Sayfaya Dön</a></div></body></html>""", code
+
+@app.errorhandler(404)
+def not_found(_):
+    return _error_page(404, "Sayfa Bulunamadı", "Aradığınız sayfa mevcut değil veya taşınmış olabilir.")
+
+@app.errorhandler(500)
+def server_error(_):
+    return _error_page(500, "Sunucu Hatası", "Beklenmedik bir hata oluştu. Lütfen daha sonra tekrar deneyin.")
 
 @app.after_request
 def add_security_headers(resp):
@@ -855,6 +888,30 @@ def api_me_password():
         return jsonify({"ok": False, "error": "Şifreler eşleşmiyor"})
     db.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(new_pw), uid))
     db.commit()
+    return jsonify({"ok": True})
+
+@app.route("/api/me/delete", methods=["POST"])
+@login_required
+def api_me_delete():
+    uid  = session["user_id"]
+    data = request.get_json(force=True)
+    pw   = data.get("password", "")
+    db   = get_db()
+    user = db.execute("SELECT password_hash FROM users WHERE id=?", (uid,)).fetchone()
+    if not user or not check_password_hash(user["password_hash"], pw):
+        return jsonify({"ok": False, "error": "Şifre hatalı"}), 403
+    user_tables = [
+        "telegram_links", "telegram_link_codes", "telegram_pending",
+        "card_daily_balance", "asset_maintenance", "assets",
+        "supplier_invoices", "suppliers", "invoices", "accounts",
+        "investments", "recurring", "todos", "goals", "budgets",
+        "transactions", "cards", "profiles", "password_reset_tokens",
+    ]
+    with pg_connect() as con:
+        for tbl in user_tables:
+            con.execute(f"DELETE FROM {tbl} WHERE user_id=%s", (uid,))
+        con.execute("DELETE FROM users WHERE id=%s", (uid,))
+    session.clear()
     return jsonify({"ok": True})
 
 def get_pid():
@@ -5281,6 +5338,35 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     </a>
     <div style="font-size:.72rem;color:var(--txt2);margin-top:12px;text-align:center;opacity:.5">🦔 Kirpi</div>
   </div>
+
+  <!-- Hesap Sil -->
+  <div class="settings-card" style="border-color:rgba(255,59,48,.25)">
+    <div class="settings-sect-title" style="color:var(--r)">Tehlikeli Alan</div>
+    <p style="font-size:.82rem;color:var(--txt2);margin-bottom:14px;line-height:1.6">
+      Hesabınızı sildiğinizde tüm verileriniz (işlemler, kartlar, yatırımlar vb.) kalıcı olarak silinir. Bu işlem geri alınamaz.
+    </p>
+    <button onclick="showDeleteAccountModal()" style="width:100%;padding:11px;border-radius:10px;border:1.5px solid rgba(255,59,48,.4);background:rgba(255,59,48,.07);color:var(--r);font-weight:700;font-size:.88rem;cursor:pointer">
+      Hesabı Kalıcı Olarak Sil
+    </button>
+  </div>
+</div>
+
+<!-- Hesap Silme Modal -->
+<div id="delete-account-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border-radius:20px;padding:28px 24px;max-width:360px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.25)">
+    <div style="font-size:2rem;text-align:center;margin-bottom:12px">⚠️</div>
+    <h3 style="text-align:center;font-size:1.05rem;font-weight:800;margin-bottom:8px">Hesabı Sil</h3>
+    <p style="font-size:.82rem;color:var(--txt2);text-align:center;margin-bottom:20px;line-height:1.6">
+      Tüm verileriniz kalıcı olarak silinecek. Devam etmek için şifrenizi girin.
+    </p>
+    <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:6px">Şifreniz</label>
+    <input type="password" id="delete-account-pw" class="f-input" placeholder="••••••" style="margin-bottom:8px;width:100%">
+    <div id="delete-account-err" style="font-size:.8rem;color:var(--r);min-height:18px;margin-bottom:12px"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <button onclick="hideDeleteAccountModal()" class="btn btn-ghost">İptal</button>
+      <button onclick="confirmDeleteAccount()" style="padding:11px;border-radius:10px;border:none;background:var(--r);color:#fff;font-weight:700;cursor:pointer">Sil</button>
+    </div>
+  </div>
 </div>
 
 <!-- ── GÖREVLER (TODOS) ──────────────────────────────────────── -->
@@ -5490,6 +5576,27 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 <div id="toast"></div>
 
 <script>
+// ── ACCOUNT DELETION ─────────────────────────────────────────────────────────
+function showDeleteAccountModal(){
+  var m=document.getElementById('delete-account-modal');
+  m.style.display='flex';
+  document.getElementById('delete-account-pw').value='';
+  document.getElementById('delete-account-err').textContent='';
+}
+function hideDeleteAccountModal(){
+  document.getElementById('delete-account-modal').style.display='none';
+}
+function confirmDeleteAccount(){
+  var pw=document.getElementById('delete-account-pw').value;
+  var errEl=document.getElementById('delete-account-err');
+  if(!pw){errEl.textContent='Şifre boş olamaz';return;}
+  fetch('/api/me/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok){window.location.href='/login';}
+      else{errEl.textContent=d.error||'Bir hata oluştu';}
+    }).catch(()=>{errEl.textContent='Bağlantı hatası';});
+}
+
 // ── DARK MODE ────────────────────────────────────────────────────────────────
 function _syncDarkModeUI(){
   var isDark=document.documentElement.getAttribute('data-theme')==='dark';
@@ -8420,7 +8527,7 @@ def assetlinks():
 def index():
     display = session.get("display","")
     first_name = display.split()[0] if display.strip() else display
-    return HTML.replace("__USER_DISPLAY__", first_name)
+    return HTML.replace("__USER_DISPLAY__", str(html_escape(first_name)))
 
 # ── LEGAL PAGES ───────────────────────────────────────────────────────────────
 
@@ -8612,9 +8719,9 @@ def admin_panel():
     rows_html = ""
     for u in recent_users:
         rows_html += f"""<tr>
-        <td>{u['username']}</td>
-        <td>{u['display_name']}</td>
-        <td>{u['email']}</td>
+        <td>{html_escape(u['username'])}</td>
+        <td>{html_escape(u['display_name'])}</td>
+        <td>{html_escape(u['email'])}</td>
         <td style="color:#64748b;font-size:.8rem">{u['created_at'][:10]}</td>
         </tr>"""
 
