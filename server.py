@@ -42,6 +42,24 @@ def validate_csrf():
 @app.errorhandler(429)
 def too_many_requests(e):
     return AUTH_HTML_render("login", "⛔ Çok fazla deneme yaptınız. Lütfen birkaç dakika bekleyin."), 429
+
+@app.after_request
+def add_security_headers(resp):
+    resp.headers['X-Content-Type-Options'] = 'nosniff'
+    resp.headers['X-Frame-Options'] = 'DENY'
+    resp.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    if request.is_secure:
+        resp.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    resp.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "script-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'"
+    )
+    return resp
 # ── DATABASE ──────────────────────────────────────────────────────────────────
 def _pg_url():
     url = os.environ.get("DATABASE_URL", "")
@@ -3554,6 +3572,13 @@ HTML = r"""<!DOCTYPE html>
   --bg:#f2f2f7;--bg2:#ffffff;--bg3:#e5e5ea;--bg4:#d1d1d6;
   --g:#34c759;--r:#ff3b30;--b:#007aff;--b2:#5856d6;--y:#ff9500;--p:#af52de;--c:#32ade6;
   --txt:#1c1c1e;--txt2:#6d6d72;--border:#d1d1d6;--border2:#c6c6c8;
+}
+[data-theme="dark"]{
+  --bg:#0a0c12;--bg2:#111318;--bg3:#1e2233;--bg4:#2a3050;
+  --txt:#e2e8f0;--txt2:#94a3b8;--border:#1e2233;--border2:#2a3050;
+  --shadow:0 2px 16px rgba(0,0,0,.4);
+}
+:root{
   --radius:14px;--shadow:0 2px 16px rgba(0,0,0,.08);
   --font:'Inter',system-ui,sans-serif;
 }
@@ -4332,6 +4357,9 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .acc-act-btn{flex:1;padding:7px;border:none;border-radius:9px;font-size:.75rem;font-weight:700;cursor:pointer;transition:.1s;-webkit-tap-highlight-color:transparent}
 .acc-act-btn:active{opacity:.75}
 </style>
+<script>
+(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();
+</script>
 </head>
 <body>
 <div class="shell">
@@ -4395,12 +4423,17 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       <span class="ico">⚙️</span>Ayarlar
     </div>
   </div>
-  <div class="nav-bottom" onclick="goPage('settings',document.querySelector('[data-page=settings]'))">
-    <div id="sidebar-profile-avatar" style="width:36px;height:36px;border-radius:50%;background:var(--bg3);border:1.5px solid var(--border2);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1rem"></div>
-    <div style="min-width:0">
-      <div id="sidebar-profile-name" style="font-size:.8rem;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
-      <div style="font-size:.68rem;color:var(--txt2);opacity:.55">Ayarlar ›</div>
+  <div style="display:flex;align-items:center;border-top:1px solid var(--border)">
+    <div class="nav-bottom" onclick="goPage('settings',document.querySelector('[data-page=settings]'))" style="flex:1;border-top:none">
+      <div id="sidebar-profile-avatar" style="width:36px;height:36px;border-radius:50%;background:var(--bg3);border:1.5px solid var(--border2);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1rem"></div>
+      <div style="min-width:0">
+        <div id="sidebar-profile-name" style="font-size:.8rem;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
+        <div style="font-size:.68rem;color:var(--txt2);opacity:.55">Ayarlar ›</div>
+      </div>
     </div>
+    <button id="dark-mode-btn" onclick="toggleDarkMode()" title="Tema değiştir"
+      style="flex-shrink:0;border:none;background:transparent;cursor:pointer;font-size:1.2rem;padding:10px 14px;color:var(--txt2);transition:.15s;border-radius:10px"
+      onmouseenter="this.style.background='var(--bg3)'" onmouseleave="this.style.background='transparent'">🌙</button>
   </div>
 </nav>
 
@@ -4436,6 +4469,9 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     </div>
     <div class="more-tile" data-sirket onclick="goPageFromSheet('cardreport')">
       <div class="mt-ico">📊</div><div class="mt-lbl">Kart Raporu</div>
+    </div>
+    <div class="more-tile" onclick="toggleDarkMode();closeMoreSheet()">
+      <div class="mt-ico" id="dark-mode-sheet-ico">🌙</div><div class="mt-lbl" id="dark-mode-sheet-lbl">Karanlık</div>
     </div>
   </div>
 </div>
@@ -5454,6 +5490,24 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 <div id="toast"></div>
 
 <script>
+// ── DARK MODE ────────────────────────────────────────────────────────────────
+function _syncDarkModeUI(){
+  var isDark=document.documentElement.getAttribute('data-theme')==='dark';
+  var btn=document.getElementById('dark-mode-btn');
+  var ico=document.getElementById('dark-mode-sheet-ico');
+  var lbl=document.getElementById('dark-mode-sheet-lbl');
+  if(btn) btn.textContent=isDark?'☀️':'🌙';
+  if(ico) ico.textContent=isDark?'☀️':'🌙';
+  if(lbl) lbl.textContent=isDark?'Aydınlık':'Karanlık';
+}
+function toggleDarkMode(){
+  var isDark=document.documentElement.getAttribute('data-theme')==='dark';
+  var next=isDark?'light':'dark';
+  document.documentElement.setAttribute('data-theme',next);
+  localStorage.setItem('theme',next);
+  _syncDarkModeUI();
+}
+
 // ── GLOBALS ──────────────────────────────────────────────────────────────────
 var MONTHS=['','Ocak','Şubat','Mart','Nisan','Mayıs','Haziran',
             'Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
@@ -5467,6 +5521,7 @@ var _todayDate=new Date().toISOString().split('T')[0];
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
 window.onload=function(){
+  _syncDarkModeUI();
   var todayISO=new Date().toISOString().split('T')[0];
   document.getElementById('f-date').value=todayISO;
   var dpick=document.getElementById('today-date-pick');
