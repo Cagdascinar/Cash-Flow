@@ -1497,9 +1497,128 @@ def export_excel():
 
     wb = Workbook()
 
-    # ── Sheet 1: Tedarikçi Faturalar ──────────────────────────────────────────
-    ws1 = wb.active
-    ws1.title = "Tedarikci Faturalar"
+    # ── Sheet 1: Hesap Hareketleri ────────────────────────────────────────────
+    ws0 = wb.active
+    ws0.title = "Hesap Hareketleri"
+    txs = db.execute(
+        "SELECT * FROM transactions WHERE profile_id=? ORDER BY date DESC, id DESC", (pid,)
+    ).fetchall()
+    profile_row = db.execute("SELECT name FROM profiles WHERE id=?", (pid,)).fetchone()
+    profile_name = profile_row["name"] if profile_row else ""
+
+    ws0.merge_cells("A1:F1")
+    c = ws0["A1"]
+    c.value = f"🦔 KIRPI — HESAP HAREKETLERİ"
+    c.font = Font(name="Calibri", bold=True, size=16, color=WHITE)
+    c.fill = navy_fill()
+    c.alignment = center()
+    ws0.row_dimensions[1].height = 36
+
+    ws0.merge_cells("A2:F2")
+    c2 = ws0["A2"]
+    c2.value = f"{profile_name}  •  {today_d.strftime('%d.%m.%Y')}  •  {len(txs)} işlem"
+    c2.font = Font(name="Calibri", size=10, color="A0AEC0")
+    c2.fill = navy_fill()
+    c2.alignment = center()
+    ws0.row_dimensions[2].height = 20
+
+    write_col_headers(ws0, 3, ["Tarih","Tür","Kategori","Açıklama","Tutar","Not"],
+                      [14, 10, 18, 32, 14, 20])
+    ws0.freeze_panes = "A4"
+    ws0.auto_filter.ref = "A3:F3"
+
+    gelir_total = 0.0
+    gider_total = 0.0
+    GREEN_LIGHT = "D6F5E3"
+    RED_LIGHT   = "FDE8E8"
+
+    for ri, row in enumerate(txs):
+        dr = 4 + ri
+        is_gelir = row["type"] == "gelir"
+        amt = float(row["amount"])
+        if is_gelir: gelir_total += amt
+        else:        gider_total += amt
+
+        row_fill = PatternFill("solid", fgColor=(GREEN_LIGHT if is_gelir else RED_LIGHT) if ri%2==0
+                               else ("EDFAF3" if is_gelir else "FAF0F0"))
+        vals = [row["date"],
+                "Gelir" if is_gelir else "Gider",
+                row["category"] or "",
+                row["description"] or "",
+                amt,
+                row["note"] or ""]
+        for ci, v in enumerate(vals, 1):
+            c = ws0.cell(row=dr, column=ci, value=v)
+            c.fill   = row_fill
+            c.border = thin_border()
+            if ci == 1:
+                c.font = body_font(size=10, color="555555")
+                c.alignment = center()
+            elif ci == 2:
+                c.font = Font(name="Calibri", bold=True, size=10,
+                              color=GREEN if is_gelir else RED)
+                c.alignment = center()
+            elif ci == 5:
+                c.font = Font(name="Calibri", bold=True, size=10,
+                              color=GREEN if is_gelir else RED)
+                c.number_format = '#,##0.00'
+                c.alignment = center()
+            else:
+                c.font = body_font(size=10)
+                c.alignment = left()
+        ws0.row_dimensions[dr].height = 18
+
+    # Totals row
+    tot_row = 4 + len(txs) + 1
+    ws0.merge_cells(f"A{tot_row}:D{tot_row}")
+    tc = ws0.cell(row=tot_row, column=1, value="TOPLAM")
+    tc.font = Font(name="Calibri", bold=True, size=11, color=WHITE)
+    tc.fill = navy_fill(); tc.alignment = center()
+    for ci, (v, col) in enumerate([(gelir_total, GREEN),(gider_total, RED)], 5):
+        c = ws0.cell(row=tot_row, column=ci, value=v)
+        c.font = Font(name="Calibri", bold=True, size=11, color=col)
+        c.fill = navy_fill(); c.number_format = '#,##0.00'; c.alignment = center()
+    ws0.row_dimensions[tot_row].height = 26
+
+    # ── Sheet 2: Aylık Özet ───────────────────────────────────────────────────
+    ws_mo = wb.create_sheet("Aylik Ozet")
+    ws_mo.merge_cells("A1:E1")
+    c = ws_mo["A1"]
+    c.value = "🦔 KIRPI — AYLIK ÖZET"
+    c.font = Font(name="Calibri", bold=True, size=16, color=WHITE)
+    c.fill = navy_fill(); c.alignment = center()
+    ws_mo.row_dimensions[1].height = 36
+    write_col_headers(ws_mo, 2, ["Yıl","Ay","Gelir","Gider","Net"], [8,14,16,16,16])
+    ws_mo.freeze_panes = "A3"
+
+    from collections import defaultdict
+    monthly = defaultdict(lambda: {"gelir":0.0,"gider":0.0})
+    for row in txs:
+        try:
+            ym = row["date"][:7]
+            monthly[ym][row["type"]] += float(row["amount"])
+        except: pass
+    MONTHS_TR = ["","Ocak","Şubat","Mart","Nisan","Mayıs","Haziran",
+                 "Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"]
+    for ri, ym in enumerate(sorted(monthly.keys(), reverse=True)):
+        dr = 3 + ri
+        yr, mo = int(ym[:4]), int(ym[5:7])
+        g = monthly[ym]["gelir"]; gz = monthly[ym]["gider"]; net = g - gz
+        row_fill = gray_fill() if ri%2==0 else PatternFill("solid", fgColor=WHITE)
+        for ci, v in enumerate([yr, MONTHS_TR[mo] if mo<=12 else mo, g, gz, net], 1):
+            c = ws_mo.cell(row=dr, column=ci, value=v)
+            c.fill = row_fill; c.border = thin_border()
+            if ci in (3,4,5):
+                c.number_format = '#,##0.00'
+                c.font = Font(name="Calibri", bold=(ci==5), size=10,
+                              color=(GREEN if (ci==5 and net>=0) else (RED if ci==5 else "1C1C1E")))
+                c.alignment = center()
+            else:
+                c.font = body_font(size=10); c.alignment = center()
+        ws_mo.row_dimensions[dr].height = 18
+
+    # ── Sheet 3: Tedarikçi Faturalar ──────────────────────────────────────────
+    ws1 = wb.create_sheet("Tedarikci Faturalar")
     data_row = write_sheet_header(ws1, "TEDARİKÇİ FATURALARI",
                                   f"Oluşturma Tarihi: {today_d.strftime('%d.%m.%Y')}")
     cols = ["Tedarikçi","Fatura No","Tutar","Para Birimi","Fatura Tarihi","Vade Tarihi","Durum","Notlar"]
@@ -4471,16 +4590,12 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 
   <!-- Ses -->
   <div class="settings-card">
-    <div class="settings-sect-title">Ses</div>
     <div style="display:flex;align-items:center;justify-content:space-between">
-      <div>
-        <div style="font-size:.88rem;font-weight:600;color:var(--txt)">🔔 Tıklama Sesi</div>
-        <div style="font-size:.75rem;color:var(--txt2)">Kirpi'ye özgü premium ses tonu</div>
-      </div>
+      <div style="font-size:.88rem;font-weight:600;color:var(--txt)">🔔 Ses</div>
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-        <span id="sound-lbl" style="font-size:.8rem;color:var(--txt2)">Açık</span>
-        <div id="sound-toggle" onclick="toggleSound(!_soundEnabled)" style="width:44px;height:26px;border-radius:13px;background:var(--g);cursor:pointer;position:relative;transition:background .2s">
-          <div id="sound-knob" style="width:22px;height:22px;border-radius:50%;background:#fff;position:absolute;top:2px;left:20px;transition:left .2s;box-shadow:0 1px 4px rgba(0,0,0,.25)"></div>
+        <span id="sound-lbl" style="font-size:.8rem;color:var(--txt2)">Kapalı</span>
+        <div id="sound-toggle" onclick="toggleSound(!_soundEnabled)" style="width:44px;height:26px;border-radius:13px;background:#c7c7cc;cursor:pointer;position:relative;transition:background .2s">
+          <div id="sound-knob" style="width:22px;height:22px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 4px rgba(0,0,0,.25)"></div>
         </div>
       </label>
     </div>
@@ -5442,7 +5557,7 @@ function loadDashboard(){
 }
 
 // ── SES SİSTEMİ ──────────────────────────────────────────────────────────────
-var _soundEnabled=(localStorage.getItem('kirpi_sound')!=='0');
+var _soundEnabled=(localStorage.getItem('kirpi_sound')==='1');
 var _audioCtx=null;
 function _getACtx(){
   if(!_audioCtx||_audioCtx.state==='closed')
@@ -5455,19 +5570,13 @@ function playClick(){
   try{
     var ctx=_getACtx(), t=ctx.currentTime;
     var master=ctx.createGain();
-    master.gain.setValueAtTime(0.13,t);
-    master.gain.exponentialRampToValueAtTime(0.001,t+0.18);
+    master.gain.setValueAtTime(0.06,t);
+    master.gain.exponentialRampToValueAtTime(0.001,t+0.07);
     master.connect(ctx.destination);
-    // C6 (1047Hz) temel ton
     var o1=ctx.createOscillator(); o1.type='sine';
-    o1.frequency.setValueAtTime(1047,t);
-    o1.frequency.exponentialRampToValueAtTime(900,t+0.18);
-    o1.connect(master); o1.start(t); o1.stop(t+0.18);
-    // G6 (1568Hz) harmonik – sıcaklık katar
-    var o2=ctx.createOscillator(); o2.type='sine';
-    o2.frequency.setValueAtTime(1568,t);
-    var g2=ctx.createGain(); g2.gain.value=0.35;
-    o2.connect(g2); g2.connect(master); o2.start(t); o2.stop(t+0.10);
+    o1.frequency.setValueAtTime(820,t);
+    o1.frequency.exponentialRampToValueAtTime(680,t+0.07);
+    o1.connect(master); o1.start(t); o1.stop(t+0.07);
   }catch(e){}
 }
 function toggleSound(on){
