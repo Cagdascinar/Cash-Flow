@@ -914,7 +914,7 @@ def summary():
         start = "0001-01-01"
         end   = "9999-12-31"
     else:  # month (default)
-        start, end = month_range(today_d.year, today_d.month)
+        start, end = month_range(year, month)
     rows = db.execute(
         "SELECT type,category,SUM(amount) as total FROM transactions "
         "WHERE profile_id=? AND date BETWEEN ? AND ? GROUP BY type,category", (pid, start, end)).fetchall()
@@ -5667,7 +5667,7 @@ function changeHeroYear(delta){
 function updateHeroLabel(){
   var lbl=document.getElementById('hero-bal-lbl');
   if(!lbl) return;
-  if(_heroPeriod==='month') lbl.textContent='BU AY NET';
+  if(_heroPeriod==='month') lbl.textContent=(_MONTHS_TR[curMonth-1]||'AY').toUpperCase()+' '+curYear+' NET';
   else if(_heroPeriod==='year') lbl.textContent=_heroYear+' YILI NET';
   else lbl.textContent='TÜM ZAMANLAR';
 }
@@ -5678,6 +5678,8 @@ function loadDashboard(){
     url='/api/summary?start='+_rangeStart+'&end='+_rangeEnd;
   } else if(_heroPeriod==='year'){
     url='/api/summary?period=year&year='+_heroYear;
+  } else if(_heroPeriod==='month'){
+    url='/api/summary?period=month&year='+curYear+'&month='+curMonth;
   } else {
     url='/api/summary?period='+_heroPeriod;
   }
