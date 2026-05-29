@@ -3296,10 +3296,6 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .f-input:focus{border-color:var(--b2)}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
 @media(max-width:500px){.form-row{grid-template-columns:1fr}}
-.day-btn{padding:7px 2px;border:1.5px solid var(--border2);border-radius:7px;font-size:.76rem;font-weight:600;color:var(--txt2);cursor:pointer;background:var(--bg3);text-align:center;transition:.12s;user-select:none;-webkit-tap-highlight-color:transparent}
-.day-btn:hover{border-color:var(--b);color:var(--b)}
-.day-btn.sel{background:var(--b);color:#fff;border-color:var(--b)}
-.day-btn:active{opacity:.7}
 .type-tabs{display:flex;gap:8px;margin-bottom:16px}
 .type-tab{flex:1;padding:10px;border-radius:9px;border:2px solid var(--border2);
   font-weight:600;font-size:.85rem;cursor:pointer;transition:.2s;background:var(--bg3);color:var(--txt2)}
@@ -4394,13 +4390,14 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
         <input class="f-input" type="text" inputmode="decimal" data-num id="rec-amount" placeholder="0,00">
       </div>
       <div style="margin-bottom:14px">
-        <label style="display:block;margin-bottom:6px">Her ayın hangi günleri? <span id="rec-days-lbl" style="font-size:.75rem;color:var(--b);font-weight:700"></span></label>
-        <div id="rec-days-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px"></div>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <button type="button" onclick="recDaysPreset([1,15])" class="btn btn-ghost" style="font-size:.7rem;padding:4px 10px">1 & 15</button>
-          <button type="button" onclick="recDaysPreset([1,8,15,22])" class="btn btn-ghost" style="font-size:.7rem;padding:4px 10px">Haftalık×4</button>
-          <button type="button" onclick="recDaysSelectAll(false)" class="btn btn-ghost" style="font-size:.7rem;padding:4px 10px">Temizle</button>
+        <label style="display:block;margin-bottom:8px">Her ayın hangi günleri?</label>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+          <input id="rec-day-input" type="number" min="1" max="31" placeholder="Gün (1-31)"
+            class="f-input" style="width:130px;margin-bottom:0"
+            onkeydown="if(event.key==='Enter'){recAddDay();event.preventDefault()}">
+          <button type="button" onclick="recAddDay()" class="btn btn-primary" style="padding:10px 16px;white-space:nowrap">+ Ekle</button>
         </div>
+        <div id="rec-days-list" style="display:flex;flex-direction:column;gap:6px"></div>
       </div>
       <div style="margin-bottom:12px"><label>Kategori</label><select class="f-input" id="rec-cat"></select></div>
       <div style="margin-bottom:20px"><label>Açıklama</label><input class="f-input" type="text" id="rec-desc" placeholder="örn. Maaş, Kira, Elektrik"></div>
@@ -6560,43 +6557,39 @@ var recTab = 'gelir';
 
 var _recSelDays = [];
 
-function _buildDayGrid(){
-  var grid = document.getElementById('rec-days-grid');
-  if(!grid) return;
-  grid.innerHTML = '';
-  for(var i=1; i<=31; i++){
-    (function(day){
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = day;
-      btn.className = 'day-btn' + (_recSelDays.indexOf(day)>=0?' sel':'');
-      btn.onclick = function(){
-        var idx = _recSelDays.indexOf(day);
-        if(idx>=0) _recSelDays.splice(idx,1); else _recSelDays.push(day);
-        _recSelDays.sort(function(a,b){return a-b});
-        _buildDayGrid();
-        _updateDaysLbl();
-      };
-      grid.appendChild(btn);
-    })(i);
+function _renderDaysList(){
+  var el = document.getElementById('rec-days-list');
+  if(!el) return;
+  if(!_recSelDays.length){
+    el.innerHTML = '<div style="font-size:.78rem;color:var(--txt2);padding:4px 0">Henüz gün eklenmedi</div>';
+    return;
   }
+  el.innerHTML = _recSelDays.map(function(d){
+    return '<div style="display:flex;align-items:center;justify-content:space-between;'+
+      'padding:9px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:10px">'+
+      '<span style="font-size:.88rem;font-weight:600;color:var(--txt)">Her ayın <strong>'+d+'. günü</strong></span>'+
+      '<button type="button" onclick="recRemoveDay('+d+')" style="background:none;border:none;'+
+      'color:var(--txt2);font-size:1rem;cursor:pointer;padding:0 4px;line-height:1">✕</button>'+
+      '</div>';
+  }).join('');
 }
 
-function _updateDaysLbl(){
-  var lbl = document.getElementById('rec-days-lbl');
-  if(!lbl) return;
-  if(!_recSelDays.length){ lbl.textContent=''; return; }
-  lbl.textContent = _recSelDays.join(', ')+'. gün';
+function recAddDay(){
+  var inp = document.getElementById('rec-day-input');
+  var d = parseInt(inp.value);
+  if(!d || d<1 || d>31){ toast('1-31 arası bir gün giriniz'); return; }
+  if(_recSelDays.indexOf(d)>=0){ toast(d+'. gün zaten ekli'); inp.value=''; return; }
+  _recSelDays.push(d);
+  _recSelDays.sort(function(a,b){return a-b});
+  inp.value='';
+  inp.focus();
+  _renderDaysList();
 }
 
-function recDaysPreset(days){
-  _recSelDays = days.slice();
-  _buildDayGrid(); _updateDaysLbl();
-}
-
-function recDaysSelectAll(on){
-  _recSelDays = on ? Array.from({length:31},function(_,i){return i+1}) : [];
-  _buildDayGrid(); _updateDaysLbl();
+function recRemoveDay(d){
+  var idx = _recSelDays.indexOf(d);
+  if(idx>=0) _recSelDays.splice(idx,1);
+  _renderDaysList();
 }
 
 function initRecurringPage(){
@@ -6608,7 +6601,7 @@ function initRecurringPage(){
     ys.innerHTML += '<option value="'+y+'"'+(y===now?' selected':'')+'>'+y+'</option>';
   }
   if(!_recSelDays.length) _recSelDays = [1];
-  _buildDayGrid(); _updateDaysLbl();
+  _renderDaysList();
   loadRecurring();
 }
 
@@ -6665,7 +6658,7 @@ function addRecurring(){
       toast('Şablon kaydedildi ✓');
       document.getElementById('rec-amount').value = '';
       document.getElementById('rec-desc').value = '';
-      _recSelDays = [1]; _buildDayGrid(); _updateDaysLbl();
+      _recSelDays = []; _renderDaysList();
       loadRecurring();
     }
   });
