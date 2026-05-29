@@ -3083,18 +3083,77 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
 .nav-logo .brand{font-size:1.1rem;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
 .nav-logo .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--b2)}
 .nav-logo .sub{font-size:.72rem;color:var(--txt2);margin-top:2px;padding-left:16px}
-.nav-links{flex:1;padding:4px 8px;display:flex;flex-direction:column;gap:2px}
-.nl{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;
-    cursor:pointer;color:var(--txt2);font-size:.88rem;font-weight:500;transition:.15s;user-select:none}
+.nav-links{flex:1;padding:4px 8px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+.nav-sect{font-size:.57rem;text-transform:uppercase;letter-spacing:.13em;color:var(--txt2);
+          font-weight:700;padding:12px 12px 3px;opacity:.45;pointer-events:none}
+.nl{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;
+    cursor:pointer;color:var(--txt2);font-size:.86rem;font-weight:500;transition:.14s;
+    user-select:none;position:relative}
 .nl:hover{background:var(--bg3);color:var(--txt)}
-.nl.active{background:rgba(0,122,255,.1);color:var(--b);
-  border:1px solid rgba(0,122,255,.18)}
-.nl .ico{font-size:1.1rem;width:22px;text-align:center}
+.nl.active{background:rgba(0,122,255,.09);color:var(--b);font-weight:600;
+  box-shadow:inset 3px 0 0 var(--b)}
+.nl .ico{font-size:1.1rem;width:22px;text-align:center;flex-shrink:0}
+
+/* ── MOBILE NAV ── */
 @media(max-width:768px){
   .nav-links{flex-direction:row;padding:0;gap:0;justify-content:space-around;align-items:center;height:100%}
-  .nl{flex-direction:column;gap:2px;font-size:.65rem;padding:4px 12px}
-  .nl .ico{font-size:1.2rem}
+  .nav-sect{display:none}
+  .nl{flex-direction:column;gap:1px;font-size:.6rem;padding:4px 6px;min-width:48px;flex:1;
+      max-width:72px;border-radius:0;box-shadow:none;background:transparent!important}
+  .nl .ico{font-size:1.22rem;width:auto;transition:transform .18s cubic-bezier(.34,1.56,.64,1)}
+  .nl span:not(.ico){color:var(--txt2);transition:color .15s;font-weight:500}
+  /* Active: blue dot above label + icon pops */
+  .nl.active .ico{transform:scale(1.12)}
+  .nl.active span:not(.ico){color:var(--b);font-weight:700}
+  .nl::after{content:'';display:block;width:18px;height:3px;border-radius:2px;
+             background:transparent;margin:1px auto 0;transition:background .2s}
+  .nl.active::after{background:var(--b)}
+  .nl-add::after,.nl-more::after{display:none}
 }
+
+/* ── ADD BUTTON (mobile center) ── */
+@media(max-width:768px){
+  .nl-add{flex:0 0 64px;position:relative}
+  .nl-add .ico{
+    background:linear-gradient(135deg,#007aff,#5856d6);
+    color:#fff;border-radius:50%;
+    width:46px;height:46px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:1.4rem;
+    box-shadow:0 4px 18px rgba(0,122,255,.45);
+    margin-top:-20px;
+    border:3px solid var(--bg);
+  }
+  .nl-add span:not(.ico){color:var(--b);font-weight:700}
+  /* More button */
+  .nl-more .ico{font-size:1.4rem}
+}
+
+/* ── MORE SHEET ── */
+.more-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);
+               z-index:9000;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.more-sheet{position:fixed;bottom:0;left:0;right:0;
+            background:var(--bg2);border-radius:22px 22px 0 0;
+            z-index:9001;padding:0 0 env(safe-area-inset-bottom,12px);
+            box-shadow:0 -6px 32px rgba(0,0,0,.18);
+            transform:translateY(100%);transition:transform .32s cubic-bezier(.4,0,.2,1);
+            max-height:80vh;overflow-y:auto}
+.more-sheet.open{transform:translateY(0)}
+.more-backdrop.open{display:block}
+.more-sheet-handle{width:38px;height:4px;border-radius:2px;background:var(--border2);
+                   margin:12px auto 16px}
+.more-sheet-title{font-size:.72rem;font-weight:700;text-transform:uppercase;
+                  letter-spacing:.1em;color:var(--txt2);padding:0 20px 10px}
+.more-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+           background:var(--border);margin:0 0 2px}
+.more-tile{display:flex;flex-direction:column;align-items:center;gap:6px;
+           padding:18px 8px 16px;background:var(--bg2);cursor:pointer;
+           transition:.12s;-webkit-tap-highlight-color:transparent}
+.more-tile:active{background:var(--bg3)}
+.more-tile .mt-ico{font-size:1.6rem;line-height:1}
+.more-tile .mt-lbl{font-size:.72rem;font-weight:600;color:var(--txt);text-align:center}
+.more-tile[data-sirket]{display:none}
+
 .nav-bottom{padding:16px;border-top:1px solid var(--border);font-size:.72rem;color:var(--txt2);line-height:1.6}
 @media(max-width:768px){.nav-bottom{display:none}}
 
@@ -3599,23 +3658,6 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   nav{height:64px;padding:0;box-shadow:0 -1px 0 var(--border),0 -4px 16px rgba(0,0,0,.07)}
   .main{margin-bottom:64px}
   .nl-desktop{display:none!important}
-  .nav-links{justify-content:space-around}
-  .nl{border-radius:10px;padding:5px 8px;min-width:50px;gap:2px;flex:1;max-width:80px}
-  .nl.active{background:transparent;border:none}
-  .nl.active .ico{color:var(--b)}
-  .nl.active span:not(.ico){color:var(--b)}
-  .nl-add{flex:0 0 64px;position:relative}
-  .nl-add .ico{
-    background:linear-gradient(135deg,#007aff,#5856d6);
-    color:#fff;border-radius:50%;
-    width:44px;height:44px;
-    display:flex;align-items:center;justify-content:center;
-    font-size:1.3rem;
-    box-shadow:0 4px 14px rgba(0,122,255,.4);
-    margin-top:-18px;
-    border:3px solid var(--bg);
-  }
-  .nl-add span:not(.ico){color:var(--b);font-weight:700}
 }
 
 /* ── KIRPI WALK ANIMATION ────────────────────────────────────── */
@@ -3775,6 +3817,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <div class="sub">Nakit Akışı Takibi</div>
   </div>
   <div class="nav-links">
+    <div class="nav-sect">Ana</div>
     <div class="nl active" data-page="dashboard" onclick="goPage('dashboard',this)">
       <span class="ico">🏠</span>Anasayfa
     </div>
@@ -3784,13 +3827,18 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <div class="nl nl-add" data-page="add" onclick="goPage('add',this)">
       <span class="ico">➕</span>Ekle
     </div>
-    <div class="nl" data-page="recurring" onclick="goPage('recurring',this)">
-      <span class="ico">🔁</span>Düzenli
-    </div>
     <div class="nl" data-page="todos" onclick="goPage('todos',this)">
       <span class="ico">✅</span>Görevler
     </div>
-    <div class="nl" data-page="budget" onclick="goPage('budget',this)">
+    <div class="nl nl-more" onclick="openMoreSheet()">
+      <span class="ico">⋯</span>Daha
+    </div>
+
+    <div class="nav-sect">Araçlar</div>
+    <div class="nl nl-desktop" data-page="recurring" onclick="goPage('recurring',this)">
+      <span class="ico">🔁</span>Düzenli
+    </div>
+    <div class="nl nl-desktop" data-page="budget" onclick="goPage('budget',this)">
       <span class="ico">🎯</span>Tasarruf
     </div>
     <div class="nl nl-desktop" data-page="import" onclick="goPage('import',this)">
@@ -3802,6 +3850,8 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <div class="nl nl-desktop" data-page="cards" onclick="goPage('cards',this)">
       <span class="ico">💳</span>Kartlar
     </div>
+
+    <div class="nav-sect">Firma</div>
     <div class="nl nl-desktop" data-page="supplier" data-sirket onclick="goPage('supplier',this)">
       <span class="ico">🏭</span>Tedarikçi
     </div>
@@ -3811,14 +3861,52 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <div class="nl nl-desktop" data-page="cardreport" data-sirket onclick="goPage('cardreport',this)">
       <span class="ico">📊</span>Kart Raporu
     </div>
+
+    <div class="nav-sect">Sistem</div>
     <div class="nl nl-desktop" data-page="settings" onclick="goPage('settings',this)">
       <span class="ico">⚙️</span>Ayarlar
     </div>
   </div>
   <div class="nav-bottom">
-    <div style="font-size:.7rem;color:var(--txt2);padding:0 4px">v1.0</div>
+    <div style="font-size:.7rem;color:var(--txt2);opacity:.5">Kirpi v1.0</div>
   </div>
 </nav>
+
+<!-- ── MORE SHEET (mobile) ── -->
+<div class="more-backdrop" id="more-backdrop" onclick="closeMoreSheet()"></div>
+<div class="more-sheet" id="more-sheet">
+  <div class="more-sheet-handle"></div>
+  <div class="more-sheet-title">Tüm Sayfalar</div>
+  <div class="more-grid">
+    <div class="more-tile" onclick="goPageFromSheet('recurring')">
+      <div class="mt-ico">🔁</div><div class="mt-lbl">Düzenli</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('budget')">
+      <div class="mt-ico">🎯</div><div class="mt-lbl">Tasarruf</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('invest')">
+      <div class="mt-ico">📈</div><div class="mt-lbl">Yatırım</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('cards')">
+      <div class="mt-ico">💳</div><div class="mt-lbl">Kartlar</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('import')">
+      <div class="mt-ico">📂</div><div class="mt-lbl">İçe Aktar</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('settings')">
+      <div class="mt-ico">⚙️</div><div class="mt-lbl">Ayarlar</div>
+    </div>
+    <div class="more-tile" data-sirket onclick="goPageFromSheet('supplier')">
+      <div class="mt-ico">🏭</div><div class="mt-lbl">Tedarikçi</div>
+    </div>
+    <div class="more-tile" data-sirket onclick="goPageFromSheet('assets')">
+      <div class="mt-ico">🚗</div><div class="mt-lbl">Kıymetler</div>
+    </div>
+    <div class="more-tile" data-sirket onclick="goPageFromSheet('cardreport')">
+      <div class="mt-ico">📊</div><div class="mt-lbl">Kart Raporu</div>
+    </div>
+  </div>
+</div>
 
 <!-- ── MAIN ── -->
 <div class="main">
@@ -4950,6 +5038,29 @@ function goPage(id, el){
   } else {
     show();
   }
+}
+
+// ── MORE SHEET ───────────────────────────────────────────────────────────────
+function openMoreSheet(){
+  var bd=document.getElementById('more-backdrop');
+  var sh=document.getElementById('more-sheet');
+  if(!sh) return;
+  bd.classList.add('open');
+  sh.classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeMoreSheet(){
+  var bd=document.getElementById('more-backdrop');
+  var sh=document.getElementById('more-sheet');
+  if(!sh) return;
+  bd.classList.remove('open');
+  sh.classList.remove('open');
+  document.body.style.overflow='';
+}
+function goPageFromSheet(id){
+  closeMoreSheet();
+  var el=document.querySelector('[data-page='+id+']');
+  setTimeout(function(){ goPage(id, el); }, 200);
 }
 
 // ── PROFILE SWITCHER ─────────────────────────────────────────────────────────
