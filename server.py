@@ -3920,8 +3920,15 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       <option value="gider">Gider</option>
     </select>
     <select class="filter-sel" id="ledger-f-cat" onchange="filterLedger()"><option value="">Tüm Kategoriler</option></select>
-    <select class="filter-sel" id="f-year" onchange="filterLedger()"></select>
+    <select class="filter-sel" id="f-year" onchange="onYearFilterChange()"></select>
     <button class="btn btn-ghost" onclick="exportCsv()">⬇ CSV</button>
+  </div>
+  <div class="ledger-toolbar" style="margin-top:-6px;margin-bottom:10px">
+    <span style="font-size:.78rem;color:var(--txt2);white-space:nowrap">Tarih aralığı:</span>
+    <input type="date" class="filter-sel" id="f-date-from" onchange="filterLedger()" style="font-size:.8rem;padding:6px 8px">
+    <span style="font-size:.78rem;color:var(--txt2)">—</span>
+    <input type="date" class="filter-sel" id="f-date-to" onchange="filterLedger()" style="font-size:.8rem;padding:6px 8px">
+    <button class="btn btn-ghost" onclick="clearDateRange()" style="font-size:.78rem;padding:6px 10px">✕ Temizle</button>
   </div>
 
   <div id="monthly-summary" style="display:none;overflow-x:auto;margin-bottom:12px">
@@ -5809,14 +5816,28 @@ function filterLedger(){
   var ft=document.getElementById('f-type').value;
   var fc=document.getElementById('ledger-f-cat').value;
   var fy=document.getElementById('f-year').value;
+  var fd=document.getElementById('f-date-from').value;
+  var fdt=document.getElementById('f-date-to').value;
   filteredTx=allTx.filter(function(t){
-    if(fy&&!t.date.startsWith(fy))return false;
+    if(fd&&t.date<fd) return false;
+    if(fdt&&t.date>fdt) return false;
+    if(!fd&&!fdt&&fy&&!t.date.startsWith(fy)) return false;
     if(ft&&t.type!==ft)return false;
     if(fc&&t.category!==fc)return false;
     if(q&&!(t.description||'').toLowerCase().includes(q)&&!t.category.toLowerCase().includes(q)&&!t.date.includes(q))return false;
     return true;
   });
   renderLedger();
+}
+function onYearFilterChange(){
+  document.getElementById('f-date-from').value='';
+  document.getElementById('f-date-to').value='';
+  filterLedger();
+}
+function clearDateRange(){
+  document.getElementById('f-date-from').value='';
+  document.getElementById('f-date-to').value='';
+  filterLedger();
 }
 
 function renderLedger(){
@@ -5899,16 +5920,22 @@ function renderMonthlySummary(txList){
   wrap.style.display='block';
 }
 function filterLedgerToMonth(ym){
+  var yr=ym.split('-')[0], mo=ym.split('-')[1];
+  // Tarih aralığını ayın ilk ve son günü olarak set et
+  var lastDay=new Date(parseInt(yr),parseInt(mo),0).getDate();
+  var fd=document.getElementById('f-date-from');
+  var fdt=document.getElementById('f-date-to');
   var fy=document.getElementById('f-year');
   var ft=document.getElementById('f-type');
   var fc=document.getElementById('ledger-f-cat');
   var ls=document.getElementById('ledger-search');
-  var yr=ym.split('-')[0], mo=parseInt(ym.split('-')[1]);
-  if(fy){ fy.value=yr; }
+  if(fd) fd.value=yr+'-'+mo+'-01';
+  if(fdt) fdt.value=yr+'-'+mo+'-'+String(lastDay).padStart(2,'0');
+  if(fy) fy.value='';
+  if(ft) ft.value='';
   if(fc) fc.value='';
   if(ls) ls.value='';
-  filteredTx=allTx.filter(function(t){ return t.date&&t.date.startsWith(ym); });
-  renderLedger();
+  filterLedger();
 }
 
 function startEdit(td){
