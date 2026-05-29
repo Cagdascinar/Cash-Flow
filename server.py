@@ -4569,7 +4569,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       </div>
       <div class="mod-field">
         <div class="mod-label">Tutar (₺)</div>
-        <input class="mod-input" type="number" id="sup-inv-amount" placeholder="0">
+        <input class="mod-input" type="text" inputmode="decimal" id="sup-inv-amount" placeholder="1.234,56">
       </div>
     </div>
     <div class="mod-row">
@@ -4584,7 +4584,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     </div>
     <div class="mod-field">
       <div class="mod-label">Referans Faiz Oranı (%)</div>
-      <input class="mod-input" type="number" id="sup-inv-rate" value="50" placeholder="50">
+      <input class="mod-input" type="text" inputmode="decimal" id="sup-inv-rate" value="50" placeholder="50">
     </div>
     <div class="mod-field">
       <div class="mod-label">Notlar</div>
@@ -4629,13 +4629,13 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       </div>
       <div class="mod-field">
         <div class="mod-label">Alış Bedeli (₺)</div>
-        <input class="mod-input" type="number" id="asset-price" placeholder="0">
+        <input class="mod-input" type="text" inputmode="decimal" id="asset-price" placeholder="1.234,56">
       </div>
     </div>
     <div class="mod-row">
       <div class="mod-field">
         <div class="mod-label">Amortisman Oranı %</div>
-        <input class="mod-input" type="number" id="asset-dep-rate" placeholder="20">
+        <input class="mod-input" type="text" inputmode="decimal" id="asset-dep-rate" placeholder="20">
       </div>
       <div class="mod-field">
         <div class="mod-label">Sonraki Bakım</div>
@@ -5814,30 +5814,41 @@ function setDbView(v){
 }
 function changeYear(d){ curYear+=d; document.getElementById('ylabel').textContent=curYear+' Yılı'; loadDashboard(); }
 
-var _origLoadDashboard = loadDashboard;
 loadDashboard = function(){
   loadTodayWidgets();
-  if(dbView==='year'){
-    xhr('/api/summary?year='+curYear,null,function(d){
-      summaryData=d;
-      var totalG=0,totalE=0;
-      d.bar.forEach(function(m){totalG+=m.gelir;totalE+=m.gider});
-      renderStats({gelir:totalG,gider:totalE,net:totalG-totalE,balance:d.balance,
-                   gelir_cats:d.gelir_cats,gider_cats:d.gider_cats,budgets:d.budgets});
-      drawBar(d.bar);
-      drawDonut(d.gider_cats);
-      renderBudgetPage(d.gider_cats,d.budgets);
-      document.getElementById('db-sub').textContent=curYear+' yılı';
+  var reqId = ++_dashReqId;
+
+  // Hero period tabs (Ay / Yıl / Tüm Zamanlar) take priority
+  if(_heroPeriod === 'year'){
+    xhr('/api/summary?period=year&year='+_heroYear, null, function(d){
+      if(reqId !== _dashReqId) return;
+      summaryData=d; renderStats(d); drawBar(d.bar); drawDonut(d.gider_cats); renderBudgetPage(d.gider_cats,d.budgets);
     });
     xhr('/api/motivation',null,renderMotivation);
     return;
   }
-  xhr('/api/summary?year='+curYear+'&month='+curMonth,null,function(d){
-    summaryData=d;
-    renderStats(d);
-    drawBar(d.bar);
-    drawDonut(d.gider_cats);
-    renderBudgetPage(d.gider_cats,d.budgets);
+  if(_heroPeriod === 'all'){
+    xhr('/api/summary?period=all', null, function(d){
+      if(reqId !== _dashReqId) return;
+      summaryData=d; renderStats(d); drawBar(d.bar); drawDonut(d.gider_cats); renderBudgetPage(d.gider_cats,d.budgets);
+    });
+    xhr('/api/motivation',null,renderMotivation);
+    return;
+  }
+
+  // Month mode — use ledger year/month nav
+  if(dbView==='year'){
+    xhr('/api/summary?period=year&year='+curYear, null, function(d){
+      if(reqId !== _dashReqId) return;
+      summaryData=d; renderStats(d); drawBar(d.bar); drawDonut(d.gider_cats); renderBudgetPage(d.gider_cats,d.budgets);
+      var sub=document.getElementById('db-sub'); if(sub) sub.textContent=curYear+' yılı';
+    });
+    xhr('/api/motivation',null,renderMotivation);
+    return;
+  }
+  xhr('/api/summary?year='+curYear+'&month='+curMonth, null, function(d){
+    if(reqId !== _dashReqId) return;
+    summaryData=d; renderStats(d); drawBar(d.bar); drawDonut(d.gider_cats); renderBudgetPage(d.gider_cats,d.budgets);
   });
   xhr('/api/motivation',null,renderMotivation);
 };
@@ -6385,7 +6396,7 @@ function addTodo(){
   var inp = document.getElementById('todo-input');
   var text = inp.value.trim();
   if(!text) return;
-  xhr('/api/todos', {method:'POST',body:JSON.stringify({text:text,date:_todoDate})}, function(r){
+  xhr('/api/todos', {text:text,date:_todoDate}, function(r){
     if(r.ok){ inp.value=''; loadTodos(); }
   });
 }
@@ -6399,27 +6410,25 @@ function toggleTodo(id){
     if(chk){ chk.classList.add('popping'); setTimeout(function(){chk.classList.remove('popping')},300); }
   }
   if(!t.done && !t.archived){
-    xhr('/api/todos/'+id, {method:'PUT',body:JSON.stringify({done:1})}, function(r){
+    xhr('/api/todos/'+id, {done:1}, function(r){
       if(r.ok){
         if(el){ el.classList.add('archiving'); }
         setTimeout(function(){
-          xhr('/api/todos/'+id, {method:'PUT',body:JSON.stringify({archived:1})}, function(){
-            loadTodos();
-          });
+          xhr('/api/todos/'+id, {archived:1}, function(){ loadTodos(); }, true);
         }, 450);
       }
-    });
+    }, true);
   } else {
-    xhr('/api/todos/'+id, {method:'PUT',body:JSON.stringify({done:0,archived:0})}, function(r){
+    xhr('/api/todos/'+id, {done:0,archived:0}, function(r){
       if(r.ok) loadTodos();
-    });
+    }, true);
   }
 }
 
 function delTodo(id){
-  xhr('/api/todos/'+id, {method:'DELETE'}, function(r){
+  xhr('/api/todos/'+id, null, function(r){
     if(r.ok) loadTodos();
-  });
+  }, false, true);
 }
 
 function escHtml(s){
@@ -6538,37 +6547,37 @@ function saveSupInv(){
   var body = {
     supplier_name: document.getElementById('sup-inv-name').value.trim(),
     invoice_no: document.getElementById('sup-inv-no').value.trim(),
-    amount: parseFloat(document.getElementById('sup-inv-amount').value)||0,
+    amount: getNumVal(document.getElementById('sup-inv-amount')),
     invoice_date: document.getElementById('sup-inv-date').value,
     due_date: document.getElementById('sup-inv-due').value,
-    reference_rate: parseFloat(document.getElementById('sup-inv-rate').value)||50,
+    reference_rate: getNumVal(document.getElementById('sup-inv-rate'))||50,
     notes: document.getElementById('sup-inv-notes').value.trim()
   };
   if(!body.supplier_name || !body.amount || !body.due_date){
-    showToast('Tedarikçi, tutar ve vade zorunlu','error'); return;
+    showToast('Tedarikçi, tutar ve vade zorunlu','#ef4444'); return;
   }
-  var url = _editingSupInvId ? '/api/supplier-invoices/'+_editingSupInvId : '/api/supplier-invoices';
-  var method = _editingSupInvId ? 'PUT' : 'POST';
-  xhr(url, {method:method, body:JSON.stringify(body)}, function(r){
-    if(r.ok){
-      closeMod('mod-sup-inv');
-      showToast('Kaydedildi','success');
-      initSupplierPage();
-    }
-  });
+  if(_editingSupInvId){
+    xhr('/api/supplier-invoices/'+_editingSupInvId, body, function(r){
+      if(r.ok){ closeMod('mod-sup-inv'); toast('Kaydedildi'); initSupplierPage(); }
+    }, true);
+  } else {
+    xhr('/api/supplier-invoices', body, function(r){
+      if(r.ok){ closeMod('mod-sup-inv'); toast('Kaydedildi'); initSupplierPage(); }
+    });
+  }
 }
 
 function openPaySupInv(id, el){
   var inv = window._supInvData && window._supInvData[id];
   if(!inv) return;
   if(inv.status === 'odendi'){
-    showToast(inv.supplier_name+' zaten ödenmiş','info'); return;
+    toast(inv.supplier_name+' zaten ödenmiş'); return;
   }
   if(confirm(inv.supplier_name+' — '+fmt(inv.amount)+' ödenmiş olarak işaretlensin mi?')){
     xhr('/api/supplier-invoices/'+id+'/pay',
-        {method:'POST',body:JSON.stringify({paid_date:new Date().toISOString().slice(0,10)})},
+        {paid_date: new Date().toISOString().slice(0,10)},
         function(r){
-          if(r.ok){ showToast('Ödendi olarak işaretlendi','success'); initSupplierPage(); }
+          if(r.ok){ toast('Ödendi olarak işaretlendi'); initSupplierPage(); }
         });
   }
 }
@@ -6661,19 +6670,19 @@ function saveAsset(){
     asset_type: document.getElementById('asset-type').value,
     plate_no: document.getElementById('asset-plate').value.trim(),
     purchase_date: document.getElementById('asset-purchase-date').value,
-    purchase_price: parseFloat(document.getElementById('asset-price').value)||0,
-    depreciation_rate: parseFloat(document.getElementById('asset-dep-rate').value)||20,
+    purchase_price: getNumVal(document.getElementById('asset-price')),
+    depreciation_rate: getNumVal(document.getElementById('asset-dep-rate'))||20,
     maintenance_date: document.getElementById('asset-maint-date').value||'',
     insurance_date: document.getElementById('asset-ins-date').value||'',
     insurance_company: document.getElementById('asset-ins-co').value.trim()
   };
   if(!body.name || !body.purchase_price){
-    showToast('Varlık adı ve alış bedeli zorunlu','error'); return;
+    showToast('Varlık adı ve alış bedeli zorunlu','#ef4444'); return;
   }
-  xhr('/api/assets', {method:'POST',body:JSON.stringify(body)}, function(r){
+  xhr('/api/assets', body, function(r){
     if(r.ok){
       closeMod('mod-asset');
-      showToast('Varlık eklendi','success');
+      toast('Varlık eklendi');
       loadAssets();
     }
   });
@@ -6711,7 +6720,7 @@ function loadCardReport(){
           '<div class="cdr-cell spent"><div class="dc-lbl">Harcama</div>'+spentHtml+'</div>' +
         '</div>' +
         '<div class="cdr-input-row">' +
-          '<input class="cdr-bal-input" type="number" id="cdr-bal-'+c.card_id+'" placeholder="Bugünkü bakiye" value="'+(c.today_balance!==null?c.today_balance:'')+'">' +
+          '<input class="cdr-bal-input" type="text" inputmode="decimal" id="cdr-bal-'+c.card_id+'" placeholder="Bugünkü bakiye" value="'+(c.today_balance!==null?c.today_balance:'')+'">' +
           '<button class="cdr-save-btn tappable" onclick="saveCardBalance('+c.card_id+')">Kaydet</button>' +
         '</div>' +
         '</div>';
@@ -6722,20 +6731,20 @@ function loadCardReport(){
 function saveCardBalance(cardId){
   var inp = document.getElementById('cdr-bal-'+cardId);
   if(!inp) return;
-  var val = parseFloat(inp.value);
-  if(isNaN(val)){ showToast('Geçerli tutar girin','error'); return; }
-  xhr('/api/cards/daily-balance', {method:'POST',body:JSON.stringify({
+  var val = getNumVal(inp);
+  if(!val && val !== 0){ showToast('Geçerli tutar girin','#ef4444'); return; }
+  xhr('/api/cards/daily-balance', {
     card_id: cardId,
     balance: val,
     date: new Date().toISOString().slice(0,10)
-  })}, function(r){
-    if(r.ok){ showToast('Bakiye kaydedildi','success'); loadCardReport(); }
+  }, function(r){
+    if(r.ok){ toast('Bakiye kaydedildi'); loadCardReport(); }
   });
 }
 
 // ── EXCEL EXPORT ──────────────────────────────────────────────────────────────
 function exportExcel(){
-  showToast('Excel hazırlanıyor...','info');
+  toast('Excel hazırlanıyor...');
   window.location.href = '/api/export/excel';
 }
 </script>
