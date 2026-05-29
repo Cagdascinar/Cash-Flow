@@ -5444,25 +5444,53 @@ function fmtK(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).
 function fmtNum(n){return Number(n).toLocaleString(_curLocale,{minimumFractionDigits:2,maximumFractionDigits:2})}
 
 // ── HERO FILTER SHORTCUT ────────────────────────────────────────────────────
+function _applyHeroPeriodToLedger(){
+  var fd=document.getElementById('f-date-from');
+  var fdt=document.getElementById('f-date-to');
+  var fy=document.getElementById('f-year');
+  if(!fd||!fdt) return;
+  if(_heroPeriod==='month'){
+    // Seçili ay'ın ilk ve son günü
+    var d=new Date(curYear,curMonth-1,1);
+    var last=new Date(curYear,curMonth,0).getDate();
+    var mo=String(curMonth).padStart(2,'0');
+    fd.value=curYear+'-'+mo+'-01';
+    fdt.value=curYear+'-'+mo+'-'+String(last).padStart(2,'0');
+    if(fy) fy.value='';
+  } else if(_heroPeriod==='year'){
+    fd.value=_heroYear+'-01-01';
+    fdt.value=_heroYear+'-12-31';
+    if(fy) fy.value='';
+  } else {
+    fd.value=''; fdt.value='';
+    if(fy) fy.value='';
+  }
+}
 function filterLedgerTo(type){
   var ledgerEl=document.querySelector('[data-page="ledger"]');
   goPage('ledger',ledgerEl);
   setTimeout(function(){
+    _applyHeroPeriodToLedger();
     var sel=document.getElementById('f-type');
     var cat=document.getElementById('ledger-f-cat');
+    var ls=document.getElementById('ledger-search');
     if(cat) cat.value='';
-    if(sel){sel.value=type;filterLedger();}
+    if(ls) ls.value='';
+    if(sel) sel.value=type;
+    filterLedger();
   },200);
 }
 function filterLedgerToCat(type, cat){
   var ledgerEl=document.querySelector('[data-page="ledger"]');
   goPage('ledger',ledgerEl);
   setTimeout(function(){
+    _applyHeroPeriodToLedger();
     var selType=document.getElementById('f-type');
     var selCat=document.getElementById('ledger-f-cat');
+    var ls=document.getElementById('ledger-search');
+    if(ls) ls.value='';
     if(selType) selType.value=type;
     if(selCat){
-      // Add option dynamically if not present
       if(!selCat.querySelector('option[value="'+cat+'"]')){
         var o=document.createElement('option'); o.value=cat; o.textContent=cat;
         selCat.appendChild(o);
