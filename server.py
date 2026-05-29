@@ -329,6 +329,7 @@ def init_db():
         ("investments",  "profile_id",      "INTEGER NOT NULL DEFAULT 1"),
         ("recurring",    "user_id",         "INTEGER NOT NULL DEFAULT 1"),
         ("recurring",    "profile_id",      "INTEGER NOT NULL DEFAULT 1"),
+        ("recurring",    "days_of_month",   "TEXT NOT NULL DEFAULT ''"),
         ("users",        "avatar",          "TEXT NOT NULL DEFAULT ''"),
     ]
     with pg_connect() as con:
@@ -2660,13 +2661,20 @@ def add_recurring():
     d = request.get_json(force=True)
     ttype = d.get("type"); amount = float(d.get("amount", 0))
     cat = d.get("category",""); desc = d.get("description","")
-    day = int(d.get("day_of_month", 1))
-    if ttype not in ("gelir","gider") or amount <= 0 or not cat or not (1 <= day <= 31):
+    days_raw = d.get("days_of_month", d.get("day_of_month", 1))
+    if isinstance(days_raw, list):
+        days_list = sorted(set(int(x) for x in days_raw if 1 <= int(x) <= 31))
+    else:
+        days_list = [int(days_raw)]
+    if not days_list: days_list = [1]
+    days_str = ",".join(str(x) for x in days_list)
+    day_first = days_list[0]
+    if ttype not in ("gelir","gider") or amount <= 0 or not cat:
         return jsonify({"ok": False, "error": "Geçersiz veri"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO recurring (user_id,profile_id,type,amount,category,description,day_of_month,active,created_at) VALUES (?,?,?,?,?,?,?,1,?)",
-        (uid, pid, ttype, amount, cat, desc, day, datetime.now().isoformat()))
+        "INSERT INTO recurring (user_id,profile_id,type,amount,category,description,day_of_month,days_of_month,active,created_at) VALUES (?,?,?,?,?,?,?,?,1,?)",
+        (uid, pid, ttype, amount, cat, desc, day_first, days_str, datetime.now().isoformat()))
     db.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
 
@@ -2688,6 +2696,13 @@ def update_recurring(rid):
             fields.append(f"{col}=?")
             val = float(d[col]) if col == "amount" else int(d[col]) if col in ("day_of_month","active") else d[col]
             params.append(val)
+    if "days_of_month" in d:
+        days_raw = d["days_of_month"]
+        if isinstance(days_raw, list):
+            days_str = ",".join(str(x) for x in sorted(set(int(x) for x in days_raw if 1 <= int(x) <= 31)))
+        else:
+            days_str = str(days_raw)
+        fields.append("days_of_month=?"); params.append(days_str)
     if not fields: return jsonify({"ok": False}), 400
     params += [rid, pid]
     get_db().execute(f"UPDATE recurring SET {','.join(fields)} WHERE id=? AND profile_id=?", params)
@@ -2710,19 +2725,25 @@ def apply_recurring():
 
     from calendar import monthrange
     for tpl in templates:
+        days_raw = (tpl["days_of_month"] or "").strip()
+        if days_raw:
+            days_list = [int(x.strip()) for x in days_raw.split(",") if x.strip().isdigit()]
+        else:
+            days_list = [tpl["day_of_month"]]
         for m in months:
             _, last_day = monthrange(year, m)
-            day = min(tpl["day_of_month"], last_day)
-            dt  = f"{year:04d}-{m:02d}-{day:02d}"
-            exists = db.execute(
-                "SELECT id FROM transactions WHERE profile_id=? AND type=? AND category=? AND description=? AND date=? AND amount=?",
-                (pid, tpl["type"], tpl["category"], tpl["description"], dt, tpl["amount"])
-            ).fetchone()
-            if exists: skipped += 1; continue
-            db.execute(
-                "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?,?)",
-                (uid, pid, tpl["type"], tpl["amount"], tpl["category"], tpl["description"], dt, datetime.now().isoformat()))
-            created += 1
+            for d_val in days_list:
+                day = min(d_val, last_day)
+                dt  = f"{year:04d}-{m:02d}-{day:02d}"
+                exists = db.execute(
+                    "SELECT id FROM transactions WHERE profile_id=? AND type=? AND category=? AND description=? AND date=? AND amount=?",
+                    (pid, tpl["type"], tpl["category"], tpl["description"], dt, tpl["amount"])
+                ).fetchone()
+                if exists: skipped += 1; continue
+                db.execute(
+                    "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?,?)",
+                    (uid, pid, tpl["type"], tpl["amount"], tpl["category"], tpl["description"], dt, datetime.now().isoformat()))
+                created += 1
 
     db.commit()
     return jsonify({"ok": True, "created": created, "skipped": skipped})
@@ -3275,6 +3296,10 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .f-input:focus{border-color:var(--b2)}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
 @media(max-width:500px){.form-row{grid-template-columns:1fr}}
+.day-btn{padding:7px 2px;border:1.5px solid var(--border2);border-radius:7px;font-size:.76rem;font-weight:600;color:var(--txt2);cursor:pointer;background:var(--bg3);text-align:center;transition:.12s;user-select:none;-webkit-tap-highlight-color:transparent}
+.day-btn:hover{border-color:var(--b);color:var(--b)}
+.day-btn.sel{background:var(--b);color:#fff;border-color:var(--b)}
+.day-btn:active{opacity:.7}
 .type-tabs{display:flex;gap:8px;margin-bottom:16px}
 .type-tab{flex:1;padding:10px;border-radius:9px;border:2px solid var(--border2);
   font-weight:600;font-size:.85rem;cursor:pointer;transition:.2s;background:var(--bg3);color:var(--txt2)}
@@ -4364,29 +4389,17 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
         <button class="type-tab tg" id="rec-tab-g" onclick="setRecTab('gelir')">📈 Gelir</button>
         <button class="type-tab" id="rec-tab-r" onclick="setRecTab('gider')">📉 Gider</button>
       </div>
-      <div class="form-row">
-        <div><label>Tutar (₺)</label><input class="f-input" type="text" inputmode="decimal" data-num id="rec-amount" placeholder="0,00"></div>
-        <div>
-          <label>Her ayın kaçında?</label>
-          <select class="f-input" id="rec-day">
-            <option value="1">1. günü</option>
-            <option value="2">2. günü</option>
-            <option value="3">3. günü</option>
-            <option value="4">4. günü</option>
-            <option value="5" selected>5. günü</option>
-            <option value="6">6. günü</option>
-            <option value="7">7. günü</option>
-            <option value="8">8. günü</option>
-            <option value="9">9. günü</option>
-            <option value="10">10. günü</option>
-            <option value="14">14. günü</option>
-            <option value="15">15. günü</option>
-            <option value="20">20. günü</option>
-            <option value="25">25. günü</option>
-            <option value="28">28. günü</option>
-            <option value="30">30. günü</option>
-            <option value="31">Son günü</option>
-          </select>
+      <div style="margin-bottom:12px">
+        <label>Tutar (₺)</label>
+        <input class="f-input" type="text" inputmode="decimal" data-num id="rec-amount" placeholder="0,00">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="display:block;margin-bottom:6px">Her ayın hangi günleri? <span id="rec-days-lbl" style="font-size:.75rem;color:var(--b);font-weight:700"></span></label>
+        <div id="rec-days-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px"></div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button type="button" onclick="recDaysPreset([1,15])" class="btn btn-ghost" style="font-size:.7rem;padding:4px 10px">1 & 15</button>
+          <button type="button" onclick="recDaysPreset([1,8,15,22])" class="btn btn-ghost" style="font-size:.7rem;padding:4px 10px">Haftalık×4</button>
+          <button type="button" onclick="recDaysSelectAll(false)" class="btn btn-ghost" style="font-size:.7rem;padding:4px 10px">Temizle</button>
         </div>
       </div>
       <div style="margin-bottom:12px"><label>Kategori</label><select class="f-input" id="rec-cat"></select></div>
@@ -6545,6 +6558,47 @@ function bookIncome(invId, amount, name){
 // ── RECURRING ─────────────────────────────────────────────────────────────────
 var recTab = 'gelir';
 
+var _recSelDays = [];
+
+function _buildDayGrid(){
+  var grid = document.getElementById('rec-days-grid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  for(var i=1; i<=31; i++){
+    (function(day){
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = day;
+      btn.className = 'day-btn' + (_recSelDays.indexOf(day)>=0?' sel':'');
+      btn.onclick = function(){
+        var idx = _recSelDays.indexOf(day);
+        if(idx>=0) _recSelDays.splice(idx,1); else _recSelDays.push(day);
+        _recSelDays.sort(function(a,b){return a-b});
+        _buildDayGrid();
+        _updateDaysLbl();
+      };
+      grid.appendChild(btn);
+    })(i);
+  }
+}
+
+function _updateDaysLbl(){
+  var lbl = document.getElementById('rec-days-lbl');
+  if(!lbl) return;
+  if(!_recSelDays.length){ lbl.textContent=''; return; }
+  lbl.textContent = _recSelDays.join(', ')+'. gün';
+}
+
+function recDaysPreset(days){
+  _recSelDays = days.slice();
+  _buildDayGrid(); _updateDaysLbl();
+}
+
+function recDaysSelectAll(on){
+  _recSelDays = on ? Array.from({length:31},function(_,i){return i+1}) : [];
+  _buildDayGrid(); _updateDaysLbl();
+}
+
 function initRecurringPage(){
   fillSel('rec-cat', CATS[recTab]);
   var ys = document.getElementById('rec-apply-year');
@@ -6553,6 +6607,8 @@ function initRecurringPage(){
   for(var y=now-1; y<=now+2; y++){
     ys.innerHTML += '<option value="'+y+'"'+(y===now?' selected':'')+'>'+y+'</option>';
   }
+  if(!_recSelDays.length) _recSelDays = [1];
+  _buildDayGrid(); _updateDaysLbl();
   loadRecurring();
 }
 
@@ -6585,7 +6641,7 @@ function loadRecurring(){
             (r.type==='gelir'?'📈':'📉')+'</div>'+
             '<div style="flex:1;min-width:0">'+
               '<div style="font-weight:600;font-size:.88rem">'+(r.description||r.category)+'</div>'+
-              '<div style="font-size:.75rem;color:var(--txt2)">'+r.category+' &middot; Her ayın <strong>'+r.day_of_month+'. günü</strong></div>'+
+              '<div style="font-size:.75rem;color:var(--txt2)">'+r.category+' &middot; Her ayın <strong>'+(r.days_of_month&&r.days_of_month.trim()?r.days_of_month.split(',').join('. ')+(r.days_of_month.split(',').length>1?'. günleri':'. günü'):r.day_of_month+'. günü')+'</strong></div>'+
             '</div>'+
             '<div style="font-weight:800;font-size:.95rem;color:'+(r.type==='gelir'?'var(--g)':'var(--r)')+'">'+
               (r.type==='gelir'?'+':'-')+fmt(r.amount)+'</div>'+
@@ -6602,13 +6658,14 @@ function addRecurring(){
   var amount = getNumVal(document.getElementById('rec-amount'));
   var cat    = document.getElementById('rec-cat').value;
   var desc   = document.getElementById('rec-desc').value;
-  var day    = parseInt(document.getElementById('rec-day').value);
   if(!amount || amount<=0){toast('Tutar giriniz'); return}
-  xhr('/api/recurring', {type:recTab, amount:amount, category:cat, description:desc, day_of_month:day}, function(r){
+  if(!_recSelDays.length){toast('En az bir gün seçiniz'); return}
+  xhr('/api/recurring', {type:recTab, amount:amount, category:cat, description:desc, days_of_month:_recSelDays}, function(r){
     if(r.ok){
       toast('Şablon kaydedildi ✓');
       document.getElementById('rec-amount').value = '';
       document.getElementById('rec-desc').value = '';
+      _recSelDays = [1]; _buildDayGrid(); _updateDaysLbl();
       loadRecurring();
     }
   });
