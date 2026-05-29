@@ -4439,6 +4439,19 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <button class="btn btn-ghost" style="width:100%" onclick="document.getElementById('add-profile-form-settings').style.display='block'">+ Yeni Profil Ekle</button>
   </div>
 
+  <!-- Para Birimi -->
+  <div class="settings-card">
+    <div class="settings-sect-title">Para Birimi</div>
+    <div style="font-size:.82rem;color:var(--txt2);margin-bottom:12px">Seçilen birim: <strong id="cur-label">TRY ₺</strong></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+      <button class="btn btn-ghost" onclick="setCurrency('TRY')" style="font-size:.85rem">₺ TRY</button>
+      <button class="btn btn-ghost" onclick="setCurrency('USD')" style="font-size:.85rem">$ USD</button>
+      <button class="btn btn-ghost" onclick="setCurrency('EUR')" style="font-size:.85rem">€ EUR</button>
+      <button class="btn btn-ghost" onclick="setCurrency('GBP')" style="font-size:.85rem">£ GBP</button>
+      <button class="btn btn-ghost" onclick="setCurrency('JPY')" style="font-size:.85rem">¥ JPY</button>
+    </div>
+  </div>
+
   <!-- App Info -->
   <div class="settings-card">
     <div class="settings-sect-title">Uygulama</div>
@@ -5043,6 +5056,9 @@ function initSettingsPage(){
     setAvatarDisplay(me.avatar, me.display||me.username||'?');
   });
   renderSettingsProfiles();
+  var el=document.getElementById('cur-label');
+  var c=_CURRENCIES[_curCode]||_CURRENCIES['TRY'];
+  if(el) el.textContent=_curCode+' '+c.sym;
 }
 
 function saveAccountInfo(){
@@ -5368,9 +5384,31 @@ function loadDashboard(){
   loadTodayWidgets();
 }
 
-function fmt(n){return '₺'+Number(n).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+var _CURRENCIES={
+  'TRY':{sym:'₺',locale:'tr-TR',pos:'before'},
+  'USD':{sym:'$',locale:'en-US',pos:'before'},
+  'EUR':{sym:'€',locale:'de-DE',pos:'before'},
+  'GBP':{sym:'£',locale:'en-GB',pos:'before'},
+  'JPY':{sym:'¥',locale:'ja-JP',pos:'before'}
+};
+var _curCode=(localStorage.getItem('kirpi_currency')||'TRY');
+var _curSym=(_CURRENCIES[_curCode]||_CURRENCIES['TRY']).sym;
+var _curLocale=(_CURRENCIES[_curCode]||_CURRENCIES['TRY']).locale;
+function setCurrency(code){
+  _curCode=code;
+  var c=_CURRENCIES[code]||_CURRENCIES['TRY'];
+  _curSym=c.sym; _curLocale=c.locale;
+  localStorage.setItem('kirpi_currency',code);
+  var el=document.getElementById('cur-label');
+  if(el) el.textContent=code+' '+c.sym;
+  if(summaryData) { renderStats(summaryData); if(summaryData.bar) drawBar(summaryData.bar); if(summaryData.gider_cats) drawDonut(summaryData.gider_cats); }
+}
+function fmt(n){
+  var s=Number(n).toLocaleString(_curLocale,{minimumFractionDigits:2,maximumFractionDigits:2});
+  return _curSym+s;
+}
 function fmtK(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(0)+'K';return Math.round(n)+''}
-function fmtNum(n){return Number(n).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function fmtNum(n){return Number(n).toLocaleString(_curLocale,{minimumFractionDigits:2,maximumFractionDigits:2})}
 
 // ── HERO FILTER SHORTCUT ────────────────────────────────────────────────────
 function filterLedgerTo(type){
@@ -5390,7 +5428,14 @@ function filterLedgerToCat(type, cat){
     var selType=document.getElementById('f-type');
     var selCat=document.getElementById('ledger-f-cat');
     if(selType) selType.value=type;
-    if(selCat) selCat.value=cat;
+    if(selCat){
+      // Add option dynamically if not present
+      if(!selCat.querySelector('option[value="'+cat+'"]')){
+        var o=document.createElement('option'); o.value=cat; o.textContent=cat;
+        selCat.appendChild(o);
+      }
+      selCat.value=cat;
+    }
     filterLedger();
   },200);
 }
@@ -5541,13 +5586,13 @@ function drawDonut(cats){
   _donutCX=cx; _donutCY=cy; _donutR=R; _donutr=r;
   keys.forEach(function(k,i){
     var sl=cats[k]/total*2*Math.PI;
-    _donutSlices.push({cat:k,start:a,end:a+sl,color:CLRS[i%CLRS.length]});
+    _donutSlices.push({cat:k,start:a,end:a+sl});
     ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,R,a,a+sl);ctx.closePath();
     ctx.fillStyle=CLRS[i%CLRS.length];ctx.fill();a+=sl;
   });
   ctx.beginPath();ctx.arc(cx,cy,r,0,2*Math.PI);ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg2')||'#fff';ctx.fill();
   ctx.fillStyle='#334155';ctx.font='bold 12px Inter,system-ui';ctx.textAlign='center';
-  ctx.fillText(fmtK(total)+'₺',cx,cy-3);
+  ctx.fillText(fmtK(total)+_curSym,cx,cy-3);
   ctx.fillStyle='#64748b';ctx.font='9px Inter,system-ui';ctx.fillText('toplam',cx,cy+10);
   var lx=H+12,ly=10,lh=20;
   keys.slice(0,8).forEach(function(k,i){
@@ -5565,14 +5610,15 @@ function drawDonut(cats){
     var my=(e.clientY-rect.top)*(cv.height/rect.height);
     var dx=mx-_donutCX, dy=my-_donutCY, dist=Math.sqrt(dx*dx+dy*dy);
     if(dist<_donutr||dist>_donutR) return;
+    // Normalize atan2 [-π,π] → [-π/2, 3π/2] to match slice angles
     var angle=Math.atan2(dy,dx);
-    if(angle<-Math.PI/2) angle+=2*Math.PI;
+    if(angle < -Math.PI/2) angle += 2*Math.PI;
     for(var i=0;i<_donutSlices.length;i++){
       var s=_donutSlices[i];
-      var sa=s.start<-Math.PI/2?s.start+2*Math.PI:s.start;
-      var ea=s.end<-Math.PI/2?s.end+2*Math.PI:s.end;
-      if(angle>=sa&&angle<=ea){ filterLedgerToCat('gider',s.cat); return; }
+      if(angle>=s.start && angle<s.end){ filterLedgerToCat('gider',s.cat); return; }
     }
+    // Edge case: last slice end may be slightly past 3π/2 due to float
+    if(_donutSlices.length) filterLedgerToCat('gider',_donutSlices[_donutSlices.length-1].cat);
   };
 }
 
