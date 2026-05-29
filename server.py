@@ -3568,6 +3568,12 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .hero-bal-lbl{font-size:.63rem;text-transform:uppercase;letter-spacing:.14em;color:rgba(255,255,255,.42);margin-bottom:6px;font-weight:700;position:relative}
 .hero-balance{font-size:2.7rem;font-weight:900;letter-spacing:-.05em;line-height:1;margin-bottom:4px;color:#fff;position:relative;text-shadow:0 2px 16px rgba(0,0,0,.25)}
 .hero-net-sub{font-size:.72rem;color:rgba(255,255,255,.42);margin-bottom:16px;min-height:14px;position:relative}
+.hero-my-row{display:flex;gap:8px;margin-bottom:10px;position:relative}
+.hero-sel{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.2);
+          color:#fff;border-radius:10px;padding:6px 10px;font-size:.8rem;font-weight:600;
+          cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;
+          font-family:inherit}
+.hero-sel option{background:#1a3065;color:#fff}
 .hero-chips{display:flex;gap:7px;flex-wrap:wrap;position:relative}
 .hero-chip{display:flex;align-items:center;gap:4px;padding:6px 14px;border-radius:20px;font-size:.76rem;font-weight:600}
 .hero-chip.gn{background:rgba(52,199,89,.22);color:#5edc80;border:1px solid rgba(52,199,89,.35)}
@@ -4005,6 +4011,10 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <div class="hero-top-row">
       <div class="hero-greeting" id="hero-greeting">Merhaba __USER_DISPLAY__ 👋</div>
       <div class="hero-kirpi" id="hero-kirpi" title="Günün durumu">🦔</div>
+    </div>
+    <div class="hero-my-row">
+      <select id="hero-month-sel" class="hero-sel" onchange="heroMonthYearChange()"></select>
+      <select id="hero-year-sel" class="hero-sel" onchange="heroMonthYearChange()"></select>
     </div>
     <div class="hero-period-tabs">
       <button class="hero-period-tab active" id="htab-month" onclick="setHeroPeriod('month')">Ay</button>
@@ -4456,7 +4466,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <!-- ADD CARD FORM -->
     <div class="card">
       <div class="section-title">Kart Ekle / Güncelle</div>
-      <div style="margin-bottom:12px"><label>Kart Sahibi</label><input class="f-input" type="text" id="card-owner" placeholder="ör. Ben, Eşim, Annem"></div>
+      <div style="margin-bottom:12px"><label>Kart Sahibi / Kullanım Amacı</label><input class="f-input" type="text" id="card-owner" placeholder="ör. Genel Gider, Seyahat, Temsil"></div>
       <div class="form-row">
         <div>
           <label>Banka Adı</label>
@@ -4934,6 +4944,7 @@ window.onload=function(){
   var prefix=h<5?'İyi geceler':h<12?'Günaydın':h<18?'İyi günler':'İyi akşamlar';
   var gEl=document.getElementById('hero-greeting');
   if(gEl) gEl.textContent=gEl.textContent.replace('Merhaba',prefix);
+  initHeroMonthYear();
   loadCats();
   loadAllTx();
   populateYearFilter();
@@ -5410,6 +5421,7 @@ function changeMonth(d){
   if(curMonth>12){curMonth=1;curYear++}
   if(curMonth<1){curMonth=12;curYear--}
   updateMonthLabel();
+  syncHeroSelects();
   loadDashboard();
 }
 function toggleDateRange(){
@@ -5599,6 +5611,38 @@ function loadTodayWidgets(){
 var _heroPeriod='month';
 var _heroYear=new Date().getFullYear();
 var _dashReqId=0;
+
+var _MONTHS_TR=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+
+function initHeroMonthYear(){
+  var ms=document.getElementById('hero-month-sel');
+  var ys=document.getElementById('hero-year-sel');
+  if(!ms||!ys) return;
+  ms.innerHTML='';
+  _MONTHS_TR.forEach(function(m,i){
+    ms.innerHTML+='<option value="'+(i+1)+'"'+(i+1===curMonth?' selected':'')+'>'+m+'</option>';
+  });
+  ys.innerHTML='';
+  var now=new Date().getFullYear();
+  for(var y=now-3;y<=now+1;y++){
+    ys.innerHTML+='<option value="'+y+'"'+(y===curYear?' selected':'')+'>'+y+'</option>';
+  }
+}
+
+function syncHeroSelects(){
+  var ms=document.getElementById('hero-month-sel');
+  var ys=document.getElementById('hero-year-sel');
+  if(ms) ms.value=curMonth;
+  if(ys) ys.value=curYear;
+}
+
+function heroMonthYearChange(){
+  var ms=document.getElementById('hero-month-sel');
+  var ys=document.getElementById('hero-year-sel');
+  curMonth=parseInt(ms.value);
+  curYear=parseInt(ys.value);
+  setHeroPeriod('month');
+}
 
 function setHeroPeriod(p){
   _heroPeriod=p;
