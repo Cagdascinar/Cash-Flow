@@ -4390,14 +4390,8 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
         <input class="f-input" type="text" inputmode="decimal" data-num id="rec-amount" placeholder="0,00">
       </div>
       <div style="margin-bottom:14px">
-        <label style="display:block;margin-bottom:8px">Her ayın hangi günleri?</label>
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-          <input id="rec-day-input" type="number" min="1" max="31" placeholder="Gün (1-31)"
-            class="f-input" style="width:130px;margin-bottom:0"
-            onkeydown="if(event.key==='Enter'){recAddDay();event.preventDefault()}">
-          <button type="button" onclick="recAddDay()" class="btn btn-primary" style="padding:10px 16px;white-space:nowrap">+ Ekle</button>
-        </div>
-        <div id="rec-days-list" style="display:flex;flex-direction:column;gap:6px"></div>
+        <label style="display:block;margin-bottom:8px">Her ayın hangi günleri? <span id="rec-days-lbl" style="font-size:.74rem;color:var(--b);font-weight:700"></span></label>
+        <div id="rec-days-chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
       </div>
       <div style="margin-bottom:12px"><label>Kategori</label><select class="f-input" id="rec-cat"></select></div>
       <div style="margin-bottom:20px"><label>Açıklama</label><input class="f-input" type="text" id="rec-desc" placeholder="örn. Maaş, Kira, Elektrik"></div>
@@ -6557,39 +6551,37 @@ var recTab = 'gelir';
 
 var _recSelDays = [];
 
-function _renderDaysList(){
-  var el = document.getElementById('rec-days-list');
+function _buildDayChips(){
+  var el = document.getElementById('rec-days-chips');
   if(!el) return;
-  if(!_recSelDays.length){
-    el.innerHTML = '<div style="font-size:.78rem;color:var(--txt2);padding:4px 0">Henüz gün eklenmedi</div>';
-    return;
+  el.innerHTML = '';
+  for(var i=1; i<=31; i++){
+    (function(day){
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = day;
+      var sel = _recSelDays.indexOf(day) >= 0;
+      btn.style.cssText = 'width:38px;height:38px;border-radius:10px;border:1.5px solid '+(sel?'var(--b)':'var(--border2)')+
+        ';background:'+(sel?'var(--b)':'var(--bg3)')+';color:'+(sel?'#fff':'var(--txt2)')+
+        ';font-size:.82rem;font-weight:700;cursor:pointer;transition:.12s;-webkit-tap-highlight-color:transparent';
+      btn.onclick = function(){
+        var idx = _recSelDays.indexOf(day);
+        if(idx >= 0) _recSelDays.splice(idx, 1);
+        else _recSelDays.push(day);
+        _recSelDays.sort(function(a,b){return a-b});
+        _buildDayChips();
+        _updateDaysLbl();
+      };
+      el.appendChild(btn);
+    })(i);
   }
-  el.innerHTML = _recSelDays.map(function(d){
-    return '<div style="display:flex;align-items:center;justify-content:space-between;'+
-      'padding:9px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:10px">'+
-      '<span style="font-size:.88rem;font-weight:600;color:var(--txt)">Her ayın <strong>'+d+'. günü</strong></span>'+
-      '<button type="button" onclick="recRemoveDay('+d+')" style="background:none;border:none;'+
-      'color:var(--txt2);font-size:1rem;cursor:pointer;padding:0 4px;line-height:1">✕</button>'+
-      '</div>';
-  }).join('');
+  _updateDaysLbl();
 }
 
-function recAddDay(){
-  var inp = document.getElementById('rec-day-input');
-  var d = parseInt(inp.value);
-  if(!d || d<1 || d>31){ toast('1-31 arası bir gün giriniz'); return; }
-  if(_recSelDays.indexOf(d)>=0){ toast(d+'. gün zaten ekli'); inp.value=''; return; }
-  _recSelDays.push(d);
-  _recSelDays.sort(function(a,b){return a-b});
-  inp.value='';
-  inp.focus();
-  _renderDaysList();
-}
-
-function recRemoveDay(d){
-  var idx = _recSelDays.indexOf(d);
-  if(idx>=0) _recSelDays.splice(idx,1);
-  _renderDaysList();
+function _updateDaysLbl(){
+  var lbl = document.getElementById('rec-days-lbl');
+  if(!lbl) return;
+  lbl.textContent = _recSelDays.length ? _recSelDays.join(', ')+'. gün seçildi' : '';
 }
 
 function initRecurringPage(){
@@ -6600,8 +6592,7 @@ function initRecurringPage(){
   for(var y=now-1; y<=now+2; y++){
     ys.innerHTML += '<option value="'+y+'"'+(y===now?' selected':'')+'>'+y+'</option>';
   }
-  if(!_recSelDays.length) _recSelDays = [1];
-  _renderDaysList();
+  _buildDayChips();
   loadRecurring();
 }
 
@@ -6658,7 +6649,7 @@ function addRecurring(){
       toast('Şablon kaydedildi ✓');
       document.getElementById('rec-amount').value = '';
       document.getElementById('rec-desc').value = '';
-      _recSelDays = []; _renderDaysList();
+      _recSelDays = []; _buildDayChips();
       loadRecurring();
     }
   });
