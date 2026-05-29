@@ -342,6 +342,17 @@ def init_db():
             code       TEXT NOT NULL UNIQUE,
             expires_at TEXT NOT NULL
         )""",
+        """CREATE TABLE IF NOT EXISTS telegram_pending (
+            id          SERIAL PRIMARY KEY,
+            tg_user_id  TEXT NOT NULL,
+            user_id     INTEGER NOT NULL,
+            profile_id  INTEGER NOT NULL DEFAULT 1,
+            type        TEXT NOT NULL,
+            amount      DOUBLE PRECISION NOT NULL,
+            category    TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            created_at  TEXT NOT NULL
+        )""",
     ]
     migrations = [
         ("users",        "email",          "TEXT NOT NULL DEFAULT ''"),
@@ -1466,14 +1477,29 @@ def save_card_daily_balance():
 
 # ── TELEGRAM BOT ──────────────────────────────────────────────────────────────
 
-def tg_send(chat_id, text, parse_mode="HTML"):
+def tg_send(chat_id, text, parse_mode="HTML", reply_markup=None):
+    if not TELEGRAM_TOKEN: return
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+    try:
+        requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                      json=payload, timeout=6)
+    except Exception: pass
+
+def tg_answer_cb(cb_id, text=""):
     if not TELEGRAM_TOKEN: return
     try:
-        requests.post(
-            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-            json={"chat_id": chat_id, "text": text, "parse_mode": parse_mode},
-            timeout=6
-        )
+        requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/answerCallbackQuery",
+                      json={"callback_query_id": cb_id, "text": text}, timeout=5)
+    except Exception: pass
+
+def tg_edit_msg(chat_id, msg_id, text):
+    if not TELEGRAM_TOKEN: return
+    try:
+        requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/editMessageText",
+                      json={"chat_id": chat_id, "message_id": msg_id,
+                            "text": text, "parse_mode": "HTML"}, timeout=5)
     except Exception: pass
 
 _TG_CAT_KW = [
@@ -1507,33 +1533,118 @@ _TG_CAT_KW = [
 ]
 _GELIR_CATS = {"Maaş","Kira Geliri","Yatırım / Temettü","Hediye / İkramiye","Serbest Meslek","Diğer Gelir"}
 
+def _parse_tg_amount(text_l):
+    """Parse Turkish amount: '10 bin' → 10000, '2.5 milyon' → 2500000, '500' → 500"""
+    # X bin Y (örn: 10 bin 500 → 10500)
+    m = re.search(r'(\d[\d.,]*)\s*bin\s+(\d+)', text_l)
+    if m:
+        try: return float(m.group(1).replace(',','.')) * 1000 + float(m.group(2))
+        except: pass
+    # X bin (örn: 10 bin → 10000)
+    m = re.search(r'(\d[\d.,]*)\s*bin\b', text_l)
+    if m:
+        try: return float(m.group(1).replace(',','.')) * 1000
+        except: pass
+    # X milyon
+    m = re.search(r'(\d[\d.,]*)\s*milyon\b', text_l)
+    if m:
+        try: return float(m.group(1).replace(',','.')) * 1_000_000
+        except: pass
+    # Xk (örn: 10k → 10000)
+    m = re.search(r'(\d[\d.,]*)\s*k\b', text_l)
+    if m:
+        try: return float(m.group(1).replace(',','.')) * 1000
+        except: pass
+    # Noktalı/virgüllü sayı (12.000 veya 12,000 → 12000)
+    m = re.search(r'\b(\d{1,3}(?:[.,]\d{3})+)\s*(?:tl|₺|lira)?\b', text_l)
+    if m:
+        try: return float(re.sub(r'[.,](?=\d{3}\b)', '', m.group(1)).replace(',','.'))
+        except: pass
+    # Normal sayı
+    m = re.search(r'\b(\d[\d]*(?:[.,]\d+)?)\s*(?:tl|₺|lira)?\b', text_l)
+    if m:
+        try: return float(m.group(1).replace(',','.'))
+        except: pass
+    return None
+
 def _parse_tg_msg(text):
     text_l = text.lower().strip()
-    amt_m = re.search(r'\b(\d[\d.,]*)\s*(?:tl|₺|lira)?\b', text_l)
-    if not amt_m: return None
-    try: amount = float(amt_m.group(1).replace(',','.'))
-    except: return None
-    if amount <= 0: return None
-    no_amt = re.sub(r'\b\d[\d.,]*\s*(?:tl|₺|lira)?\b','', text_l).strip()
+    amount = _parse_tg_amount(text_l)
+    if not amount or amount <= 0: return None
+    # Miktarı ve birim kelimelerini temizle
+    no_amt = re.sub(r'\d[\d.,]*\s*(?:bin|milyon|k|tl|₺|lira)?\b', '', text_l).strip()
     category = None
     for kw, cat in _TG_CAT_KW:
-        if kw in no_amt:
+        if kw in no_amt or kw in text_l:
             category = cat; break
     if not category:
         category = "Diğer Gider"
     ttype = "gelir" if category in _GELIR_CATS else "gider"
-    desc_words = [w for w in text.split() if not re.match(r'^\d[\d.,]*$', w) and w.lower() not in ('tl','₺','lira')]
-    return {"type": ttype, "amount": amount, "category": category, "description": ' '.join(desc_words) or text}
+    # Açıklama: sayılar hariç orijinal kelimeler
+    stop = {'tl','₺','lira','bin','milyon','k'}
+    desc_words = [w for w in text.split() if not re.match(r'^\d[\d.,]*$', w) and w.lower() not in stop]
+    return {"type": ttype, "amount": amount, "category": category,
+            "description": ' '.join(desc_words) or text}
 
 @app.route("/api/telegram/webhook", methods=["POST"])
 def telegram_webhook():
     if not TELEGRAM_TOKEN: return "ok"
     data = request.get_json(force=True, silent=True) or {}
+
+    # ── Callback query (Evet/Hayır butonları) ──
+    cb = data.get("callback_query")
+    if cb:
+        cb_id   = cb["id"]
+        cdata   = cb.get("data","")
+        chat_id = cb["message"]["chat"]["id"]
+        msg_id  = cb["message"]["message_id"]
+        tg_uid  = str(cb["from"]["id"])
+        db = pg_connect()
+        try:
+            if cdata.startswith("confirm:"):
+                pid_pending = int(cdata.split(":")[1])
+                row = db.execute(
+                    "SELECT * FROM telegram_pending WHERE id=%s AND tg_user_id=%s",
+                    (pid_pending, tg_uid)
+                ).fetchone()
+                if row:
+                    db.execute(
+                        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                        (row["user_id"], row["profile_id"], row["type"], row["amount"],
+                         row["category"], row["description"], date.today().isoformat(),
+                         datetime.now().isoformat())
+                    )
+                    db.execute("DELETE FROM telegram_pending WHERE id=%s", (pid_pending,))
+                    db.commit()
+                    icon = "📈" if row["type"] == "gelir" else "📉"
+                    tg_edit_msg(chat_id, msg_id,
+                        f"{icon} <b>Kaydedildi!</b>\n\n"
+                        f"{'Gelir' if row['type']=='gelir' else 'Gider'}: <b>₺{row['amount']:,.2f}</b>\n"
+                        f"Kategori: {row['category']}\n"
+                        f"Not: {row['description']}"
+                    )
+                    tg_answer_cb(cb_id, "✅ Kaydedildi!")
+                else:
+                    tg_answer_cb(cb_id, "Bu işlem zaten işlendi.")
+            elif cdata.startswith("cancel:"):
+                pid_pending = int(cdata.split(":")[1])
+                db.execute("DELETE FROM telegram_pending WHERE id=%s AND tg_user_id=%s", (pid_pending, tg_uid))
+                db.commit()
+                tg_edit_msg(chat_id, msg_id, "❌ İptal edildi.")
+                tg_answer_cb(cb_id, "İptal edildi.")
+        except Exception as e:
+            log.error("Telegram callback error: %s", e)
+            tg_answer_cb(cb_id, "Hata oluştu.")
+        finally:
+            db.close()
+        return "ok"
+
+    # ── Normal mesaj ──
     msg = data.get("message") or data.get("edited_message")
     if not msg: return "ok"
     chat_id = msg["chat"]["id"]
-    text = (msg.get("text") or "").strip()
-    tg_uid = str(msg["from"]["id"])
+    text    = (msg.get("text") or "").strip()
+    tg_uid  = str(msg["from"]["id"])
     db = pg_connect()
     try:
         if text.lower().startswith("/link "):
@@ -1552,37 +1663,50 @@ def telegram_webhook():
                                (uid, pid, tg_uid, datetime.now().isoformat()))
                 db.execute("DELETE FROM telegram_link_codes WHERE code=%s", (code,))
                 db.commit()
-                tg_send(chat_id, "✅ <b>Hesabınız bağlandı!</b>\n\nArtık harcamalarınızı girebilirsiniz.\n\n<b>Örnekler:</b>\n• <code>market 250</code>\n• <code>yemek 85</code>\n• <code>maaş 15000</code>\n• <code>fatura 320</code>")
+                tg_send(chat_id, "✅ <b>Hesabınız bağlandı!</b>\n\n<b>Örnekler:</b>\n• <code>market 250</code>\n• <code>10 bin yemek</code>\n• <code>maaş 15000</code>\n• <code>benzin 1.500</code>")
             else:
                 tg_send(chat_id, "❌ Geçersiz veya süresi dolmuş kod.\nKirpi Ayarlar sayfasından yeni kod alın.")
             return "ok"
+
         if text.lower() == "/start":
-            tg_send(chat_id, f"🦔 <b>Kirpi Bot'a hoş geldiniz!</b>\n\nHarcamalarınızı buradan girebilirsiniz.\n\n<b>Önce hesabınızı bağlayın:</b>\n1. Kirpi uygulamasında <b>Ayarlar</b> sayfasını açın\n2. <b>Telegram Bağla</b> butonuna tıklayın\n3. Oluşan kodu buraya gönderin:\n<code>/link KOD</code>")
+            tg_send(chat_id, "🦔 <b>Kirpi Bot'a hoş geldiniz!</b>\n\n<b>Önce hesabınızı bağlayın:</b>\n1. Kirpi → <b>Ayarlar</b> → <b>Telegram → Kişi Ekle</b>\n2. Gelen kodu buraya <code>/link KOD</code> şeklinde gönderin")
             return "ok"
         if text.lower() == "/help":
-            tg_send(chat_id, "📖 <b>Kullanım:</b>\n\n<code>market 250</code>\n<code>yemek 85 tl</code>\n<code>benzin 400</code>\n<code>maaş 15000</code>\n<code>fatura 320</code>\n\nTutar + açıklama yazmanız yeterli, kategori otomatik belirlenir.")
+            tg_send(chat_id, "📖 <b>Kullanım:</b>\n\n<code>market 250</code>\n<code>10 bin yemek</code>\n<code>benzin 1.500</code>\n<code>maaş 15 bin</code>\n<code>fatura 3.200</code>\n\nTutar + açıklama yaz, onay ver, kaydedilir.")
             return "ok"
+
         link = db.execute("SELECT user_id, profile_id FROM telegram_links WHERE tg_user_id=%s", (tg_uid,)).fetchone()
         if not link:
-            tg_send(chat_id, "⚠️ Hesabınız bağlı değil.\n/start yazın ve talimatları takip edin.")
+            tg_send(chat_id, "⚠️ Hesabınız bağlı değil.\n/start yazın.")
             return "ok"
+
         uid, pid = link["user_id"], link["profile_id"]
         parsed = _parse_tg_msg(text)
         if not parsed:
-            tg_send(chat_id, "❓ Anlamadım.\nÖrnek: <code>market 250</code> veya <code>yemek 85 tl</code>")
+            tg_send(chat_id, "❓ Anlamadım.\nÖrnek: <code>market 250</code> veya <code>10 bin yemek</code>")
             return "ok"
-        db.execute(
-            "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
-            (uid, pid, parsed["type"], parsed["amount"], parsed["category"],
-             parsed["description"], date.today().isoformat(), datetime.now().isoformat())
+
+        # Pending olarak kaydet
+        cur = db.execute(
+            "INSERT INTO telegram_pending (tg_user_id,user_id,profile_id,type,amount,category,description,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+            (tg_uid, uid, pid, parsed["type"], parsed["amount"],
+             parsed["category"], parsed["description"], datetime.now().isoformat())
         )
         db.commit()
+        pending_id = cur.lastrowid
+
         icon = "📈" if parsed["type"] == "gelir" else "📉"
         tg_send(chat_id,
-            f"{icon} <b>Kaydedildi!</b>\n\n"
-            f"{'Gelir' if parsed['type']=='gelir' else 'Gider'}: <b>₺{parsed['amount']:,.2f}</b>\n"
+            f"{icon} <b>{'Gelir' if parsed['type']=='gelir' else 'Gider'}: ₺{parsed['amount']:,.2f}</b>\n"
             f"Kategori: {parsed['category']}\n"
-            f"Not: {parsed['description']}"
+            f"Not: {parsed['description']}\n\n"
+            f"Kayıt edilsin mi?",
+            reply_markup={
+                "inline_keyboard": [[
+                    {"text": "✅  Evet, kaydet", "callback_data": f"confirm:{pending_id}"},
+                    {"text": "❌  Hayır",        "callback_data": f"cancel:{pending_id}"}
+                ]]
+            }
         )
     except Exception as e:
         log.error("Telegram webhook error: %s", e)
@@ -3398,7 +3522,7 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
       position:fixed;bottom:0;top:auto;z-index:200;
       padding-bottom:env(safe-area-inset-bottom,0px);
       box-shadow:0 -4px 24px rgba(0,0,0,.09)}
-  .main{margin-left:0;margin-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
+  .main{margin-left:0;margin-bottom:calc(58px + env(safe-area-inset-bottom,0px))}
   .nav-logo{display:none}
 }
 
@@ -3420,40 +3544,38 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
 
 /* ── MOBILE NAV — Duolingo style ── */
 @media(max-width:768px){
-  .nav-links{flex-direction:row;padding:0 4px;gap:0;justify-content:space-around;align-items:center;height:64px}
+  .nav-links{flex-direction:row;padding:0 2px;gap:0;justify-content:space-around;align-items:center;height:58px}
   .nav-sect{display:none}
-  .nl{flex-direction:column;gap:2px;font-size:.58rem;padding:6px 2px;min-width:52px;flex:1;
-      max-width:76px;border-radius:0;box-shadow:none!important;background:transparent!important;align-items:center}
-  /* Icon inside a pill */
-  .nl .ico{font-size:1.3rem;width:44px;height:30px;display:flex;align-items:center;justify-content:center;
-           border-radius:14px;background:transparent;transition:all .2s cubic-bezier(.34,1.4,.64,1)}
+  .nl{flex-direction:column;gap:1px;font-size:.56rem;padding:5px 2px;min-width:48px;flex:1;
+      max-width:72px;border-radius:0;box-shadow:none!important;background:transparent!important;align-items:center}
+  .nl .ico{font-size:1.2rem;width:40px;height:26px;display:flex;align-items:center;justify-content:center;
+           border-radius:12px;background:transparent;transition:all .2s cubic-bezier(.34,1.4,.64,1)}
   .nl span:not(.ico){color:var(--txt2);transition:color .15s;font-weight:600;letter-spacing:.01em}
-  /* Active: pill fills with blue tint, icon scales, label turns blue */
-  .nl.active .ico{background:rgba(0,122,255,.13);transform:scale(1.08)}
+  .nl.active .ico{background:rgba(0,122,255,.12);transform:scale(1.06)}
   .nl.active span:not(.ico){color:var(--b);font-weight:800}
   .nl::after{display:none}
 }
 
 /* ── ADD BUTTON (mobile center floating) ── */
 @media(max-width:768px){
-  .nl-add{flex:0 0 68px;position:relative}
+  .nl-add{flex:0 0 62px;position:relative}
   .nl-add .ico{
     background:linear-gradient(145deg,#007aff 0%,#5856d6 100%);
     color:#fff;border-radius:50%;
-    width:52px;height:52px;
+    width:46px;height:46px;
     display:flex;align-items:center;justify-content:center;
-    font-size:1.5rem;
-    box-shadow:0 6px 24px rgba(0,122,255,.45),0 2px 8px rgba(0,0,0,.12);
-    margin-top:-22px;
-    border:3.5px solid var(--bg);
+    font-size:1.35rem;
+    box-shadow:0 5px 20px rgba(0,122,255,.4),0 2px 6px rgba(0,0,0,.1);
+    margin-top:-18px;
+    border:3px solid var(--bg);
     background-clip:padding-box;
     transition:transform .18s cubic-bezier(.34,1.56,.64,1),box-shadow .18s;
   }
   .nl-add:active .ico{transform:scale(.93)}
   .nl-add.active .ico{background:linear-gradient(145deg,#007aff,#5856d6)}
-  .nl-add span:not(.ico){color:var(--b);font-weight:800;font-size:.58rem}
-  .nl-more .ico{font-size:1.25rem}
-  .nl-more.active .ico{background:rgba(0,122,255,.13)}
+  .nl-add span:not(.ico){color:var(--b);font-weight:800;font-size:.56rem}
+  .nl-more .ico{font-size:1.2rem}
+  .nl-more.active .ico{background:rgba(0,122,255,.12)}
 }
 
 /* ── MORE SHEET ── */
