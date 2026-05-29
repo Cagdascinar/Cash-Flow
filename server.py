@@ -4687,10 +4687,9 @@ window.onload=function(){
   var prefix=h<5?'İyi geceler':h<12?'Günaydın':h<18?'İyi günler':'İyi akşamlar';
   var gEl=document.getElementById('hero-greeting');
   if(gEl) gEl.textContent=gEl.textContent.replace('Merhaba',prefix);
-  loadCats(function(){
-    loadAllTx();
-    populateYearFilter();
-  });
+  loadCats();
+  loadAllTx();
+  populateYearFilter();
   loadDashboard();
   setupDrop();
   loadProfiles();
@@ -5165,7 +5164,7 @@ function loadCats(cb){
   });
 }
 function fillSel(id,list){
-  var s=document.getElementById(id); s.innerHTML='';
+  var s=document.getElementById(id); if(!s)return; s.innerHTML='';
   list.forEach(function(c){s.innerHTML+='<option>'+c+'</option>'});
 }
 function setTab(t){
