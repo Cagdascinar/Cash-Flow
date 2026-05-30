@@ -122,11 +122,12 @@ HTML = r"""<!DOCTYPE html>
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0a0c12">
 <meta name="description" content="Kirpi — Kişisel nakit akışı takip uygulaması">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Kirpi">
 <link rel="manifest" href="/manifest.json">
 <title>Kirpi — Finansal Kontrol</title>
@@ -147,7 +148,10 @@ HTML = r"""<!DOCTYPE html>
   --font:'Inter',system-ui,sans-serif;
 }
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-body{background:var(--bg);color:var(--txt);font-family:var(--font);min-height:100vh;overflow-x:hidden}
+body{background:var(--bg);color:var(--txt);font-family:var(--font);min-height:100vh;overflow-x:hidden;
+  overscroll-behavior:none;-webkit-overflow-scrolling:touch;
+  -webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:text}
 
 /* ── LAYOUT ── */
 .shell{display:flex;min-height:100vh}
@@ -253,8 +257,9 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
 
 /* ── PAGE ── */
 .main{display:flex;flex-direction:column}
-.page{display:none;padding:20px 28px;max-width:1280px;will-change:opacity,transform;opacity:0;transform:translateY(10px)}
-.page.active{display:block;opacity:1;transform:translateY(0);transition:opacity .22s ease,transform .22s ease}
+.page{display:none;padding:20px 28px;max-width:1280px;will-change:opacity,transform;opacity:0;transform:translateX(18px)}
+.page.active{display:block;opacity:1;transform:translateX(0);transition:opacity .2s ease,transform .2s cubic-bezier(.25,.46,.45,.94)}
+.page.slide-back{transform:translateX(-18px)}
 @media(max-width:600px){.page{padding:14px 14px 20px}}
 .page-title{font-size:1.4rem;font-weight:800;margin-bottom:4px;letter-spacing:-.02em}
 .page-sub{font-size:.82rem;color:var(--txt2);margin-bottom:24px}
@@ -801,7 +806,10 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .page.active{animation:page-in .22s ease-out}
 
 /* ── TAP FEEDBACK ────────────────────────────────────────────── */
-.tappable{cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .1s,opacity .1s}
+.tappable{cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s,opacity .12s;touch-action:manipulation}
+.tappable:active{transform:scale(.96);opacity:.85}
+button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.btn:active{transform:scale(.97);opacity:.88}
 .tappable:active{transform:scale(.97);opacity:.85}
 
 /* ── TODOS PAGE ──────────────────────────────────────────────── */
@@ -2400,6 +2408,33 @@ function confirmDeleteAccount(){
       else{errEl.textContent=d.error||'Bir hata oluştu';}
     }).catch(()=>{errEl.textContent='Bağlantı hatası';});
 }
+
+// ── NATIVE APP FEEL ──────────────────────────────────────────────────────────
+// Pull-to-refresh engeli
+var _lastTouchY = 0;
+document.addEventListener('touchstart', function(e){ _lastTouchY = e.touches[0].clientY; }, {passive:true});
+document.addEventListener('touchmove', function(e){
+  var el = e.target.closest('.s-body,.more-sheet,.mod-sheet,.ledger-wrap,[style*="overflow"]');
+  if(!el && e.touches[0].clientY > _lastTouchY && window.scrollY === 0){
+    e.preventDefault();
+  }
+}, {passive:false});
+
+// iOS status bar rengini sayfa geçişlerinde koru
+function _setStatusBar(color){
+  var m = document.querySelector('meta[name=theme-color]');
+  if(m) m.content = color || (document.documentElement.getAttribute('data-theme')==='dark'?'#0a0c12':'#f2f2f7');
+}
+
+// ── HAPTIC FEEDBACK ──────────────────────────────────────────────────────────
+function haptic(ms){
+  if(navigator.vibrate) navigator.vibrate(ms||8);
+}
+// Tüm buton ve tappable'lara haptic ekle
+document.addEventListener('touchstart', function(e){
+  var t = e.target.closest('button,.btn,.tappable,.nl,.more-tile,.ob-step');
+  if(t) haptic(6);
+}, {passive:true});
 
 // ── DARK MODE ────────────────────────────────────────────────────────────────
 function _syncDarkModeUI(){
