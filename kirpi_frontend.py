@@ -132,7 +132,10 @@ HTML = r"""<!DOCTYPE html>
 <link rel="manifest" href="/manifest.json">
 <title>Kirpi — Finansal Kontrol</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
+*{box-sizing:border-box;margin:0;padding:0;max-width:100%}
+img,video,canvas,svg{max-width:100%;display:block}
+html{overflow-x:hidden;max-width:100vw}
+html,body{position:relative;width:100%;max-width:100vw}
 :root{
   --bg:#f2f2f7;--bg2:#ffffff;--bg3:#e5e5ea;--bg4:#d1d1d6;
   --g:#34c759;--r:#ff3b30;--b:#007aff;--b2:#5856d6;--y:#ff9500;--p:#af52de;--c:#32ade6;
