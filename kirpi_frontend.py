@@ -1223,7 +1223,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
       <span style="display:block;width:16px;height:2px;background:var(--txt);border-radius:2px;transition:.2s"></span>
       <span style="display:block;width:20px;height:2px;background:var(--txt);border-radius:2px;transition:.2s"></span>
     </button>
-    <div class="top-header-logo tappable" onclick="openMoreSheet()" style="cursor:pointer">🦔 <span style="color:var(--b);font-weight:900">Kirpi</span></div>
+    <div class="top-header-logo tappable" onclick="openMoreSheet()" style="cursor:pointer">🦔 <span style="color:var(--b);font-weight:900">Kirpi Finans</span></div>
   </div>
   <div class="top-header-right">
     <div class="notif-bell-wrap">
@@ -2553,7 +2553,7 @@ function confirmDeleteAccount(){
   setTimeout(function(){
     splash.classList.add('hide');
     setTimeout(function(){ splash.style.display='none'; }, 500);
-  }, 2200);
+  }, 4000);
 })();
 
 // ── NATIVE APP FEEL ──────────────────────────────────────────────────────────
