@@ -198,7 +198,8 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 /* ── MOBILE NAV — iOS Tab Bar style ── */
 @media(max-width:768px){
   .nl-desktop-only{display:none!important}
-  .nav-links{flex-direction:row;padding:0;gap:0;justify-content:space-around;align-items:center;height:56px;overflow:visible}
+  .nl-menu{display:flex}
+  .nav-links{flex-direction:row;padding:0;gap:0;justify-content:space-between;align-items:center;height:56px;overflow:visible}
   .nav-sect{display:none}
   .nl{flex-direction:column;gap:3px;font-size:.6rem;padding:0 4px 2px;min-width:0;flex:1;
       border-radius:0;box-shadow:none!important;background:transparent!important;align-items:center}
@@ -354,7 +355,7 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 .page{display:none;padding:20px 28px;max-width:1280px;will-change:opacity,transform;opacity:0;transform:translateX(18px)}
 .page.active{display:block;opacity:1;transform:translateX(0);transition:opacity .2s ease,transform .2s cubic-bezier(.25,.46,.45,.94)}
 .page.slide-back{transform:translateX(-18px)}
-@media(max-width:600px){.page{padding:14px 14px 20px}}
+@media(max-width:600px){.page{padding:16px 16px 20px}}
 .page-title{font-size:1.75rem;font-weight:900;margin-bottom:4px;letter-spacing:-.03em}
 .page-sub{font-size:.84rem;color:var(--txt2);margin-bottom:20px}
 @media(max-width:768px){
@@ -797,7 +798,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .settings-profile-item .sp-active{font-size:.68rem;color:var(--g);font-weight:700;padding:2px 8px;background:#22c55e15;border-radius:8px;border:1px solid #22c55e25}
 
 /* ── HERO BALANCE CARD ────────────────────────────────────── */
-.hero-card{background:linear-gradient(145deg,#0d1f3c 0%,#16305a 55%,#1a3565 100%);border:none;border-radius:26px;padding:26px 22px 22px;margin-bottom:16px;position:relative;overflow:hidden;box-shadow:0 14px 52px rgba(8,28,80,.5),0 2px 10px rgba(0,0,0,.2)}
+.hero-card{background:linear-gradient(145deg,#0d1f3c 0%,#16305a 55%,#1a3565 100%);border:none;border-radius:26px;padding:22px 22px 22px;margin-bottom:16px;position:relative;overflow:hidden;box-shadow:0 14px 52px rgba(8,28,80,.5),0 2px 10px rgba(0,0,0,.2)}
 .hero-card::before{content:'';position:absolute;top:-70px;right:-60px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(99,160,255,.18),transparent 70%)}
 .hero-card::after{content:'';position:absolute;bottom:-60px;left:-40px;width:210px;height:210px;border-radius:50%;background:radial-gradient(circle,rgba(52,199,89,.13),transparent 70%)}
 .hero-top-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;position:relative}
@@ -944,6 +945,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 
 /* ── MOBILE NAV ENHANCEMENTS ────────────────────────────────── */
 .nl-desktop{}
+.nl-menu{display:none}
 @media(max-width:768px){
   nav{height:64px;padding:0;box-shadow:0 -1px 0 var(--border),0 -4px 16px rgba(0,0,0,.07)}
   .main{margin-bottom:64px}
@@ -977,7 +979,9 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .tappable{cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s,opacity .12s;touch-action:manipulation}
 .tappable:active{transform:scale(.96);opacity:.85}
 button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-.btn:active{transform:scale(.97);opacity:.88}
+a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
+.btn:active{transform:scale(.97);opacity:.9}
+.btn-primary:active,.btn-green:active,.btn-danger:active{opacity:1}
 .tappable:active{transform:scale(.97);opacity:.85}
 
 /* ── TODOS PAGE ──────────────────────────────────────────────── */
@@ -1176,6 +1180,9 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
     </div>
     <div class="nl" data-page="todos" onclick="goPage('todos',this)">
       <span class="ico">✅</span>Görevler
+    </div>
+    <div class="nl nl-menu" onclick="openMoreSheet()">
+      <span class="ico">☰</span>Menü
     </div>
     <div class="nl nl-more nl-desktop-only" onclick="openMoreSheet()">
       <span class="ico">⋯</span>Daha
@@ -2723,22 +2730,26 @@ function goPage(id, el){
   if(el) el.classList.add('active');
 
   function show(){
-    document.querySelectorAll('.page').forEach(function(p){
-      p.classList.remove('active');
-      p.style.transition='none';
-      p.style.opacity='0';
-      p.style.transform='translateY(12px)';
-      p.style.display='none';
-    });
+    // Önce yeni sayfayı hazırla (gizli)
     next.style.display='block';
     next.style.opacity='0';
-    next.style.transform='translateY(12px)';
+    next.style.transform='translateX(12px)';
     next.style.transition='none';
+
     requestAnimationFrame(function(){
+      // Eski sayfayı fade out
+      if(prev && prev !== next){
+        prev.style.transition='opacity .15s ease';
+        prev.style.opacity='0';
+      }
       requestAnimationFrame(function(){
-        next.style.transition='opacity .24s ease,transform .24s ease';
+        // Eski gizle, yeni göster
+        document.querySelectorAll('.page').forEach(function(p){
+          if(p !== next){ p.classList.remove('active'); p.style.display='none'; p.style.opacity=''; p.style.transition=''; p.style.transform=''; }
+        });
+        next.style.transition='opacity .2s ease,transform .2s cubic-bezier(.25,.46,.45,.94)';
         next.style.opacity='1';
-        next.style.transform='translateY(0)';
+        next.style.transform='translateX(0)';
         next.classList.add('active');
       });
     });
@@ -2989,7 +3000,12 @@ function switchProfile(pid){
     renderSettingsProfiles();
     showToast('Profil: '+d.name,'#6366f1');
     applyProfileType(d.type);
-    loadDashboard(); renderLedger();
+    // Önbelleği temizle — yeni profilin verilerini çek
+    allTx = []; filteredTx = [];
+    loadDashboard();
+    loadAllTx();
+    loadInsights();
+    loadReminders();
   });
 }
 
