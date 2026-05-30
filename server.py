@@ -19,16 +19,18 @@ log = logging.getLogger("kirpi")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+_is_prod = not os.environ.get("FLASK_DEBUG")
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=_is_prod,
     PERMANENT_SESSION_LIFETIME=timedelta(days=30),
 )
 
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=[],
+    default_limits=["300 per minute"],
     storage_uri=os.environ.get("REDIS_URL", "memory://"),
 )
 
@@ -743,6 +745,7 @@ def login():
         if row and check_password_hash(row["password_hash"], password):
             if not row["email_verified"]:
                 return AUTH_HTML_render("login", "✉️ Email adresiniz doğrulanmamış. Şifreyi biliyorsanız <a href='/forgot-password' style='color:#818cf8'>şifre sıfırla</a> yaparak hem şifreyi sıfırlayın hem de emailinizi doğrulatın. Ya da <a href='/resend-verify' style='color:#818cf8'>yeni doğrulama maili al</a>.")
+            session.permanent   = True
             session["user_id"]  = row["id"]
             session["username"] = row["username"]
             session["display"]  = row["display_name"]
@@ -875,6 +878,10 @@ def api_me_update():
         db.execute("UPDATE users SET display_name=? WHERE id=?", (display, uid))
         session["display"] = display
     if avatar is not None:
+        safe_prefixes = ("data:image/png;base64,", "data:image/jpeg;base64,",
+                         "data:image/jpg;base64,", "data:image/webp;base64,")
+        if avatar and not any(avatar.startswith(p) for p in safe_prefixes):
+            return jsonify({"ok": False, "error": "Geçersiz resim formatı"}), 400
         db.execute("UPDATE users SET avatar=? WHERE id=?", (avatar, uid))
     db.commit()
     return jsonify({"ok": True})
@@ -964,6 +971,10 @@ def update_profile_avatar(pid):
     uid = session["user_id"]
     data = request.get_json(force=True)
     avatar = data.get("avatar", "")
+    safe_prefixes = ("data:image/png;base64,", "data:image/jpeg;base64,",
+                     "data:image/jpg;base64,", "data:image/webp;base64,")
+    if avatar and not any(avatar.startswith(p) for p in safe_prefixes):
+        return jsonify({"ok": False, "error": "Geçersiz resim formatı"}), 400
     db = get_db()
     db.execute("UPDATE profiles SET avatar=? WHERE id=? AND user_id=?", (avatar, pid, uid))
     db.commit()
@@ -1688,9 +1699,15 @@ def _parse_tg_msg(text):
     return {"type": ttype, "amount": amount, "category": category,
             "description": ' '.join(desc_words) or text}
 
+TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
+
 @app.route("/api/telegram/webhook", methods=["POST"])
 def telegram_webhook():
     if not TELEGRAM_TOKEN: return "ok"
+    if TELEGRAM_WEBHOOK_SECRET:
+        incoming = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+        if not secrets.compare_digest(incoming, TELEGRAM_WEBHOOK_SECRET):
+            return "Forbidden", 403
     data = request.get_json(force=True, silent=True) or {}
 
     # ── Callback query (Evet/Hayır butonları) ──
@@ -4365,7 +4382,7 @@ def gizlilik():
 <h2>6. Üçüncü Taraf Hizmetler</h2>
 <ul>
 <li><strong>Railway.app:</strong> Uygulama barındırma (ABD merkezli)</li>
-<li><strong>Gmail SMTP:</strong> E-posta bildirimleri</li>
+<li><strong>Zoho/Gmail SMTP:</strong> E-posta bildirimleri</li>
 <li><strong>open.er-api.com:</strong> Döviz kurları (anonim)</li>
 <li><strong>tefas.gov.tr:</strong> Fon fiyatları (anonim)</li>
 </ul>
@@ -4450,12 +4467,14 @@ def admin_panel():
     rows_html = ""
     for u in recent_users:
         uname = html_escape(u['username'])
+        safe_uname = html_escape(u['username'])
         rows_html += f"""<tr>
-        <td>{uname}</td>
+        <td>{safe_uname}</td>
         <td>{html_escape(u['display_name'])}</td>
         <td>{html_escape(u['email'])}</td>
         <td style="color:#64748b;font-size:.8rem">{u['created_at'][:10]}</td>
-        <td><form method="POST" action="/admin/delete-user/{uname}" onsubmit="return confirm('{uname} kullanıcısını ve tüm verilerini silmek istediğinize emin misiniz?')">
+        <td><form method="POST" action="/admin/delete-user/{safe_uname}" onsubmit="return confirm('Bu kullanıcıyı ve tüm verilerini silmek istediğinize emin misiniz?')">
+          <input type="hidden" name="csrf_token" value="{get_csrf_token()}">
           <button type="submit" style="background:#ef444420;color:#ef4444;border:1px solid #ef444440;border-radius:6px;padding:4px 10px;font-size:.75rem;cursor:pointer">Sil</button>
         </form></td>
         </tr>"""
@@ -4554,6 +4573,8 @@ data.forEach(function(v,i){{
 @app.route("/admin/delete-user/<username>", methods=["POST"])
 @admin_required
 def admin_delete_user(username):
+    if not validate_csrf():
+        return "Geçersiz istek", 403
     with pg_connect() as con:
         user = con.execute("SELECT id FROM users WHERE username=%s", (username,)).fetchone()
         if not user:
@@ -4572,7 +4593,7 @@ if __name__ == "__main__":
     init_db()
     t = threading.Thread(target=_daily_backup_loop, daemon=True)
     t.start()
-    app.run(debug=True, port=5001)
+    app.run(debug=os.environ.get("FLASK_DEBUG") == "1", port=5001)
 
 init_db()
 _backup_thread = threading.Thread(target=_daily_backup_loop, daemon=True)
