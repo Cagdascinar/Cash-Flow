@@ -1940,10 +1940,37 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   <!-- App Info -->
   <!-- Telegram Bot -->
   <div class="settings-card">
-    <div class="settings-sect-title">📱 Telegram</div>
-    <div style="font-size:.78rem;color:var(--txt2);margin-bottom:12px;line-height:1.6">
-      Telegram'da <b id="tg-botname-lbl">@AppKirpi_BOT</b>'u açıp bağlantı kodu göndererek harcamalarınızı mesajla kaydedebilirsiniz.
+    <div class="settings-sect-title">📱 Telegram Botu</div>
+
+    <!-- Kurulum Rehberi (bot bağlı değilse göster) -->
+    <div id="tg-setup-guide" style="margin-bottom:14px">
+      <div style="font-size:.82rem;font-weight:700;color:var(--txt);margin-bottom:10px">Nasıl çalışır?</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <div style="width:22px;height:22px;border-radius:50%;background:var(--b);color:#fff;font-size:.7rem;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">1</div>
+          <div style="font-size:.8rem;color:var(--txt2);line-height:1.5">Telegram'da <b id="tg-botname-lbl" style="color:var(--b)">@KirpiNakitBot</b>'u ara ve <b>Başlat</b>'a bas</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <div style="width:22px;height:22px;border-radius:50%;background:var(--b);color:#fff;font-size:.7rem;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">2</div>
+          <div style="font-size:.8rem;color:var(--txt2);line-height:1.5">Aşağıdan <b>Bağlantı Kodu Al</b> butonuna bas</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <div style="width:22px;height:22px;border-radius:50%;background:var(--b);color:#fff;font-size:.7rem;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">3</div>
+          <div style="font-size:.8rem;color:var(--txt2);line-height:1.5">Bota <code style="background:var(--bg3);padding:2px 6px;border-radius:5px">/link KOD</code> gönder — bağlandı! 🎉</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <div style="width:22px;height:22px;border-radius:50%;background:var(--g);color:#fff;font-size:.7rem;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">✓</div>
+          <div style="font-size:.8rem;color:var(--txt2);line-height:1.5">Artık bota <code style="background:var(--bg3);padding:2px 6px;border-radius:5px">market 250</code> yaz → harcama otomatik kaydolur</div>
+        </div>
+      </div>
+      <div style="background:var(--bg3);border-radius:10px;padding:10px 12px;font-size:.76rem;color:var(--txt2);line-height:1.6">
+        <b style="color:var(--txt)">Örnek komutlar:</b><br>
+        <code>market 250</code> → Gider: Market/Gıda ₺250<br>
+        <code>maaş 15000</code> → Gelir: Maaş ₺15.000<br>
+        <code>yemek 85 öğle</code> → Açıklamayla gider
+      </div>
     </div>
+
     <div id="tg-members-list" style="margin-bottom:12px"></div>
     <div id="tg-code-area" style="display:none;margin-bottom:12px">
       <div style="background:var(--bg3);border-radius:13px;padding:14px 16px;margin-bottom:10px;border:1px solid var(--border2)">
@@ -1952,12 +1979,12 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
         <div style="font-size:.7rem;color:var(--txt2);margin-top:6px">Komut: <code id="tg-cmd" style="background:var(--bg4);padding:2px 6px;border-radius:5px">/link KOD</code> &nbsp;·&nbsp; 15 dk geçerli</div>
       </div>
       <div style="font-size:.78rem;color:var(--txt2);line-height:1.7">
-        1. Telegram'da <b id="tg-botname">@AppKirpi_BOT</b>'u açın<br>
+        1. Telegram'da <b id="tg-botname">@KirpiNakitBot</b>'u açın<br>
         2. <code>/link <span id="tg-code-inline">KOD</span></code> yazıp gönderin<br>
         3. Artık <code>market 250</code>, <code>yemek 85</code> gibi mesajlarla harcama kaydolur
       </div>
     </div>
-    <button class="btn btn-primary" style="width:100%;padding:11px;font-size:.86rem" onclick="getTgCode()">➕ Kişi Ekle / Bağla</button>
+    <button class="btn btn-primary" style="width:100%;padding:11px;font-size:.86rem" onclick="getTgCode()">🔗 Bağlantı Kodu Al</button>
   </div>
 
   <div class="settings-card">
