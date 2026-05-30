@@ -210,24 +210,22 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 
 /* ── ADD BUTTON (mobile center floating) ── */
 @media(max-width:768px){
-  .nl-add{flex:0 0 62px;position:relative}
+  .nl-add{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;padding-top:0}
   .nl-add .ico{
-    background:linear-gradient(145deg,#007aff 0%,#5856d6 100%);
-    color:#fff;border-radius:50%;
-    width:46px;height:46px;
+    background:linear-gradient(145deg,#f0b90b 0%,#d4a017 100%);
+    color:#1e2026;border-radius:50%;
+    width:48px;height:48px;
     display:flex;align-items:center;justify-content:center;
-    font-size:1.35rem;
-    box-shadow:0 5px 20px rgba(0,122,255,.4),0 2px 6px rgba(0,0,0,.1);
-    margin-top:-18px;
+    font-size:1.5rem;
+    box-shadow:0 4px 0 #a07800,0 6px 20px rgba(240,185,11,.4);
+    margin-top:-20px;
     border:3px solid var(--bg);
+    transition:transform .15s cubic-bezier(.34,1.56,.64,1),box-shadow .15s;
     background-clip:padding-box;
-    transition:transform .18s cubic-bezier(.34,1.56,.64,1),box-shadow .18s;
   }
-  .nl-add:active .ico{transform:scale(.93)}
-  .nl-add.active .ico{background:linear-gradient(145deg,#007aff,#5856d6)}
-  .nl-add span:not(.ico){color:var(--b);font-weight:800;font-size:.56rem}
-  .nl-more .ico{font-size:1.2rem}
-  .nl-more.active .ico{background:rgba(0,122,255,.12)}
+  .nl-add:active .ico{transform:scale(.93) translateY(3px);box-shadow:0 1px 0 #a07800,0 3px 10px rgba(240,185,11,.3)}
+  .nl-add.active .ico{background:linear-gradient(145deg,#f0b90b,#d4a017)}
+  .nl-add span:not(.ico){color:var(--b);font-weight:800;font-size:.56rem;margin-top:4px}
 }
 
 /* ── MORE SHEET ── */
@@ -247,8 +245,22 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 #splash-screen.hide{opacity:0;pointer-events:none}
 .splash-bg{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,rgba(240,185,11,.08),transparent 70%)}
 .splash-content{display:flex;flex-direction:column;align-items:center;gap:12px;position:relative}
-.splash-kirpi{font-size:5rem;animation:splash-bounce 1s cubic-bezier(.34,1.56,.64,1) forwards;opacity:0}
-@keyframes splash-bounce{0%{opacity:0;transform:scale(.3) translateY(30px)}60%{opacity:1;transform:scale(1.15)}100%{opacity:1;transform:scale(1) translateY(0)}}
+/* Kirpi splash: soldan koşup gelir, ortada durup sevinç zıplaması yapar */
+.splash-kirpi{
+  font-size:5rem;
+  opacity:0;
+  animation:kirpi-enter 2s cubic-bezier(.25,.46,.45,.94) forwards;
+}
+@keyframes kirpi-enter{
+  0%  {opacity:0;transform:translateX(-200px) scaleX(-1)}
+  15% {opacity:1;transform:translateX(-200px) scaleX(-1)}
+  50% {opacity:1;transform:translateX(0) scaleX(1) rotate(0deg)}
+  58% {transform:translateX(0) scaleX(1) translateY(-18px) rotate(-8deg)}
+  65% {transform:translateX(0) scaleX(1) translateY(0) rotate(6deg)}
+  72% {transform:translateX(0) scaleX(1) translateY(-10px) rotate(-4deg)}
+  78% {transform:translateX(0) scaleX(1) translateY(0) rotate(2deg)}
+  100%{transform:translateX(0) scaleX(1) rotate(0deg);opacity:1}
+}
 .splash-name{font-size:2.2rem;font-weight:900;color:#f0b90b;letter-spacing:-.04em;
   animation:splash-fade .6s .4s ease forwards;opacity:0}
 .splash-tag{font-size:.9rem;color:#848e9c;animation:splash-fade .6s .6s ease forwards;opacity:0}
@@ -738,9 +750,19 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .hero-card::after{content:'';position:absolute;bottom:-60px;left:-40px;width:210px;height:210px;border-radius:50%;background:radial-gradient(circle,rgba(52,199,89,.13),transparent 70%)}
 .hero-top-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;position:relative}
 .hero-greeting{font-size:.82rem;color:rgba(255,255,255,.55);font-weight:500}
-.hero-kirpi{font-size:1.8rem;line-height:1;transition:transform .4s cubic-bezier(.34,1.56,.64,1),opacity .3s;user-select:none}
-.hero-kirpi.bounce{animation:kirpi-bounce .5s cubic-bezier(.34,1.56,.64,1)}
-@keyframes kirpi-bounce{0%{transform:scale(1)}40%{transform:scale(1.35)}100%{transform:scale(1)}}
+.hero-kirpi{font-size:1.8rem;line-height:1;user-select:none;
+  animation:kirpi-walk-hero 1.8s ease-in-out infinite;
+  display:inline-block}
+@keyframes kirpi-walk-hero{
+  0%,100%{transform:translateY(0) rotate(0deg)}
+  15%    {transform:translateY(-4px) rotate(-6deg) scaleX(-1)}
+  30%    {transform:translateY(0)   rotate(0deg)  scaleX(-1)}
+  45%    {transform:translateY(-4px) rotate(6deg) scaleX(1)}
+  60%    {transform:translateY(0)   rotate(0deg)  scaleX(1)}
+  75%    {transform:translateY(-2px) rotate(-3deg) scaleX(1)}
+}
+.hero-kirpi.bounce{animation:kirpi-hero-pop .4s cubic-bezier(.34,1.56,.64,1)}
+@keyframes kirpi-hero-pop{0%{transform:scale(1)}50%{transform:scale(1.4)}100%{transform:scale(1)}}
 .hero-period-tabs{display:flex;gap:4px;background:rgba(255,255,255,.1);border-radius:9px;padding:3px;margin-bottom:8px;position:relative;width:fit-content}
 .hero-period-tab{padding:4px 14px;border-radius:7px;font-size:.7rem;font-weight:600;color:rgba(255,255,255,.45);cursor:pointer;transition:.18s;border:none;background:transparent}
 .hero-period-tab.active{background:#fff;color:#0d1f3c;box-shadow:0 1px 6px rgba(0,0,0,.2)}
