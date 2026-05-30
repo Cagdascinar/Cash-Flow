@@ -217,53 +217,59 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
     overflow:visible;
   }
 
-  /* 4 sekmenin hepsi eşit genişlik */
+  /* TÜM sekmeler — aynı kurallar, tam simetri */
   .nl {
-    flex:1;
-    flex-direction:column;
-    gap:3px;
-    font-size:.58rem;
-    padding:0 4px 2px;
-    border-radius:0;
+    flex:1!important;
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:center!important;
+    justify-content:center!important;
+    gap:4px;
+    height:56px;
+    padding:0;
     box-shadow:none!important;
     background:transparent!important;
-    align-items:center;
-  }
-  .nl .ico {
-    font-size:1.3rem;
-    line-height:1.2;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    background:transparent;
-    transition:transform .15s cubic-bezier(.34,1.4,.64,1);
-  }
-  .nl span:not(.ico) { color:var(--txt2); font-weight:500; font-size:.57rem; }
-  .nl.active .ico    { transform:scale(1.1) }
-  .nl.active span:not(.ico) { color:var(--b); font-weight:700 }
-  .nl::after { display:none }
-
-  /* Ekle — bar içinde normal sekme, sadece sarı ikon */
-  .nl-add-ghost { display:none!important }
-  .nl-add {
-    flex:1!important;
+    border-radius:0;
+    cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+    text-align:center;
     position:static!important;
     transform:none!important;
-    bottom:auto!important;
     width:auto!important;
   }
-  .nl-add .ico {
-    background:linear-gradient(145deg,#f0b90b,#d4a017);
-    color:#1e2026!important;
-    border-radius:14px;
-    width:36px; height:28px;
-    font-size:1.1rem;
-    box-shadow:0 2px 8px rgba(240,185,11,.4);
-    margin-top:0;
-    border:none;
+  .nl .ico {
+    display:flex!important;
+    align-items:center;
+    justify-content:center;
+    width:28px;height:28px;
+    font-size:1.25rem;
+    line-height:1;
+    transition:transform .14s cubic-bezier(.34,1.4,.64,1);
   }
-  .nl-add:active .ico { transform:scale(.92); }
-  .nl-add span:not(.ico) { color:#f0b90b; font-weight:800; font-size:.57rem; }
+  .nl span:not(.ico) {
+    font-size:.56rem;
+    font-weight:500;
+    color:var(--txt2);
+    white-space:nowrap;
+  }
+  .nl.active .ico { transform:scale(1.1) }
+  .nl.active span:not(.ico) { color:var(--b);font-weight:700 }
+  .nl::after { display:none!important }
+
+  /* Ekle — aynı boyut, sadece sarı ikon farkı */
+  .nl-add-ghost { display:none!important }
+  .nl-add .ico {
+    background:linear-gradient(145deg,#f0b90b,#d4a017)!important;
+    color:#1e2026!important;
+    border-radius:10px;
+    font-size:1.1rem;
+    box-shadow:0 2px 6px rgba(240,185,11,.4);
+  }
+  .nl-add span:not(.ico) { color:#f0b90b!important;font-weight:700 }
+  .nl-add:active .ico { transform:scale(.92)!important }
+
+  /* Gizlenenler — en sona, kesin override */
+  .nl-desktop,.nl-desktop-only,.nl-menu,.nl-more,.nav-sect{display:none!important}
 }
 
 /* ── MORE SHEET ── */
