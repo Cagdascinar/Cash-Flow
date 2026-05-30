@@ -243,40 +243,27 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
   .nl.active span:not(.ico) { color:var(--b); font-weight:700 }
   .nl::after { display:none }
 
-  /* Gizli spacer — Görevler'in sağındaki yer tutucu */
-  .nl-add-ghost { flex:1; visibility:hidden; display:block!important }
-
-  /* Ekle — position:absolute, kesinlikle %50 merkez */
+  /* Ekle — bar içinde normal sekme, sadece sarı ikon */
+  .nl-add-ghost { display:none!important }
   .nl-add {
-    position:absolute!important;
-    left:50%!important;
-    transform:translateX(-50%)!important;
-    bottom:4px!important;
-    flex:none!important;
-    width:56px;
-    display:flex!important;flex-direction:column;
-    align-items:center;gap:3px;
-    background:transparent!important;box-shadow:none!important;
-    cursor:pointer;-webkit-tap-highlight-color:transparent;
+    flex:1!important;
+    position:static!important;
+    transform:none!important;
+    bottom:auto!important;
+    width:auto!important;
   }
-  /* Ekle butonu — yükseltilmiş sarı daire */
   .nl-add .ico {
     background:linear-gradient(145deg,#f0b90b,#d4a017);
-    color:#1e2026;
-    border-radius:50%;
-    width:46px; height:46px;
-    font-size:1.4rem;
-    box-shadow:0 4px 0 #a07800, 0 6px 18px rgba(240,185,11,.38);
-    margin-top:-18px;
-    border:3px solid var(--bg);
-    transition:transform .14s cubic-bezier(.34,1.56,.64,1), box-shadow .14s;
-    background-clip:padding-box;
+    color:#1e2026!important;
+    border-radius:14px;
+    width:36px; height:28px;
+    font-size:1.1rem;
+    box-shadow:0 2px 8px rgba(240,185,11,.4);
+    margin-top:0;
+    border:none;
   }
-  .nl-add:active .ico {
-    transform:scale(.93) translateY(3px);
-    box-shadow:0 1px 0 #a07800, 0 2px 8px rgba(240,185,11,.2);
-  }
-  .nl-add span:not(.ico) { color:var(--b); font-weight:800; font-size:.56rem; }
+  .nl-add:active .ico { transform:scale(.92); }
+  .nl-add span:not(.ico) { color:#f0b90b; font-weight:800; font-size:.57rem; }
 }
 
 /* ── MORE SHEET ── */
@@ -1223,12 +1210,11 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
     <div class="nl" data-page="ledger" onclick="goPage('ledger',this)">
       <span class="ico">📋</span>İşlemler
     </div>
-    <div class="nl-add-ghost"></div>
-    <div class="nl" data-page="todos" onclick="goPage('todos',this)">
-      <span class="ico">✅</span>Görevler
-    </div>
     <div class="nl nl-add" data-page="add" onclick="goPage('add',this)">
       <span class="ico">➕</span>Ekle
+    </div>
+    <div class="nl" data-page="todos" onclick="goPage('todos',this)">
+      <span class="ico">✅</span>Görevler
     </div>
     <div class="nl nl-menu" onclick="openMoreSheet()">
       <span class="ico">☰</span>Menü
