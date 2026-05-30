@@ -1333,10 +1333,42 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     </div>
   </div>
 
-  <!-- hidden canvases needed by JS (not rendered) -->
+  <!-- ── GRAFİKLER ── -->
+  <div class="dash-section" id="charts-section">
+    <div class="s-header" onclick="toggleSection('charts')">
+      <div class="sh-left"><span class="sh-dot" style="background:var(--b2)"></span>Aylık Analiz</div>
+      <span class="sh-chevron" id="chevron-charts">▾</span>
+    </div>
+    <div class="s-body" id="sec-charts">
+
+      <!-- Bar Chart -->
+      <div style="margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div class="chart-lbl">Aylık Gelir / Gider</div>
+          <div style="display:flex;gap:14px;font-size:.72rem;color:var(--txt2)">
+            <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#30d15870;margin-right:4px"></span>Gelir</span>
+            <span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#ff453a70;margin-right:4px"></span>Gider</span>
+          </div>
+        </div>
+        <div class="chart-wrap" style="height:220px">
+          <canvas id="barChart" style="height:220px"></canvas>
+        </div>
+        <div style="font-size:.72rem;color:var(--txt2);text-align:center;margin-top:6px">Bir aya tıkla → o ayın işlemlerini gör</div>
+      </div>
+
+      <!-- Donut Chart -->
+      <div>
+        <div class="chart-lbl">Bu Dönem Gider Dağılımı</div>
+        <div class="chart-wrap" style="height:220px">
+          <canvas id="donut" style="height:220px"></canvas>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- hidden elements needed by JS -->
   <div style="display:none">
-    <canvas id="barChart"></canvas>
-    <canvas id="donut"></canvas>
     <div id="sec-analytics"></div>
     <div id="db-sub"></div>
     <div id="mlabel"></div><div id="ylabel"></div>
@@ -3506,7 +3538,7 @@ function renderMotivation(d){
 var _barCols=[], _barYear=new Date().getFullYear();
 function drawBar(data){
   var cv=document.getElementById('barChart');
-  var W=cv.parentElement.clientWidth||400, H=190;
+  var W=cv.parentElement.clientWidth||400, H=220;
   cv.width=W; cv.height=H;
   var ctx=cv.getContext('2d');
   ctx.clearRect(0,0,W,H);
@@ -3515,11 +3547,14 @@ function drawBar(data){
   if(!maxVal)maxVal=1;
   var p={t:10,r:10,b:28,l:52}, cw=W-p.l-p.r, ch=H-p.t-p.b, gap=cw/12, bw=gap*0.28;
   _barCols=[]; _barYear=(_heroPeriod==='year')?_heroYear:curYear;
-  ctx.strokeStyle='#d1d1d6'; ctx.lineWidth=1;
+  var isDark=document.documentElement.getAttribute('data-theme')==='dark';
+  var gridColor=isDark?'#1e2233':'#e5e5ea';
+  var labelColor=isDark?'#94a3b8':'#6d6d72';
+  ctx.strokeStyle=gridColor; ctx.lineWidth=1;
   [0,.25,.5,.75,1].forEach(function(f){
     var y=p.t+ch*(1-f);
     ctx.beginPath();ctx.moveTo(p.l,y);ctx.lineTo(W-p.r,y);ctx.stroke();
-    ctx.fillStyle='#6d6d72';ctx.font='10px Inter,system-ui';ctx.textAlign='right';
+    ctx.fillStyle=labelColor;ctx.font='10px Inter,system-ui';ctx.textAlign='right';
     ctx.fillText(fmtK(maxVal*f),p.l-4,y+3);
   });
   data.forEach(function(d,i){
@@ -3532,7 +3567,7 @@ function drawBar(data){
       ctx.strokeStyle='#6366f1';ctx.lineWidth=1.5;
       ctx.strokeRect(x-bw-4,p.t,bw*2+8,ch);
     }
-    ctx.fillStyle='#475569';ctx.font='9px Inter,system-ui';ctx.textAlign='center';
+    ctx.fillStyle=labelColor;ctx.font='9px Inter,system-ui';ctx.textAlign='center';
     ctx.fillText(MONTHS[i+1].slice(0,3),x,H-6);
   });
   cv.style.cursor='pointer';
@@ -3559,7 +3594,7 @@ function rr(ctx,x,y,w,h,r){
 var _donutSlices=[], _donutCX=0, _donutCY=0, _donutR=0, _donutr=0;
 function drawDonut(cats){
   var cv=document.getElementById('donut');
-  var W=cv.parentElement.clientWidth||400, H=190;
+  var W=cv.parentElement.clientWidth||400, H=220;
   cv.width=W; cv.height=H;
   var ctx=cv.getContext('2d');
   ctx.clearRect(0,0,W,H);
