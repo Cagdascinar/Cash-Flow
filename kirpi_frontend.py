@@ -226,6 +226,13 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
             max-height:82vh;overflow-y:auto}
 .more-sheet.open{transform:translateY(0)}
 .more-backdrop.open{display:block}
+/* Onboarding */
+.ob-step{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.15);
+  border-radius:12px;padding:12px 14px;cursor:pointer;transition:.12s}
+.ob-step:active{background:rgba(255,255,255,.25)}
+.ob-num{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.25);
+  display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:900;flex-shrink:0}
+
 .more-sheet-handle{width:40px;height:4px;border-radius:3px;background:var(--bg4);
                    margin:14px auto 6px;cursor:grab}
 .more-sect-label{font-size:.62rem;font-weight:800;text-transform:uppercase;
@@ -1168,6 +1175,49 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     </div>
     <span id="s-gelir-sub" style="display:none"></span>
     <span id="s-gider-sub" style="display:none"></span>
+  </div>
+
+  <!-- ── ONBOARDING ── -->
+  <div id="onboarding-card" style="display:none;background:linear-gradient(135deg,#6366f1,#a855f7);border-radius:20px;padding:24px;margin-bottom:16px;color:#fff">
+    <div style="font-size:2rem;margin-bottom:10px">🦔</div>
+    <div style="font-size:1.1rem;font-weight:900;margin-bottom:6px">Kirpi'ye Hoş Geldin!</div>
+    <div style="font-size:.84rem;opacity:.85;margin-bottom:18px;line-height:1.6">Finansal kontrolü ele geçirmek için 3 adım:</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px">
+      <div class="ob-step" id="ob-step-1" onclick="goPage('add',document.querySelector('[data-page=add]'))">
+        <div class="ob-num">1</div>
+        <div>
+          <div style="font-size:.86rem;font-weight:700">İlk işlemini ekle</div>
+          <div style="font-size:.74rem;opacity:.7">Gelir veya gider gir</div>
+        </div>
+        <div style="margin-left:auto;opacity:.6">›</div>
+      </div>
+      <div class="ob-step" id="ob-step-2" onclick="goPage('budget',document.querySelector('[data-page=budget]'))">
+        <div class="ob-num">2</div>
+        <div>
+          <div style="font-size:.86rem;font-weight:700">Bütçe belirle</div>
+          <div style="font-size:.74rem;opacity:.7">Kategori limitleri koy</div>
+        </div>
+        <div style="margin-left:auto;opacity:.6">›</div>
+      </div>
+      <div class="ob-step" id="ob-step-3" onclick="goPage('recurring',document.querySelector('[data-page=recurring]'))">
+        <div class="ob-num">3</div>
+        <div>
+          <div style="font-size:.86rem;font-weight:700">Düzenli işlemleri ekle</div>
+          <div style="font-size:.74rem;opacity:.7">Kira, maaş, abonelikler</div>
+        </div>
+        <div style="margin-left:auto;opacity:.6">›</div>
+      </div>
+    </div>
+    <button onclick="document.getElementById('onboarding-card').style.display='none'"
+      style="background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.3);color:#fff;border-radius:10px;padding:8px 18px;font-size:.82rem;font-weight:700;cursor:pointer">
+      Kapat
+    </button>
+  </div>
+
+  <!-- ── HATIRLATICILAR ── -->
+  <div id="reminders-card" style="display:none;background:var(--bg2);border:1.5px solid #007aff30;border-radius:16px;padding:16px 18px;margin-bottom:12px">
+    <div style="font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--b);margin-bottom:10px">🔔 Yaklaşan Ödemeler</div>
+    <div id="reminders-list"></div>
   </div>
 
   <!-- ── INSIGHTS ── -->
@@ -2164,6 +2214,45 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 <div id="toast"></div>
 
 <script>
+// ── REMINDERS & ONBOARDING ───────────────────────────────────────────────────
+function loadReminders(){
+  xhr('/api/reminders',null,function(d){
+    if(!d) return;
+
+    // Onboarding
+    if(d.show_onboarding){
+      var ob=document.getElementById('onboarding-card');
+      if(ob) ob.style.display='block';
+    }
+
+    // Hatırlatıcılar
+    var all = (d.upcoming||[]).concat(d.card_reminders||[]);
+    if(all.length > 0){
+      var rc=document.getElementById('reminders-card');
+      var rl=document.getElementById('reminders-list');
+      if(rc) rc.style.display='block';
+      if(rl){
+        var html = all.map(function(r){
+          var isCard = !!r.name;
+          var label  = isCard ? r.name : r.description;
+          var dayTxt = r.days_until===0?'Bugün':r.days_until===1?'Yarın':r.days_until<0?'Geçti':''+r.days_until+' gün';
+          var color  = r.days_until<=0?'var(--r)':r.days_until<=2?'var(--y)':'var(--b)';
+          var ico    = isCard?'💳':(r.type==='gelir'?'📈':'📉');
+          return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">'
+            +'<span style="font-size:1.1rem">'+ico+'</span>'
+            +'<div style="flex:1;min-width:0">'
+            +'<div style="font-size:.84rem;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+label+'</div>'
+            +'<div style="font-size:.72rem;color:var(--txt2)">₺'+r.amount.toLocaleString('tr-TR')+'</div>'
+            +'</div>'
+            +'<div style="font-size:.78rem;font-weight:800;color:'+color+';flex-shrink:0">'+dayTxt+'</div>'
+            +'</div>';
+        }).join('');
+        rl.innerHTML = html;
+      }
+    }
+  });
+}
+
 // ── INSIGHTS ─────────────────────────────────────────────────────────────────
 function loadInsights(){
   xhr('/api/insights',null,function(d){
@@ -2279,6 +2368,7 @@ var _todayDate=new Date().toISOString().split('T')[0];
 // ── INIT ─────────────────────────────────────────────────────────────────────
 window.onload=function(){
   _syncDarkModeUI();
+  loadReminders();
   loadInsights();
   var todayISO=new Date().toISOString().split('T')[0];
   document.getElementById('f-date').value=todayISO;

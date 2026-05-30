@@ -2964,6 +2964,71 @@ def goals_analysis():
 def categories():
     return jsonify({"gelir":GELIR_CATS,"gider":GIDER_CATS,"all":ALL_CATS})
 
+@app.route("/api/reminders")
+@login_required
+def reminders():
+    pid     = get_pid(); db = get_db()
+    today_d = date.today()
+    year, month = today_d.year, today_d.month
+    _, last_day = __import__('calendar').monthrange(year, month)
+    days_left_in_month = last_day - today_d.day
+
+    # Yaklaşan tekrar eden işlemler (bu ay henüz girilmemiş, önümüzdeki 7 gün içinde)
+    recurrings = db.execute(
+        "SELECT * FROM recurring WHERE profile_id=? AND active=1 ORDER BY day_of_month",
+        (pid,)
+    ).fetchall()
+
+    upcoming = []
+    for r in recurrings:
+        day = r["day_of_month"]
+        due_date = f"{year:04d}-{month:02d}-{min(day, last_day):02d}"
+        days_until = (date.fromisoformat(due_date) - today_d).days
+        if -2 <= days_until <= 7:
+            already = db.execute(
+                "SELECT id FROM transactions WHERE profile_id=? AND description=? AND date=?",
+                (pid, r["description"], due_date)
+            ).fetchone()
+            if not already:
+                upcoming.append({
+                    "id": r["id"],
+                    "type": r["type"],
+                    "amount": float(r["amount"]),
+                    "category": r["category"],
+                    "description": r["description"] or r["category"],
+                    "due_date": due_date,
+                    "days_until": days_until,
+                })
+
+    # Yaklaşan kart ödeme günleri
+    cards = db.execute(
+        "SELECT card_name, bank_name, due_day, used_ FROM cards WHERE profile_id=? AND used_>0",
+        (pid,)
+    ).fetchall()
+    card_reminders = []
+    for c in cards:
+        due_day = c["due_day"]
+        due_date = f"{year:04d}-{month:02d}-{min(due_day, last_day):02d}"
+        days_until = (date.fromisoformat(due_date) - today_d).days
+        if 0 <= days_until <= 7:
+            card_reminders.append({
+                "name": f"{c['bank_name']} {c['card_name']}",
+                "amount": float(c["used_"]),
+                "due_date": due_date,
+                "days_until": days_until,
+            })
+
+    # Onboarding kontrolü
+    tx_count = db.execute("SELECT COUNT(*) as n FROM transactions WHERE profile_id=?", (pid,)).fetchone()["n"]
+    show_onboarding = tx_count == 0
+
+    return jsonify({
+        "upcoming": upcoming,
+        "card_reminders": card_reminders,
+        "show_onboarding": show_onboarding,
+        "tx_count": tx_count,
+    })
+
 @app.route("/api/insights")
 @login_required
 def insights():
