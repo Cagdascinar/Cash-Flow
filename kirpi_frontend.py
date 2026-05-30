@@ -1655,6 +1655,13 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
 
 <!-- LEDGER -->
 <div class="page" id="page-ledger">
+  <!-- Aktif profil banner -->
+  <div id="ledger-profile-banner" style="display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:8px 14px;margin-bottom:10px;font-size:.8rem">
+    <span id="ledger-profile-dot" style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#6366f1"></span>
+    <span style="color:var(--txt2)">Görüntülenen profil:</span>
+    <span id="ledger-profile-name" style="font-weight:700;color:var(--txt)">—</span>
+    <span id="ledger-profile-type" style="font-size:.7rem;color:var(--txt2);padding:2px 8px;background:var(--bg4);border-radius:6px;margin-left:2px"></span>
+  </div>
   <div class="top-row">
     <div>
       <div class="page-title">İşlemler</div>
@@ -1754,6 +1761,12 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
 <!-- ADD -->
 <div class="page" id="page-add">
   <div class="page-title">Gider / Gelir Ekle</div>
+  <div id="add-profile-banner" style="display:flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:7px 12px;margin-bottom:12px;font-size:.78rem">
+    <span id="add-profile-dot" style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:#6366f1"></span>
+    <span style="color:var(--txt2)">Kaydedilecek profil:</span>
+    <span id="add-profile-name" style="font-weight:700;color:var(--txt)">—</span>
+    <span id="add-profile-type-badge" style="font-size:.68rem;color:var(--txt2);padding:1px 6px;background:var(--bg4);border-radius:4px;margin-left:2px"></span>
+  </div>
   <div class="page-sub">Harcama veya gelir gir, ödeme yöntemini seç</div>
 
   <div class="card" style="max-width:520px">
@@ -2928,7 +2941,7 @@ function goPage(id, el){
     if(id==='invest') initInvestPage();
     if(id==='cards') loadCards();
     if(id==='hesaplar') loadAccounts();
-    if(id==='add'){ setTab('gider'); loadAccountsDropdown(); }
+    if(id==='add'){ setTab('gider'); loadAccountsDropdown(); _updateAddProfileBanner(); }
     if(id==='settings') initSettingsPage();
     if(id==='budget') loadGoalsPage();
     if(id==='todos') initTodosPage();
@@ -3024,7 +3037,11 @@ function applyProfileType(ptype){
 function loadProfiles(){
   xhr('/api/me',null,function(me){
     _curAvatar = me.avatar || '';
-    if(me.profile_id) sessionStorage.setItem('cur_pid', me.profile_id);
+    if(me.profile_id){
+      sessionStorage.setItem('cur_pid', me.profile_id);
+      sessionStorage.setItem('cur_pname', me.profile_name||'');
+      sessionStorage.setItem('cur_ptype', me.profile_type||'');
+    }
     setAvatarDisplay(me.avatar, me.display || me.username || '?');
     var n=document.getElementById('udrop-name');
     var s=document.getElementById('udrop-sub');
@@ -3163,6 +3180,8 @@ function switchProfile(pid){
     if(!d.ok) return;
     document.getElementById('user-dropdown').classList.remove('open');
     sessionStorage.setItem('cur_pid', pid);
+    sessionStorage.setItem('cur_pname', d.name||'');
+    sessionStorage.setItem('cur_ptype', d.type||'');
     localStorage.setItem('preferred_pid', pid);
     renderDropdownProfiles();
     renderSettingsProfiles();
@@ -4538,6 +4557,16 @@ function addTx(){
 
 // ── LEDGER ────────────────────────────────────────────────────────────────────
 function loadAllTx(){
+  // Profil banner'ı güncelle
+  var pname=document.getElementById('ledger-profile-name');
+  var ptype=document.getElementById('ledger-profile-type');
+  var pdot=document.getElementById('ledger-profile-dot');
+  if(pname) pname.textContent=sessionStorage.getItem('cur_pname')||'—';
+  if(ptype){
+    var t=sessionStorage.getItem('cur_ptype')||'';
+    ptype.textContent=t==='sirket'?'🏢 Şirket':t==='sahis'?'👤 Şahıs':'';
+    if(pdot) pdot.style.background=t==='sirket'?'#f59e0b':'#6366f1';
+  }
   xhr('/api/transactions',null,function(d){allTx=d;filteredTx=d;renderLedger();});
 }
 
@@ -4551,6 +4580,17 @@ function populateYearFilter(){
 }
 
 var _sortIcos={};
+function _updateAddProfileBanner(){
+  var pname=sessionStorage.getItem('cur_pname')||'—';
+  var ptype=sessionStorage.getItem('cur_ptype')||'';
+  var el=document.getElementById('add-profile-name');
+  var tb=document.getElementById('add-profile-type-badge');
+  var dot=document.getElementById('add-profile-dot');
+  if(el) el.textContent=pname;
+  if(tb) tb.textContent=ptype==='sirket'?'🏢 Şirket':ptype==='sahis'?'👤 Şahıs':'';
+  if(dot) dot.style.background=ptype==='sirket'?'#f59e0b':'#6366f1';
+}
+
 function setTypePill(val){
   document.getElementById('f-type').value=val;
   ['all','gelir','gider'].forEach(function(k){
