@@ -320,6 +320,7 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
   font-size:4.5rem;
   position:absolute;
   top:50%; margin-top:-2.8rem;
+  left:4%;                        /* başlangıç: sol taraf */
   opacity:0;
   animation:kirpi-walk 3.6s ease forwards;
   transition:filter .4s ease;
@@ -328,27 +329,27 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
   filter:drop-shadow(0 0 24px rgba(240,185,11,.9)) drop-shadow(0 0 10px rgba(240,185,11,.5));
 }
 @keyframes kirpi-walk{
-  /* 1. Soldan belirir — yüzü sağa (🦔 doğal yönü) */
-  0%  {opacity:0;left:2%; transform:translateY(0) scale(.9)}
-  6%  {opacity:1;left:4%; transform:translateY(0) scale(1)}
-  /* 2. Adım adım yürüyüş — hoplar */
-  13% {left:16%;transform:translateY(-9px) scale(1)}
-  19% {left:28%;transform:translateY(2px)  scale(1)}
-  25% {left:40%;transform:translateY(-9px) scale(1)}
-  31% {left:52%;transform:translateY(2px)  scale(1)}
-  37% {left:60%;transform:translateY(-9px) scale(1)}
-  43% {left:66%;transform:translateY(0)    scale(1)}
-  /* 3. Paraya ulaştı — büyük sevinç zıplaması */
-  49% {left:66%;transform:translateY(-24px) scale(1.3) rotate(10deg)}
-  55% {left:66%;transform:translateY(2px)   scale(1)   rotate(0deg)}
+  /* 1. Belirir */
+  0%  {left:4%;  opacity:0; transform:translateY(0) scale(.9)}
+  6%  {left:4%;  opacity:1; transform:translateY(0) scale(1)}
+  /* 2. Yürüyüş — adım adım hoplar */
+  13% {left:16%; transform:translateY(-10px) scale(1)}
+  19% {left:28%; transform:translateY(2px)   scale(1)}
+  25% {left:40%; transform:translateY(-10px) scale(1)}
+  31% {left:52%; transform:translateY(2px)   scale(1)}
+  37% {left:60%; transform:translateY(-10px) scale(1)}
+  43% {left:66%; transform:translateY(0)     scale(1)}
+  /* 3. Paraya ulaştı — sevinç zıplaması */
+  49% {left:66%; transform:translateY(-26px) scale(1.3) rotate(10deg)}
+  55% {left:66%; transform:translateY(2px)   scale(1)   rotate(0)}
   /* 4. İkinci zıplama */
-  61% {left:66%;transform:translateY(-16px) scale(1.2) rotate(-6deg)}
-  67% {left:66%;transform:translateY(2px)   scale(1)   rotate(0deg)}
-  /* 5. Yerleşiyor — mutlu, sakin */
-  75% {left:66%;transform:translateY(-6px) scale(1.15)}
-  83% {left:66%;transform:translateY(0)    scale(1.12)}
-  91% {left:66%;transform:translateY(-3px) scale(1.13)}
-  100%{left:66%;transform:translateY(0)    scale(1.12);opacity:1}
+  61% {left:66%; transform:translateY(-18px) scale(1.2) rotate(-6deg)}
+  67% {left:66%; transform:translateY(2px)   scale(1)   rotate(0)}
+  /* 5. Yerleşti — mutlu, sakin, glow ile */
+  76% {left:66%; transform:translateY(-6px)  scale(1.15)}
+  84% {left:66%; transform:translateY(0)     scale(1.12)}
+  92% {left:66%; transform:translateY(-3px)  scale(1.13)}
+  100%{left:66%; transform:translateY(0)     scale(1.12); opacity:1}
 }
 
 /* Zafer işareti — kirpinin üstünde, para yığınının yanında */
@@ -1223,9 +1224,6 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
 
   <!-- Kirpi yürüyor -->
   <div class="splash-kirpi" id="splash-kirpi">🦔</div>
-
-  <!-- Gülücük — kirpi ekrana bakınca belirir -->
-  <div id="splash-smile">✨</div>
 
   <!-- Alt yazı -->
   <div class="splash-bottom">
@@ -2778,22 +2776,16 @@ function confirmDeleteAccount(){
   var splash = document.getElementById('splash-screen');
   if(!splash) return;
 
-  // 1.9s: kirpi döndü, merkeze geliyor — glow başlar
+  // 2.1s: paraya ulaşınca glow başlar
   setTimeout(function(){
     var k = document.getElementById('splash-kirpi');
     if(k) k.classList.add('glow');
-  }, 1900);
+  }, 2100);
 
-  // 2.2s: zafer/özgürlük emoji belirir
-  setTimeout(function(){
-    var s = document.getElementById('splash-smile');
-    if(s){ s.textContent='✌️'; s.style.opacity='1'; }
-  }, 2200);
-
-  // 2.5s: alt yazı değişir
+  // 2.5s: alt yazı sarıya döner
   setTimeout(function(){
     var tag = document.querySelector('.splash-tag');
-    if(tag){ tag.textContent='Nakit akışın, cebinde! 💛'; tag.style.color='#f0b90b'; tag.style.opacity='1'; }
+    if(tag){ tag.textContent='Nakit akışın, cebinde! 💛'; tag.style.color='#f0b90b'; }
     var dots = document.querySelector('.splash-dots');
     if(dots) dots.style.display='none';
   }, 2500);
