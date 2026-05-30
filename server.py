@@ -159,8 +159,10 @@ TELEGRAM_TOKEN  = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME", "KirpiNakitBot")
 
 GELIR_CATS = ["Maaş", "Serbest Meslek", "Kira Geliri", "Yatırım / Temettü", "Hediye / İkramiye", "Diğer Gelir"]
-GIDER_CATS = ["Kira / Mortgage", "Market / Gıda", "Faturalar", "Ulaşım", "Yemek / Restoran",
-               "Eğlence", "Sağlık", "Giyim", "Eğitim", "Abonelikler", "Elektronik", "Diğer Gider"]
+GIDER_CATS = ["Kira / Mortgage", "Konut Kredisi Taksiti", "Araç Kredisi Taksiti", "İhtiyaç Kredisi",
+               "Market / Gıda", "Faturalar", "Ulaşım", "Yemek / Restoran",
+               "Eğlence", "Sağlık", "Giyim", "Eğitim", "Abonelikler", "Elektronik",
+               "Sigorta", "Vergi / Harç", "Diğer Gider"]
 ALL_CATS   = GELIR_CATS + GIDER_CATS
 
 # ── DB ────────────────────────────────────────────────────────────────────────
@@ -1835,6 +1837,12 @@ _TG_CAT_KW = [
     ("benzin","Ulaşım"),("akaryakıt","Ulaşım"),("shell","Ulaşım"),("opet","Ulaşım"),
     ("taksi","Ulaşım"),("uber","Ulaşım"),("metro","Ulaşım"),("otobüs","Ulaşım"),
     ("bilet","Ulaşım"),("ulaşım","Ulaşım"),("araç","Ulaşım"),
+    ("konut kredisi","Konut Kredisi Taksiti"),("eminevim","Konut Kredisi Taksiti"),
+    ("finansevim","Konut Kredisi Taksiti"),("mortgage","Konut Kredisi Taksiti"),
+    ("araç kredisi","Araç Kredisi Taksiti"),("araba kredisi","Araç Kredisi Taksiti"),
+    ("ihtiyaç kredisi","İhtiyaç Kredisi"),("kredi taksit","İhtiyaç Kredisi"),
+    ("sigorta","Sigorta"),("kasko","Sigorta"),("trafik sigortası","Sigorta"),
+    ("vergi","Vergi / Harç"),("kdv","Vergi / Harç"),("sgk","Vergi / Harç"),
     ("kira","Kira / Mortgage"),
     ("eczane","Sağlık"),("hastane","Sağlık"),("doktor","Sağlık"),("ilaç","Sağlık"),("sağlık","Sağlık"),
     ("netflix","Abonelikler"),("spotify","Abonelikler"),("youtube","Abonelikler"),

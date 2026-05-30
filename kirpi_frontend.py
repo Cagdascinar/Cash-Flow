@@ -2076,6 +2076,9 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
           <button type="button" class="acc-type-chip" data-type="kmh" onclick="selectAccType(this)">🔄 KMH</button>
           <button type="button" class="acc-type-chip active" data-type="vadesiz" onclick="selectAccType(this)">🏦 Vadesiz</button>
           <button type="button" class="acc-type-chip" data-type="tasarruf" onclick="selectAccType(this)">💰 Tasarruf</button>
+          <button type="button" class="acc-type-chip" data-type="konut_kredisi" onclick="selectAccType(this)">🏠 Konut Kredisi</button>
+          <button type="button" class="acc-type-chip" data-type="arac_kredisi" onclick="selectAccType(this)">🚗 Araç Kredisi</button>
+          <button type="button" class="acc-type-chip" data-type="ihtiyac_kredisi" onclick="selectAccType(this)">💼 İhtiyaç Kredisi</button>
           <button type="button" class="acc-type-chip" data-type="diger" onclick="selectAccType(this)">📋 Diğer</button>
         </div>
       </div>
@@ -2084,11 +2087,32 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
         <label>Banka</label>
         <select class="f-input" id="acc-bank">
           <option value="">— Banka seç —</option>
-          <option>Garanti BBVA</option><option>İş Bankası</option><option>Akbank</option>
-          <option>Yapı Kredi</option><option>Ziraat Bankası</option><option>Halkbank</option>
-          <option>Vakıfbank</option><option>QNB Finansbank</option><option>Denizbank</option>
-          <option>ING</option><option>TEB</option><option>HSBC</option><option>Odeabank</option>
-          <option>Şekerbank</option><option>Fibabanka</option><option>Burgan Bank</option>
+          <optgroup label="Büyük Bankalar">
+            <option>Garanti BBVA</option><option>İş Bankası</option><option>Akbank</option>
+            <option>Yapı Kredi</option><option>Ziraat Bankası</option><option>Halkbank</option>
+            <option>Vakıfbank</option><option>QNB Finansbank</option><option>Denizbank</option>
+            <option>ING</option><option>TEB</option><option>HSBC</option>
+          </optgroup>
+          <optgroup label="Dijital / Neo Bankalar">
+            <option>Enpara</option><option>Papara</option><option>Ininal</option>
+            <option>Moka</option><option>Revolt</option><option>Wise</option>
+            <option>Paysera</option><option>Param</option><option>Tosla</option>
+            <option>Paycell</option><option>Sipay</option>
+          </optgroup>
+          <optgroup label="Katılım Bankaları">
+            <option>Albaraka Türk</option><option>Kuveyt Türk</option>
+            <option>Türkiye Finans</option><option>Emlak Katılım</option>
+            <option>Ziraat Katılım</option><option>Vakıf Katılım</option>
+          </optgroup>
+          <optgroup label="Diğer Bankalar">
+            <option>Odeabank</option><option>Şekerbank</option><option>Fibabanka</option>
+            <option>Burgan Bank</option><option>Pasha Bank</option><option>Alternatifbank</option>
+            <option>Anadolubank</option><option>ICBC Turkey</option>
+          </optgroup>
+          <optgroup label="Kredi / Finansman Kuruluşları">
+            <option>Eminevim</option><option>Finansevim</option><option>Tam Finansman</option>
+            <option>Creditas</option><option>BNP Paribas Cardif</option>
+          </optgroup>
           <option>Diğer</option>
         </select>
       </div>
