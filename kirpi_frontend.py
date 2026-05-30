@@ -296,66 +296,70 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 #splash-screen.hide{opacity:0;pointer-events:none}
 .splash-bg{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 35%,rgba(240,185,11,.1),transparent 65%)}
 
-/* Para yığını — kirpinin etrafında çember */
+/* Para yığını — SAĞ TARAFTA sabit, kirpi buraya doğru yürüyor */
 .splash-money{
   position:absolute;
-  top:50%;left:50%;
-  width:200px;height:200px;
-  margin-top:-100px;margin-left:-100px;
+  right:10%; top:50%;
+  transform:translateY(-55%);
+  display:flex;flex-direction:column;align-items:center;gap:3px;
   pointer-events:none;
 }
-.sm-coin{font-size:1.8rem;display:block;opacity:0;position:absolute}
-.sm-c1{top:0;left:50%;margin-left:-14px;animation:coin-appear .35s .5s ease forwards}
-.sm-c2{top:20%;right:0;animation:coin-appear .35s .65s ease forwards;font-size:1.5rem}
-.sm-c3{bottom:10%;right:10%;animation:coin-appear .35s .8s ease forwards;font-size:1.4rem}
-.sm-c4{bottom:10%;left:10%;animation:coin-appear .35s .95s ease forwards;font-size:1.4rem}
-.sm-c5{top:20%;left:0;animation:coin-appear .35s 1.1s ease forwards;font-size:1.5rem}
+.sm-coin{font-size:2.2rem;display:block;opacity:0}
+.sm-c1{animation:coin-appear .3s .3s ease forwards}
+.sm-c2{animation:coin-appear .3s .45s ease forwards;font-size:1.9rem}
+.sm-c3{animation:coin-appear .3s .6s ease forwards;font-size:1.7rem}
+.sm-c4{animation:coin-appear .3s .75s ease forwards;font-size:1.5rem}
+.sm-c5{animation:coin-appear .3s .9s ease forwards;font-size:1.3rem}
 @keyframes coin-appear{
-  from{opacity:0;transform:scale(.3) translateY(6px)}
+  from{opacity:0;transform:scale(.4) translateY(8px)}
   to{opacity:1;transform:scale(1) translateY(0)}
 }
 
-/* Kirpi — merkezde, zıplıyor, kullanıcıya bakıyor */
+/* Kirpi — soldan sağa yürüyor, paraya ulaşıyor, sevinçle zıplıyor */
 .splash-kirpi{
-  font-size:5rem;
+  font-size:4.5rem;
   position:absolute;
-  top:50%; left:50%;
-  margin-top:-3.1rem; margin-left:-2.5rem;
+  top:50%; margin-top:-2.8rem;
   opacity:0;
-  animation:kirpi-bounce 3.0s cubic-bezier(.4,0,.2,1) forwards;
+  animation:kirpi-walk 3.6s ease forwards;
   transition:filter .4s ease;
 }
 .splash-kirpi.glow{
-  filter:drop-shadow(0 0 24px rgba(240,185,11,.9)) drop-shadow(0 0 8px rgba(240,185,11,.5));
+  filter:drop-shadow(0 0 24px rgba(240,185,11,.9)) drop-shadow(0 0 10px rgba(240,185,11,.5));
 }
-@keyframes kirpi-bounce{
-  /* Aşağıdan belirir */
-  0%  {opacity:0; transform:scale(.3) translateY(40px)}
-  12% {opacity:1; transform:scale(1.25) translateY(-18px)}
-  20% {transform:scale(.95) translateY(4px)}
-  /* Sevinç zıplamaları */
-  28% {transform:scale(1.2) translateY(-20px)}
-  36% {transform:scale(.97) translateY(3px)}
-  44% {transform:scale(1.15) translateY(-14px)}
-  52% {transform:scale(1)   translateY(2px)}
-  58% {transform:scale(1.08) translateY(-8px)}
-  64% {transform:scale(1)   translateY(0)}
-  /* Sakinleşiyor — ekrana bakıyor */
-  72% {transform:scale(1.18) translateY(-5px)}
-  80% {transform:scale(1.15) translateY(0)}
-  88% {transform:scale(1.17) translateY(-3px)}
-  94% {transform:scale(1.15) translateY(0)}
-  100%{transform:scale(1.15) translateY(0);opacity:1}
+@keyframes kirpi-walk{
+  /* 1. Soldan belirir — yüzü sağa (🦔 doğal yönü) */
+  0%  {opacity:0;left:2%; transform:translateY(0) scale(.9)}
+  6%  {opacity:1;left:4%; transform:translateY(0) scale(1)}
+  /* 2. Adım adım yürüyüş — hoplar */
+  13% {left:16%;transform:translateY(-9px) scale(1)}
+  19% {left:28%;transform:translateY(2px)  scale(1)}
+  25% {left:40%;transform:translateY(-9px) scale(1)}
+  31% {left:52%;transform:translateY(2px)  scale(1)}
+  37% {left:60%;transform:translateY(-9px) scale(1)}
+  43% {left:66%;transform:translateY(0)    scale(1)}
+  /* 3. Paraya ulaştı — büyük sevinç zıplaması */
+  49% {left:66%;transform:translateY(-24px) scale(1.3) rotate(10deg)}
+  55% {left:66%;transform:translateY(2px)   scale(1)   rotate(0deg)}
+  /* 4. İkinci zıplama */
+  61% {left:66%;transform:translateY(-16px) scale(1.2) rotate(-6deg)}
+  67% {left:66%;transform:translateY(2px)   scale(1)   rotate(0deg)}
+  /* 5. Yerleşiyor — mutlu, sakin */
+  75% {left:66%;transform:translateY(-6px) scale(1.15)}
+  83% {left:66%;transform:translateY(0)    scale(1.12)}
+  91% {left:66%;transform:translateY(-3px) scale(1.13)}
+  100%{left:66%;transform:translateY(0)    scale(1.12);opacity:1}
 }
 
-/* Zafer işareti — kirpinin üstünde */
+/* Zafer işareti — kirpinin üstünde, para yığınının yanında */
 #splash-smile{
-  position:absolute;top:50%;left:50%;
-  font-size:2.2rem;opacity:0;
-  margin-top:-6.5rem;margin-left:.8rem;
+  position:absolute;
+  right:calc(10% - 1rem);
+  top:calc(50% - 7rem);
+  font-size:2rem;opacity:0;
 }
 @keyframes smile-pop{
-  from{opacity:0;transform:scale(.4) translateY(8px)}
+  from{opacity:0;transform:scale(.3) translateY(8px)}
   to{opacity:1;transform:scale(1) translateY(0)}
 }
 
