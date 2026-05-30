@@ -200,16 +200,25 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
   .nl-desktop-only{display:none!important}
   .nl-menu{display:flex}
   .nav-links{
-    display:grid!important;
-    grid-template-columns:1fr 1fr 1fr 1fr 1fr;
+    display:flex!important;flex-direction:row;
     padding:0;height:56px;overflow:visible;
-    align-items:center;
+    align-items:center;position:relative;
   }
   .nav-sect{display:none!important}
-  .nl-desktop,.nl-desktop-only{display:none!important}
-  .nl{flex-direction:column;gap:3px;font-size:.6rem;padding:0 4px 2px;min-width:0;
+  .nl-desktop,.nl-desktop-only,.nl-menu{display:none!important}
+  /* 4 normal sekme eşit dağılım, Ekle absolute merkez */
+  .nl:not(.nl-add){flex:1;flex-direction:column;gap:3px;font-size:.6rem;padding:0 4px 2px;
       border-radius:0;box-shadow:none!important;background:transparent!important;
-      display:flex!important;align-items:center;justify-content:center;width:100%}
+      display:flex!important;align-items:center;justify-content:center}
+  /* Ekle — kesin %50 merkez */
+  .nl-add{
+    position:absolute!important;
+    left:50%;transform:translateX(-50%);
+    width:64px;flex:none;
+    flex-direction:column;gap:3px;font-size:.6rem;padding:0 4px 2px;
+    display:flex!important;align-items:center;justify-content:center;
+    background:transparent!important;box-shadow:none!important
+  }
   .nl .ico{font-size:1.35rem;line-height:1.2;display:flex;align-items:center;justify-content:center;
            background:transparent;transition:transform .15s cubic-bezier(.34,1.4,.64,1)}
   .nl span:not(.ico){color:var(--txt2);transition:color .15s;font-weight:500;font-size:.58rem}
@@ -1187,9 +1196,6 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
     </div>
     <div class="nl" data-page="todos" onclick="goPage('todos',this)">
       <span class="ico">✅</span>Görevler
-    </div>
-    <div class="nl nl-menu" onclick="openMoreSheet()">
-      <span class="ico">☰</span>Menü
     </div>
     <div class="nl nl-more nl-desktop-only" onclick="openMoreSheet()">
       <span class="ico">⋯</span>Daha
