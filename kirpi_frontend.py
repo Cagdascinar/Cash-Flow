@@ -663,10 +663,10 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   position:fixed;
   top:calc(54px + env(safe-area-inset-top,0px));
   right:0;bottom:0;width:360px;max-width:100vw;
-  background:var(--bg1);border-left:1px solid var(--border2);
+  background:var(--bg2,#fff);border-left:1px solid var(--border2,#e5e5ea);
   z-index:499;display:flex;flex-direction:column;
   transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
-  box-shadow:-12px 0 48px rgba(0,0,0,.18);
+  box-shadow:-12px 0 48px rgba(0,0,0,.22);
 }
 .notif-panel.open{transform:translateX(0)}
 .notif-panel-head{
@@ -2260,7 +2260,9 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
     <label>Kullanıcı Adı <span style="color:var(--txt2);font-size:.72rem">(değiştirilemez)</span></label>
     <input type="text" class="f-input" id="settings-username" disabled style="margin-bottom:10px;opacity:.5">
     <label>E-posta <span style="color:var(--txt2);font-size:.72rem">(değiştirilemez)</span></label>
-    <input type="email" class="f-input" id="settings-email" disabled style="margin-bottom:14px;opacity:.5">
+    <input type="email" class="f-input" id="settings-email" disabled style="margin-bottom:10px;opacity:.5">
+    <label>Telefon <span style="color:var(--txt2);font-size:.7rem">(şifre sıfırlama için)</span></label>
+    <input type="tel" class="f-input" id="settings-phone" placeholder="05XX XXX XX XX" style="margin-bottom:14px">
     <button class="btn btn-primary" onclick="saveAccountInfo()" style="width:100%">Bilgileri Kaydet</button>
   </div>
 
@@ -3366,6 +3368,8 @@ function initSettingsPage(){
     if(em) em.value=me.email||'';
     if(dn) dn.textContent=me.display||me.username||'—';
     if(un) un.textContent='@'+(me.username||'');
+    var ph=document.getElementById('settings-phone');
+    if(ph) ph.value=me.phone||'';
     setAvatarDisplay(me.avatar, me.display||me.username||'?');
     _renderAccountCard(me);
   });
@@ -3461,8 +3465,9 @@ function tgUnlinkOne(id){
 
 function saveAccountInfo(){
   var display=document.getElementById('settings-display').value.trim();
+  var phone=(document.getElementById('settings-phone')||{}).value||'';
   if(!display){ showToast('Ad Soyad boş olamaz','#ef4444'); return; }
-  xhr('/api/me/update',{display_name:display},function(d){
+  xhr('/api/me/update',{display_name:display,phone:phone},function(d){
     if(d.ok){
       document.getElementById('settings-display-name-show').textContent=display;
       document.getElementById('udrop-name').textContent=display;

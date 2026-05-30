@@ -470,6 +470,7 @@ def init_db():
         ("users",        "report_name",     "TEXT NOT NULL DEFAULT ''"),
         ("users",        "report_contact",  "TEXT NOT NULL DEFAULT ''"),
         ("users",        "report_logo",     "TEXT NOT NULL DEFAULT ''"),
+        ("users",        "phone",           "TEXT NOT NULL DEFAULT ''"),
     ]
     with pg_connect() as con:
         for stmt in stmts:
@@ -832,6 +833,7 @@ def register():
             error = "Şifreler eşleşmiyor"
         if error:
             return AUTH_HTML_render("register", error)
+        phone = request.form.get("phone","").strip().replace(" ","")
         ptype = request.form.get("profile_type","sahis")
         if ptype not in ("sahis","sirket"): ptype = "sahis"
         prof_name = display if display else ("Şirket" if ptype=="sirket" else "Şahıs")
@@ -839,8 +841,8 @@ def register():
             vtok = secrets.token_urlsafe(32)
             with pg_connect() as con:
                 cur = con.execute(
-                    "INSERT INTO users (username,display_name,password_hash,email,email_verified,verify_token,created_at) VALUES (?,?,?,?,0,?,?)",
-                    (username, display or username, generate_password_hash(password), email, vtok, datetime.now().isoformat())
+                    "INSERT INTO users (username,display_name,password_hash,email,email_verified,verify_token,phone,created_at) VALUES (?,?,?,?,0,?,?,?)",
+                    (username, display or username, generate_password_hash(password), email, vtok, phone, datetime.now().isoformat())
                 )
                 uid = cur.lastrowid
                 con.execute(
@@ -874,7 +876,8 @@ def login():
             if not row["email_verified"]:
                 return AUTH_HTML_render("login", "✉️ Email adresiniz doğrulanmamış. Şifreyi biliyorsanız <a href='/forgot-password' style='color:#818cf8'>şifre sıfırla</a> yaparak hem şifreyi sıfırlayın hem de emailinizi doğrulatın. Ya da <a href='/resend-verify' style='color:#818cf8'>yeni doğrulama maili al</a>.")
             _clear_login_attempts(username)
-            session.permanent   = True
+            remember = request.form.get("remember_me") == "1"
+            session.permanent   = remember          # True → 30 gün, False → tarayıcı kapanınca
             session["user_id"]  = row["id"]
             session["username"] = row["username"]
             session["display"]  = row["display_name"]
@@ -904,10 +907,18 @@ def forgot_password():
     if request.method == "POST":
         if not validate_csrf():
             return AUTH_HTML_render("forgot", "Geçersiz istek. Lütfen sayfayı yenileyin."), 403
-        identifier = request.form.get("identifier","").strip().lower()
+        identifier = request.form.get("identifier","").strip()
+        id_lower   = identifier.lower()
+        # Telefon numarasını normalleştir (başındaki 0 veya +90 kaldır)
+        phone_clean = identifier.replace(" ","").replace("-","").replace("(","").replace(")","")
+        if phone_clean.startswith("+90"): phone_clean = phone_clean[3:]
+        if phone_clean.startswith("90") and len(phone_clean) > 10: phone_clean = phone_clean[2:]
+        if phone_clean.startswith("0"): phone_clean = phone_clean[1:]
         with pg_connect() as con:
             row = con.execute(
-                "SELECT * FROM users WHERE username=? OR email=?", (identifier, identifier)
+                "SELECT * FROM users WHERE username=%s OR email=%s OR "
+                "(phone != '' AND (phone=%s OR phone=%s OR phone=%s))",
+                (id_lower, id_lower, identifier, phone_clean, "0"+phone_clean)
             ).fetchone()
         if row:
             token = secrets.token_urlsafe(32)
@@ -986,7 +997,7 @@ def logout():
 def api_me():
     uid = session.get("user_id")
     db  = get_db()
-    row = db.execute("SELECT display_name,username,email,avatar FROM users WHERE id=?", (uid,)).fetchone()
+    row = db.execute("SELECT display_name,username,email,avatar,phone FROM users WHERE id=?", (uid,)).fetchone()
     avatar = row["avatar"] if row else ""
     sub    = get_sub_status(uid)
     return jsonify({
@@ -996,6 +1007,7 @@ def api_me():
         "profile_name": session.get("profile_name"),
         "profile_type": session.get("profile_type"),
         "email":        row["email"] if row else "",
+        "phone":        (row["phone"] if row else "") or "",
         "avatar":       avatar or "",
         "subscription": sub,
     })
@@ -1006,11 +1018,14 @@ def api_me_update():
     data    = request.get_json(force=True)
     display = (data.get("display_name") or "").strip()
     avatar  = data.get("avatar", None)
+    phone   = (data.get("phone") or "").strip().replace(" ","")[:20]
     uid     = session["user_id"]
     db      = get_db()
     if display:
         db.execute("UPDATE users SET display_name=? WHERE id=?", (display, uid))
         session["display"] = display
+    if phone is not None:
+        db.execute("UPDATE users SET phone=? WHERE id=?", (phone, uid))
     if avatar is not None:
         safe_prefixes = ("data:image/png;base64,", "data:image/jpeg;base64,",
                          "data:image/jpg;base64,", "data:image/webp;base64,")
@@ -4303,6 +4318,8 @@ def AUTH_HTML_render(mode, msg="", token=None):
       <input type="text" name="username" placeholder="kullanici_adi" required autocomplete="username">
       <label>E-posta</label>
       <input type="email" name="email" placeholder="ornek@gmail.com" required autocomplete="email">
+      <label>Telefon <span style="color:#8e8e93;font-size:.72rem;font-weight:400">(opsiyonel — şifre sıfırlama için)</span></label>
+      <input type="tel" name="phone" placeholder="05XX XXX XX XX" autocomplete="tel">
       <label>Şifre (en az 6 karakter)</label>
       <input type="password" name="password" required autocomplete="new-password">
       <label>Şifre Tekrar</label>
@@ -4351,14 +4368,33 @@ def AUTH_HTML_render(mode, msg="", token=None):
     </div>
     <form method="POST" action="/login">
       <!-- CSRF_FIELD -->
+      <input type="hidden" name="remember_me" id="remember_me_val" value="0">
       <label id="login-uname-label">Kullanıcı Adı</label>
       <input type="text" name="username" required autocomplete="username">
       <label>Şifre</label>
       <input type="password" name="password" required autocomplete="current-password">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;margin-top:-6px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.82rem;color:#6d6d72;margin-bottom:0">
+          <div id="remember-toggle" onclick="toggleRemember()" style="width:40px;height:24px;border-radius:12px;background:#c7c7cc;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0">
+            <div id="remember-knob" style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div>
+          </div>
+          Beni Hatırla <span id="remember-lbl" style="color:#aaa">(30 gün)</span>
+        </label>
+        <a href="/forgot-password" style="font-size:.8rem;color:#007aff;text-decoration:none">Şifremi unuttum</a>
+      </div>
       <button class="btn" type="submit" id="login-btn">Bireysel Giriş Yap</button>
     </form>
-    <div class="link" style="margin-top:12px"><a href="/forgot-password">Şifremi unuttum</a></div>
     <div class="link">Hesabın yok mu? <a href="/register">Kayıt Ol</a></div>
+    <script>
+    var _rem=false;
+    function toggleRemember(){
+      _rem=!_rem;
+      document.getElementById("remember_me_val").value=_rem?"1":"0";
+      document.getElementById("remember-toggle").style.background=_rem?"#007aff":"#c7c7cc";
+      document.getElementById("remember-knob").style.left=_rem?"18px":"2px";
+      document.getElementById("remember-lbl").style.color=_rem?"#007aff":"#aaa";
+    }
+    </script>
     <script>
     function setLoginType(t){
       var isBir=t==="bireysel";
@@ -4376,12 +4412,13 @@ def AUTH_HTML_render(mode, msg="", token=None):
     elif mode == "forgot":
         form = f"""
     <h2 style="font-size:1.1rem;font-weight:700;margin-bottom:8px;text-align:center">Şifremi Unuttum</h2>
-    <p style="text-align:center;color:#64748b;font-size:.82rem;margin-bottom:20px">Kullanıcı adın veya email adresin ile şifre sıfırlama linki alabilirsin.</p>
+    <p style="text-align:center;color:#64748b;font-size:.82rem;margin-bottom:20px">Kullanıcı adın, email veya telefon numaranla şifre sıfırlama linki alabilirsin.</p>
     {msg_html}
     <form method="POST" action="/forgot-password">
       <!-- CSRF_FIELD -->
-      <label>Kullanıcı Adı veya Email</label>
-      <input type="text" name="identifier" required placeholder="kullanici_adi veya ornek@gmail.com" autocomplete="username email">
+      <label>Kullanıcı Adı, Email veya Telefon</label>
+      <input type="text" name="identifier" required placeholder="kullanici_adi / ornek@gmail.com / 05XX..." autocomplete="username email tel">
+      <div style="font-size:.72rem;color:#64748b;margin-top:-10px;margin-bottom:14px">📱 Telefon numarası girebilirsin — hesabına kayıtlı email'e link gönderilir</div>
       <button class="btn" type="submit">Sıfırlama Linki Gönder</button>
     </form>
     <div class="link"><a href="/login">← Giriş ekranına dön</a></div>"""
