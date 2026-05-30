@@ -1522,8 +1522,11 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
     <!-- Finansal Pozisyon Kartları -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
       <!-- Net Likidite: gerçek eli altındaki para (hesap - kart borcu) -->
-      <div style="background:linear-gradient(135deg,#0d2118,#0a1a12);border:1px solid #22c55e30;border-radius:16px;padding:14px">
-        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.45);margin-bottom:5px">💧 Net Likidite</div>
+      <div onclick="showLiquidityDetail()" style="background:linear-gradient(135deg,#0d2118,#0a1a12);border:1px solid #22c55e30;border-radius:16px;padding:14px;cursor:pointer;transition:.15s" onmouseenter="this.style.borderColor='#22c55e60'" onmouseleave="this.style.borderColor='#22c55e30'">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+          <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.45)">💧 Net Likidite</div>
+          <div style="font-size:.6rem;color:rgba(255,255,255,.3)">detay ›</div>
+        </div>
         <div id="ins-liquidity" style="font-size:1.25rem;font-weight:900;color:#4ade80">—</div>
         <div style="font-size:.68rem;color:rgba(255,255,255,.35);margin-top:3px">Hesap − Kart Borcu</div>
         <div id="ins-burn" style="font-size:.68rem;color:rgba(255,255,255,.35);margin-top:2px"></div>
@@ -2647,6 +2650,7 @@ function loadReminders(){
 function loadInsights(){
   xhr('/api/insights',null,function(d){
     if(!d) return;
+    window._lastInsightData=d;
     var sec=document.getElementById('insights-section');
     if(sec) sec.style.display='block';
 
@@ -3661,14 +3665,15 @@ function renderTxList(listId, txns, type){
     var lbl=type==='gelir'?'+':'-';
     var action=t.is_invoice
       ? 'goPage(\'supplier\',document.querySelector(\'[data-page=supplier]\'))'
-      : 'goToTx('+t.id+')';
+      : 'showTxDayDetail('+JSON.stringify(t)+')';
+    var amtStr=lbl+fmt(t.amount);
     return '<div class="tx-day-item" onclick="'+action+'">'+
       '<div class="tx-day-icon '+cls+'">'+lbl+'</div>'+
       '<div class="tx-day-info">'+
         '<div class="tx-day-cat">'+t.category+'</div>'+
-        (t.description?'<div class="tx-day-desc">'+t.description+'</div>':'')+
+        (t.description?'<div class="tx-day-desc">'+t.description+'</div>':'<div class="tx-day-desc" style="color:var(--txt2);opacity:.5">Açıklama yok</div>')+
       '</div>'+
-      '<div class="tx-day-amt" style="color:var(--'+(type==='gelir'?'g':'r')+')">'+lbl+fmt(t.amount)+'</div>'+
+      '<div class="tx-day-amt" style="color:var(--'+(type==='gelir'?'g':'r')+')">'+(t.amount?amtStr:'?')+'</div>'+
     '</div>';
   }).join('');
 }
@@ -4560,21 +4565,22 @@ function renderLedger(){
   }
   tbody.innerHTML=data.map(function(t){
     var isG=t.type==='gelir';
-    return '<tr data-id="'+t.id+'" data-type="'+t.type+'">'+
-      '<td><div class="cell"><input type="checkbox" class="row-chk" data-id="'+t.id+'" onchange="rowChkChange()"></div></td>'+
-      '<td class="editable" data-field="date" data-id="'+t.id+'"><div class="cell">'+fmtDate(t.date)+'</div></td>'+
+    return '<tr data-id="'+t.id+'" data-type="'+t.type+'" onclick="showTxDetail('+t.id+')" style="cursor:pointer">'+
+      '<td onclick="event.stopPropagation()"><div class="cell"><input type="checkbox" class="row-chk" data-id="'+t.id+'" onchange="rowChkChange()"></div></td>'+
+      '<td><div class="cell">'+fmtDate(t.date)+'</div></td>'+
       '<td><div class="cell"><span class="badge '+(isG?'badge-g':'badge-r')+'">'+(isG?'Gelir':'Gider')+'</span></div></td>'+
-      '<td class="editable" data-field="category" data-id="'+t.id+'"><div class="cell"><span class="badge badge-cat">'+t.category+'</span></div></td>'+
-      '<td class="editable" data-field="description" data-id="'+t.id+'"><div class="cell">'+(t.description||'<span style="color:var(--txt2);font-size:.78rem">—</span>')+'</div></td>'+
-      '<td class="editable" data-field="amount" data-id="'+t.id+'" style="text-align:right">'+
-        '<div class="cell" style="justify-content:flex-end;color:'+(isG?'var(--g)':'var(--r)')+'">'+
-          (isG?'+':'-')+fmt(t.amount)+'</div></td>'+
-      '<td><div class="cell"><button class="del-row" onclick="delTx('+t.id+')">✕</button></div></td>'+
+      '<td><div class="cell"><span class="badge badge-cat">'+t.category+'</span></div></td>'+
+      '<td><div class="cell" style="color:var(--txt2);font-size:.82rem">'+(t.description||'<span style="opacity:.4">—</span>')+'</div></td>'+
+      '<td style="text-align:right"><div class="cell" style="justify-content:flex-end;font-weight:700;color:'+(isG?'var(--g)':'var(--r)')+'">'+
+        (isG?'+':'-')+fmt(t.amount)+'</div></td>'+
+      '<td onclick="event.stopPropagation()"><div class="cell" style="gap:4px">'+
+        '<button class="del-row" title="Düzenle" onclick="openTxEdit('+t.id+')" style="background:var(--bg3);color:var(--txt2);border:1px solid var(--border)">✏️</button>'+
+        '<button class="del-row" onclick="delTx('+t.id+')">✕</button>'+
+      '</div></td>'+
     '</tr>';
   }).join('');
   document.getElementById('ledger-count').textContent=data.length+' işlem';
 
-  // alt toplam
   var sumEl=document.getElementById('ledger-summary');
   if(sumEl){
     var totG=0,totR=0;
@@ -4587,14 +4593,7 @@ function renderLedger(){
     sumEl.innerHTML=parts.join('<span style="color:var(--border,#e5e5ea)"> &nbsp;|&nbsp; </span>');
     sumEl.style.display=parts.length?'flex':'none';
   }
-
-  // aylık özet
   renderMonthlySummary(allTx);
-
-  // inline editing
-  [].forEach.call(document.querySelectorAll('.editable'),function(td){
-    td.addEventListener('click',function(e){startEdit(td)});
-  });
 }
 
 function renderMonthlySummary(txList){
@@ -4644,53 +4643,64 @@ function filterLedgerToMonth(ym){
   filterLedger();
 }
 
-function startEdit(td){
-  if(td.classList.contains('cell-editing'))return;
-  var field=td.dataset.field, id=td.dataset.id;
-  var tx=allTx.find(function(t){return t.id==id});
-  if(!tx)return;
-  td.classList.add('cell-editing');
-  var val=tx[field];
-  var inp;
-  if(field==='category'){
-    inp=document.createElement('select');
-    inp.className='cell-edit';
-    var list=tx.type==='gelir'?CATS.gelir:CATS.gider;
-    list.forEach(function(c){inp.innerHTML+='<option'+(c===val?' selected':'')+'>'+c+'</option>'});
-  } else if(field==='amount'){
-    inp=document.createElement('input');
-    inp.type='number'; inp.step='0.01'; inp.value=val;
-  } else if(field==='date'){
-    inp=document.createElement('input');
-    inp.type='date'; inp.value=val;
-  } else {
-    inp=document.createElement('input');
-    inp.type='text'; inp.value=val||'';
-  }
-  inp.style.cssText='width:100%;padding:10px 12px;background:transparent;border:none;color:var(--txt);font-size:.83rem;outline:none;font-family:inherit';
-  td.innerHTML=''; td.appendChild(inp);
-  inp.focus();
-  if(inp.type==='text'||inp.type==='number')inp.select();
-
-  function save(){
-    var newVal=inp.value.trim();
-    if(newVal!==String(val)){
-      var body={};body[field]=newVal;
-      xhr('/api/transactions/'+id,body,function(r){if(r.ok){toast('Kaydedildi');loadAllTx();loadDashboard()}},true);
-    } else {
-      td.classList.remove('cell-editing');loadAllTx();
-    }
-  }
-  inp.addEventListener('blur',save);
-  inp.addEventListener('keydown',function(e){
-    if(e.key==='Enter'){e.preventDefault();inp.blur()}
-    if(e.key==='Escape'){td.classList.remove('cell-editing');loadAllTx()}
-    if(e.key==='Tab'){e.preventDefault();inp.blur();
-      var cells=[].slice.call(td.parentElement.querySelectorAll('.editable'));
-      var idx=cells.indexOf(td);if(idx<cells.length-1)setTimeout(function(){startEdit(cells[idx+1])},80);
-    }
-  });
+// ── İŞLEM DETAY MODALI ────────────────────────────────────────────────────────
+function showTxDetail(id){
+  var tx=allTx.find(function(t){return t.id==id}); if(!tx) return;
+  var isG=tx.type==='gelir';
+  var sign=isG?'+':'-';
+  var col=isG?'#22c55e':'#ef4444';
+  var m=document.getElementById('tx-detail-modal');
+  if(!m) return;
+  document.getElementById('txd-type').textContent=isG?'Gelir':'Gider';
+  document.getElementById('txd-type').style.color=col;
+  document.getElementById('txd-amount').textContent=sign+fmt(tx.amount);
+  document.getElementById('txd-amount').style.color=col;
+  document.getElementById('txd-category').textContent=tx.category||'—';
+  document.getElementById('txd-desc').textContent=tx.description||'Açıklama yok';
+  document.getElementById('txd-date').textContent=fmtDate(tx.date);
+  document.getElementById('txd-edit-btn').onclick=function(){ closeTxDetail(); openTxEdit(id); };
+  document.getElementById('txd-del-btn').onclick=function(){ closeTxDetail(); delTx(id); };
+  m.style.display='flex';
 }
+function closeTxDetail(){
+  var m=document.getElementById('tx-detail-modal'); if(m) m.style.display='none';
+}
+
+// ── İŞLEM DÜZENLEME MODALI ────────────────────────────────────────────────────
+function openTxEdit(id){
+  var tx=allTx.find(function(t){return t.id==id}); if(!tx) return;
+  var m=document.getElementById('tx-edit-modal'); if(!m) return;
+  document.getElementById('txe-id').value=id;
+  document.getElementById('txe-date').value=tx.date||'';
+  document.getElementById('txe-amount').value=tx.amount||'';
+  document.getElementById('txe-desc').value=tx.description||'';
+  var catSel=document.getElementById('txe-category');
+  catSel.innerHTML='';
+  var list=tx.type==='gelir'?CATS.gelir:CATS.gider;
+  list.forEach(function(c){
+    var o=document.createElement('option');
+    o.value=o.textContent=c;
+    if(c===tx.category) o.selected=true;
+    catSel.appendChild(o);
+  });
+  m.style.display='flex';
+}
+function closeTxEdit(){ var m=document.getElementById('tx-edit-modal'); if(m) m.style.display='none'; }
+function saveTxEdit(){
+  var id=document.getElementById('txe-id').value;
+  var body={
+    date:document.getElementById('txe-date').value,
+    amount:document.getElementById('txe-amount').value,
+    category:document.getElementById('txe-category').value,
+    description:document.getElementById('txe-desc').value,
+  };
+  xhr('/api/transactions/'+id,body,function(r){
+    if(r.ok){closeTxEdit();toast('Kaydedildi');loadAllTx();loadDashboard();}
+    else toast('Hata: '+(r.error||''),'#ef4444');
+  },true);
+}
+
+function startEdit(td){ /* artık openTxEdit kullanılıyor */ }
 
 function rowChkChange(){
   var any=[].some.call(document.querySelectorAll('.row-chk'),function(c){return c.checked});
@@ -5868,7 +5878,116 @@ function applyPremiumLocks() {
 }
 
 document.addEventListener('DOMContentLoaded', loadSubStatus);
+
+// ── İŞLEM DETAY (dashboard today kartı) ──────────────────────────────────────
+function showTxDayDetail(t){
+  var isG=t.type==='gelir'; var col=isG?'#22c55e':'#ef4444';
+  var m=document.getElementById('tx-detail-modal'); if(!m) return;
+  document.getElementById('txd-type').textContent=isG?'Gelir':'Gider';
+  document.getElementById('txd-type').style.color=col;
+  document.getElementById('txd-amount').textContent=(isG?'+':'-')+fmt(t.amount);
+  document.getElementById('txd-amount').style.color=col;
+  document.getElementById('txd-category').textContent=t.category||'—';
+  document.getElementById('txd-desc').textContent=t.description||'Açıklama yok';
+  document.getElementById('txd-date').textContent=fmtDate(t.date||'');
+  document.getElementById('txd-edit-btn').onclick=function(){ closeTxDetail(); if(t.id) openTxEdit(t.id); };
+  document.getElementById('txd-del-btn').onclick=function(){ closeTxDetail(); if(t.id) delTx(t.id); };
+  m.style.display='flex';
+}
+
+// ── NET LİKİDİTE DETAYI ───────────────────────────────────────────────────────
+function showLiquidityDetail(){
+  var m=document.getElementById('liquidity-detail-modal'); if(!m) return;
+  var d=window._lastInsightData||{};
+  document.getElementById('lqd-balance').textContent='₺'+(d.total_balance||0).toLocaleString('tr-TR');
+  document.getElementById('lqd-card').textContent='−₺'+(d.card_debt||0).toLocaleString('tr-TR');
+  document.getElementById('lqd-net').textContent=(d.net_liquidity>=0?'+':'−')+'₺'+Math.abs(d.net_liquidity||0).toLocaleString('tr-TR');
+  document.getElementById('lqd-net').style.color=(d.net_liquidity||0)>=0?'#4ade80':'#f87171';
+  m.style.display='flex';
+}
+function closeLiquidityDetail(){ var m=document.getElementById('liquidity-detail-modal'); if(m) m.style.display='none'; }
 </script>
+
+<!-- İŞLEM DETAY MODALI -->
+<div id="tx-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;align-items:flex-end;justify-content:center;padding:0" onclick="if(event.target===this)closeTxDetail()">
+  <div style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:28px 24px 40px;border-top:1px solid var(--border)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <div id="txd-type" style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">—</div>
+        <div id="txd-amount" style="font-size:2rem;font-weight:900">—</div>
+      </div>
+      <button onclick="closeTxDetail()" style="width:32px;height:32px;border-radius:50%;border:1px solid var(--border2);background:var(--bg3);color:var(--txt2);cursor:pointer;font-size:.9rem">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:24px">
+      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:.8rem;color:var(--txt2)">Kategori</span>
+        <span id="txd-category" style="font-size:.85rem;font-weight:600;color:var(--txt)">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:.8rem;color:var(--txt2)">Tarih</span>
+        <span id="txd-date" style="font-size:.85rem;color:var(--txt)">—</span>
+      </div>
+      <div style="padding:10px 0">
+        <div style="font-size:.8rem;color:var(--txt2);margin-bottom:6px">Açıklama</div>
+        <div id="txd-desc" style="font-size:.88rem;color:var(--txt);line-height:1.5">—</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button id="txd-edit-btn" style="flex:1;padding:12px;background:var(--bg3);color:var(--txt);border:1px solid var(--border2);border-radius:10px;font-size:.88rem;font-weight:600;cursor:pointer">✏️ Düzenle</button>
+      <button id="txd-del-btn" style="flex:1;padding:12px;background:#ef444415;color:#f87171;border:1px solid #ef444430;border-radius:10px;font-size:.88rem;font-weight:600;cursor:pointer">🗑 Sil</button>
+    </div>
+  </div>
+</div>
+
+<!-- İŞLEM DÜZENLEME MODALI -->
+<div id="tx-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeTxEdit()">
+  <div style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:28px 24px 40px;border-top:1px solid var(--border)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div style="font-size:1rem;font-weight:800;color:var(--txt)">✏️ İşlemi Düzenle</div>
+      <button onclick="closeTxEdit()" style="width:32px;height:32px;border-radius:50%;border:1px solid var(--border2);background:var(--bg3);color:var(--txt2);cursor:pointer;font-size:.9rem">✕</button>
+    </div>
+    <input type="hidden" id="txe-id">
+    <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:5px">Tarih</label>
+    <input type="date" id="txe-date" class="f-input" style="margin-bottom:12px">
+    <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:5px">Kategori</label>
+    <select id="txe-category" class="f-input" style="margin-bottom:12px"></select>
+    <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:5px">Tutar</label>
+    <input type="number" id="txe-amount" class="f-input" step="0.01" style="margin-bottom:12px">
+    <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:5px">Açıklama</label>
+    <input type="text" id="txe-desc" class="f-input" style="margin-bottom:20px">
+    <button onclick="saveTxEdit()" style="width:100%;padding:13px;background:var(--b);color:#fff;border:none;border-radius:10px;font-size:.92rem;font-weight:700;cursor:pointer">Kaydet</button>
+  </div>
+</div>
+
+<!-- NET LİKİDİTE DETAY MODALI -->
+<div id="liquidity-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeLiquidityDetail()">
+  <div style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:28px 24px 40px;border-top:1px solid var(--border)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div style="font-size:1rem;font-weight:800;color:var(--txt)">💧 Net Likidite Detayı</div>
+      <button onclick="closeLiquidityDetail()" style="width:32px;height:32px;border-radius:50%;border:1px solid var(--border2);background:var(--bg3);color:var(--txt2);cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:.8rem;color:var(--txt2);margin-bottom:16px;line-height:1.6">
+      Hesaplarınızın toplam bakiyesinden kredi kartı borçlarınız düşülerek hesaplanır.
+    </div>
+    <div style="display:flex;flex-direction:column;gap:0">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:.85rem;color:var(--txt2)">🏦 Hesap Bakiyeleri</span>
+        <span id="lqd-balance" style="font-size:.9rem;font-weight:700;color:var(--g)">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:.85rem;color:var(--txt2)">💳 Kredi Kartı Borcu</span>
+        <span id="lqd-card" style="font-size:.9rem;font-weight:700;color:var(--r)">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0">
+        <span style="font-size:.88rem;font-weight:700;color:var(--txt)">Net Likidite</span>
+        <span id="lqd-net" style="font-size:1.1rem;font-weight:900">—</span>
+      </div>
+    </div>
+    <div style="margin-top:16px;padding:12px 14px;background:var(--bg3);border-radius:10px;font-size:.76rem;color:var(--txt2);line-height:1.6">
+      💡 Hesap bakiyesi = Hesapların başlangıç bakiyesi + Bugüne kadar kaydedilen gelir/gider işlemleri
+    </div>
+  </div>
+</div>
 
 </body>
 </html>"""
