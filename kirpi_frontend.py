@@ -161,11 +161,14 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
     display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;height:100vh;z-index:100}
 .main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden;min-width:0}
 @media(max-width:768px){
-  nav{width:100%;height:auto;flex-direction:row;border-right:none;border-top:1px solid rgba(0,0,0,.07);border-bottom:none;
+  nav{width:100%;height:auto;flex-direction:row;border-right:none;border-top:none;border-bottom:none;
       position:fixed;bottom:0;top:auto;z-index:200;
       padding-bottom:env(safe-area-inset-bottom,0px);
-      box-shadow:0 -4px 24px rgba(0,0,0,.09)}
-  .main{margin-left:0;margin-bottom:calc(58px + env(safe-area-inset-bottom,0px))}
+      background:rgba(255,255,255,.82);
+      backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+      box-shadow:0 -1px 0 rgba(0,0,0,.08),0 -8px 32px rgba(0,0,0,.06)}
+  [data-theme="dark"] nav{background:rgba(18,18,20,.88)}
+  .main{margin-left:0;margin-bottom:calc(62px + env(safe-area-inset-bottom,0px))}
   .nav-logo{display:none}
 }
 
@@ -185,17 +188,17 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
   box-shadow:inset 3px 0 0 var(--b)}
 .nl .ico{font-size:1.1rem;width:22px;text-align:center;flex-shrink:0}
 
-/* ── MOBILE NAV — Duolingo style ── */
+/* ── MOBILE NAV — iOS Tab Bar style ── */
 @media(max-width:768px){
-  .nav-links{flex-direction:row;padding:0 2px;gap:0;justify-content:space-around;align-items:center;height:58px}
+  .nav-links{flex-direction:row;padding:4px 8px 0;gap:0;justify-content:space-around;align-items:flex-start;height:50px}
   .nav-sect{display:none}
-  .nl{flex-direction:column;gap:1px;font-size:.56rem;padding:5px 2px;min-width:48px;flex:1;
-      max-width:72px;border-radius:0;box-shadow:none!important;background:transparent!important;align-items:center}
-  .nl .ico{font-size:1.2rem;width:40px;height:26px;display:flex;align-items:center;justify-content:center;
-           border-radius:12px;background:transparent;transition:all .2s cubic-bezier(.34,1.4,.64,1)}
-  .nl span:not(.ico){color:var(--txt2);transition:color .15s;font-weight:600;letter-spacing:.01em}
-  .nl.active .ico{background:rgba(0,122,255,.12);transform:scale(1.06)}
-  .nl.active span:not(.ico){color:var(--b);font-weight:800}
+  .nl{flex-direction:column;gap:3px;font-size:.6rem;padding:4px 4px 2px;min-width:52px;flex:1;
+      max-width:80px;border-radius:0;box-shadow:none!important;background:transparent!important;align-items:center}
+  .nl .ico{font-size:1.4rem;width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+           border-radius:0;background:transparent;transition:transform .15s cubic-bezier(.34,1.4,.64,1),opacity .15s}
+  .nl span:not(.ico){color:var(--txt2);transition:color .15s;font-weight:500;letter-spacing:-.01em;font-size:.59rem}
+  .nl.active .ico{transform:scale(1.08)}
+  .nl.active span:not(.ico){color:var(--b);font-weight:700}
   .nl::after{display:none}
 }
 
@@ -263,11 +266,17 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
 .page.active{display:block;opacity:1;transform:translateX(0);transition:opacity .2s ease,transform .2s cubic-bezier(.25,.46,.45,.94)}
 .page.slide-back{transform:translateX(-18px)}
 @media(max-width:600px){.page{padding:14px 14px 20px}}
-.page-title{font-size:1.4rem;font-weight:800;margin-bottom:4px;letter-spacing:-.02em}
-.page-sub{font-size:.82rem;color:var(--txt2);margin-bottom:24px}
+.page-title{font-size:1.75rem;font-weight:900;margin-bottom:4px;letter-spacing:-.03em}
+.page-sub{font-size:.84rem;color:var(--txt2);margin-bottom:20px}
+@media(max-width:768px){
+  .page-title{font-size:1.5rem}
+  .page-sub{margin-bottom:16px}
+}
 
 /* ── CARDS ── */
-.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;
+  box-shadow:0 2px 12px rgba(0,0,0,.06),0 1px 3px rgba(0,0,0,.04)}
+[data-theme="dark"] .card{box-shadow:0 2px 12px rgba(0,0,0,.3)}
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
@@ -346,7 +355,8 @@ canvas{display:block;width:100%!important}
 .btn-ghost:hover{border-color:var(--b2);color:var(--b2)}
 .btn-green{background:var(--g);color:#fff}
 
-.ledger-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius)}
+.ledger-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:0 1px 6px rgba(0,0,0,.04)}
 table{width:100%;border-collapse:collapse;font-size:.83rem}
 thead tr{background:var(--bg3);position:sticky;top:0;z-index:10}
 th{padding:11px 12px;text-align:left;font-size:.72rem;font-weight:600;text-transform:uppercase;
@@ -355,10 +365,34 @@ th.sortable{cursor:pointer}
 th.sortable:hover{color:var(--b2)}
 th .sort-ico{margin-left:4px;opacity:.4}
 td{padding:0;border-bottom:1px solid var(--border);vertical-align:middle}
-td .cell{padding:10px 12px;display:flex;align-items:center;gap:6px;min-height:42px}
-tbody tr:hover{background:#ffffff05}
+td .cell{padding:10px 12px;display:flex;align-items:center;gap:6px;min-height:44px}
+tbody tr:hover{background:rgba(0,122,255,.03)}
 tbody tr.selected{background:#6366f10d}
 tbody tr:last-child td{border-bottom:none}
+
+/* Mobilde tablo → kart liste görünümü */
+@media(max-width:768px){
+  .ledger-wrap{border:none;border-radius:0;overflow-x:visible;box-shadow:none;background:transparent}
+  table{display:block}
+  thead{display:none}
+  tbody{display:flex;flex-direction:column;gap:8px}
+  tbody tr{display:flex;align-items:center;background:var(--bg2);border-radius:14px;
+    border:1px solid var(--border);box-shadow:0 1px 6px rgba(0,0,0,.05);padding:12px 14px;
+    gap:10px;cursor:pointer;transition:.12s;-webkit-tap-highlight-color:transparent}
+  tbody tr:active{background:var(--bg3);transform:scale(.99)}
+  tbody tr:last-child td{border-bottom:1px solid var(--border)}
+  tbody tr.selected{background:#6366f108;border-color:#6366f140}
+  td{padding:0;border:none;vertical-align:middle}
+  td .cell{padding:0;min-height:auto}
+  /* Gizlenecek sütunlar mobilde */
+  td:nth-child(1){display:none} /* checkbox */
+  td:nth-child(5){display:none} /* not */
+  td:nth-child(6){display:none} /* aksiyon */
+  /* Tarih küçük göster */
+  td:nth-child(2) .cell{font-size:.72rem;color:var(--txt2);flex-direction:column;align-items:flex-start;gap:1px;min-width:52px}
+  /* Tutar sağa */
+  td:nth-child(5){margin-left:auto}
+}
 
 /* inline edit */
 .cell-edit{padding:0!important}
@@ -388,9 +422,11 @@ tbody tr:last-child td{border-bottom:none}
 
 /* ── FORMS (add page) ── */
 label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-weight:500}
-.f-input{width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--txt);
-  padding:10px 14px;border-radius:9px;font-size:.88rem;outline:none;transition:.15s;font-family:inherit}
-.f-input:focus{border-color:var(--b2)}
+.f-input{width:100%;background:var(--bg3);border:1.5px solid transparent;color:var(--txt);
+  padding:11px 14px;border-radius:11px;font-size:.92rem;outline:none;transition:.15s;font-family:inherit;
+  -webkit-appearance:none;appearance:none;
+  box-shadow:0 1px 3px rgba(0,0,0,.06) inset}
+.f-input:focus{border-color:var(--b);background:var(--bg2);box-shadow:0 0 0 3px rgba(0,122,255,.12)}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
 @media(max-width:500px){.form-row{grid-template-columns:1fr}}
 .type-tabs{display:flex;gap:8px;margin-bottom:16px}
@@ -535,14 +571,17 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 
 /* ── TOP HEADER ─────────────────────────────────────────────── */
 .top-header{
-  position:sticky;top:0;z-index:90;height:54px;
+  position:sticky;top:0;z-index:90;
+  height:calc(54px + env(safe-area-inset-top,0px));
+  padding-top:env(safe-area-inset-top,0px);
   background:rgba(242,242,247,.92);backdrop-filter:blur(20px) saturate(180%);
   -webkit-backdrop-filter:blur(20px) saturate(180%);
-  border-bottom:1px solid rgba(0,0,0,.1);
+  border-bottom:1px solid rgba(0,0,0,.08);
   display:flex;align-items:center;justify-content:flex-end;
-  padding:0 24px;flex-shrink:0;
+  padding-left:24px;padding-right:24px;flex-shrink:0;
 }
-@media(max-width:768px){.top-header{padding:0 16px;justify-content:space-between}}
+[data-theme="dark"] .top-header{background:rgba(10,12,18,.92)}
+@media(max-width:768px){.top-header{padding-left:16px;padding-right:16px;justify-content:space-between}}
 .top-header-logo{font-size:.95rem;font-weight:800;display:none;align-items:center;gap:8px;color:var(--txt)}
 @media(max-width:768px){.top-header-logo{display:flex}}
 .top-header-right{display:flex;align-items:center;gap:10px}
@@ -977,7 +1016,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
       <span class="ico">🏠</span>Anasayfa
     </div>
     <div class="nl" data-page="ledger" onclick="goPage('ledger',this)">
-      <span class="ico">📋</span>Tablo
+      <span class="ico">📋</span>İşlemler
     </div>
     <div class="nl nl-add" data-page="add" onclick="goPage('add',this)">
       <span class="ico">➕</span>Gider Ekle
@@ -1395,8 +1434,8 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 <div class="page" id="page-ledger">
   <div class="top-row">
     <div>
-      <div class="page-title">Tablo Görünümü</div>
-      <div class="page-sub">Hücreye tıkla → düzenle &nbsp;·&nbsp; Tab ile ileri &nbsp;·&nbsp; Enter ile kaydet</div>
+      <div class="page-title">İşlemler</div>
+      <div class="page-sub">Tüm gelir ve gider hareketlerin</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-ghost" id="del-sel-btn" onclick="bulkDelete()" style="display:none">🗑 Seçilenleri Sil</button>
