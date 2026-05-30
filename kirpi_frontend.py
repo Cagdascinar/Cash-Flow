@@ -296,74 +296,89 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 #splash-screen.hide{opacity:0;pointer-events:none}
 .splash-bg{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 35%,rgba(240,185,11,.1),transparent 65%)}
 
-/* Para yığını — sağ tarafta sabit */
+/* Para yığını — sağda */
 .splash-money{
   position:absolute;
-  right:18%;top:50%;transform:translateY(-50%);
-  display:flex;flex-direction:column;gap:4px;align-items:center;
+  right:16%;top:50%;transform:translateY(-60%);
+  display:flex;flex-direction:column;gap:2px;align-items:center;
 }
-.sm-coin{font-size:2.4rem;display:block;opacity:0}
-.sm-c1{animation:coin-appear .4s 1.8s ease forwards}
-.sm-c2{animation:coin-appear .4s 1.9s ease forwards;font-size:2rem}
-.sm-c3{animation:coin-appear .4s 2.0s ease forwards;font-size:1.8rem}
-.sm-c4{animation:coin-appear .4s 2.1s ease forwards;font-size:1.6rem}
-.sm-c5{animation:coin-appear .4s 2.2s ease forwards;font-size:1.4rem}
+.sm-coin{font-size:2.2rem;display:block;opacity:0}
+.sm-c1{animation:coin-appear .3s .8s ease forwards}
+.sm-c2{animation:coin-appear .3s .9s ease forwards;font-size:1.9rem}
+.sm-c3{animation:coin-appear .3s 1.0s ease forwards;font-size:1.7rem}
+.sm-c4{animation:coin-appear .3s 1.1s ease forwards;font-size:1.5rem}
+.sm-c5{animation:coin-appear .3s 1.2s ease forwards;font-size:1.3rem}
 @keyframes coin-appear{
-  from{opacity:0;transform:scale(.5) translateY(10px)}
+  from{opacity:0;transform:scale(.4) translateY(8px)}
   to{opacity:1;transform:scale(1) translateY(0)}
 }
 
-/* Kirpi — soldan sağa yürüyor, paraya ulaşınca zıplıyor */
+/* Kirpi ana animasyon — toplam 3.0s */
 .splash-kirpi{
-  font-size:4.5rem;
+  font-size:4rem;
   position:absolute;
-  top:50%;margin-top:-3rem;
+  top:50%;margin-top:-2.5rem;
   opacity:0;
-  animation:kirpi-walk-to-money 3.5s ease forwards;
+  animation:kirpi-main 3.0s cubic-bezier(.4,0,.2,1) forwards;
 }
-@keyframes kirpi-walk-to-money{
-  0%  {opacity:0;left:5%;transform:scaleX(-1) translateY(0) scale(1)}
-  8%  {opacity:1;left:5%;transform:scaleX(-1) translateY(0) scale(1)}
-  /* Yürüyüş adımları — sağa doğru */
-  14% {left:16%;transform:scaleX(-1) translateY(-5px) scale(1)}
-  18% {left:22%;transform:scaleX(-1) translateY(0)    scale(1)}
-  22% {left:28%;transform:scaleX(-1) translateY(-5px) scale(1)}
-  26% {left:34%;transform:scaleX(-1) translateY(0)    scale(1)}
-  30% {left:40%;transform:scaleX(-1) translateY(-5px) scale(1)}
-  34% {left:46%;transform:scaleX(-1) translateY(0)    scale(1)}
-  38% {left:52%;transform:scaleX(-1) translateY(-5px) scale(1)}
-  42% {left:56%;transform:scaleX(-1) translateY(0)    scale(1)}
-  /* Durdu, ekrana döndü */
-  47% {left:56%;transform:scaleX(1) translateY(0) scale(1)}
-  /* Kollarını açarak sevinç — ekrana bakıyor */
-  53% {left:56%;transform:scaleX(1) translateY(-22px) scale(1.4) rotate(-12deg)}
-  58% {left:56%;transform:scaleX(1) translateY(0)     scale(1.5) rotate(0deg)}
-  63% {left:56%;transform:scaleX(1) translateY(-16px) scale(1.4) rotate(14deg)}
-  68% {left:56%;transform:scaleX(1) translateY(0)     scale(1.5) rotate(0deg)}
-  73% {left:56%;transform:scaleX(1) translateY(-10px) scale(1.4) rotate(-8deg)}
-  78% {left:56%;transform:scaleX(1) translateY(0)     scale(1.3) rotate(0deg)}
-  /* Ekrana gülümseyerek bakıyor, büyük kaldı */
-  85% {left:56%;transform:scaleX(1) translateY(-5px)  scale(1.35) rotate(0deg)}
-  100%{left:56%;transform:scaleX(1) translateY(0)     scale(1.3)  rotate(0deg);opacity:1}
+@keyframes kirpi-main{
+  /* 1. Giriş */
+  0%   {opacity:0;left:2%; transform:scaleX(-1) scale(.8) translateY(0)}
+  4%   {opacity:1;left:4%; transform:scaleX(-1) scale(1)  translateY(0)}
+  /* 2. Hızlı yürüyüş → para */
+  9%   {left:14%;transform:scaleX(-1) scale(1) translateY(-6px)}
+  13%  {left:24%;transform:scaleX(-1) scale(1) translateY(0)}
+  17%  {left:34%;transform:scaleX(-1) scale(1) translateY(-6px)}
+  21%  {left:44%;transform:scaleX(-1) scale(1) translateY(0)}
+  25%  {left:54%;transform:scaleX(-1) scale(1) translateY(-6px)}
+  30%  {left:62%;transform:scaleX(-1) scale(1) translateY(0)}
+  /* 3. Paraya ulaştı — sevinç zıplaması */
+  34%  {left:62%;transform:scaleX(-1) scale(1.3) translateY(-20px)}
+  38%  {left:62%;transform:scaleX(-1) scale(1)   translateY(0)}
+  /* 4. Paralar arasında rastgele oynuyor */
+  42%  {left:70%;transform:scaleX(-1) scale(1.1) translateY(-12px) rotate(10deg)}
+  46%  {left:65%;transform:scaleX(1)  scale(1)   translateY(0)     rotate(0deg)}
+  50%  {left:55%;transform:scaleX(1)  scale(1.1) translateY(-14px) rotate(-8deg)}
+  54%  {left:62%;transform:scaleX(-1) scale(1)   translateY(0)     rotate(0deg)}
+  58%  {left:68%;transform:scaleX(-1) scale(1.2) translateY(-10px) rotate(6deg)}
+  62%  {left:62%;transform:scaleX(-1) scale(1)   translateY(0)     rotate(0deg)}
+  /* 5. Durdu — kullanıcıya döndü */
+  68%  {left:50%;transform:scaleX(1)  scale(1.1) translateY(0)}
+  /* 6. Ekrana bakıyor — büyüdü, gülümsüyor */
+  74%  {left:50%;transform:scaleX(1)  scale(1.5) translateY(-8px)}
+  80%  {left:50%;transform:scaleX(1)  scale(1.4) translateY(0)}
+  86%  {left:50%;transform:scaleX(1)  scale(1.45) translateY(-4px)}
+  /* 7. Son poz — mutlu, sakin, ekrana bakıyor */
+  92%  {left:50%;transform:scaleX(1)  scale(1.4) translateY(0)}
+  100% {left:50%;transform:scaleX(1)  scale(1.35) translateY(0);opacity:1}
 }
 
-/* Alt yazı */
-.splash-bottom{
-  position:absolute;bottom:15%;
-  display:flex;flex-direction:column;align-items:center;gap:8px;
-  animation:splash-fade .6s 1s ease forwards;opacity:0;
+/* Gülücük emoji — JS ile swap ediliyor */
+#splash-smile{
+  position:absolute;top:50%;left:50%;
+  font-size:2rem;opacity:0;margin-top:-5rem;margin-left:1rem;
+  animation:smile-pop .4s 2.2s ease forwards;
 }
-.splash-name{font-size:2rem;font-weight:900;color:#f0b90b;letter-spacing:-.04em}
-.splash-tag{font-size:.88rem;color:#848e9c}
+@keyframes smile-pop{
+  from{opacity:0;transform:scale(.5) translateY(4px)}
+  to{opacity:1;transform:scale(1) translateY(0)}
+}
+
+/* Alt yazı — hızlı giriş */
+.splash-bottom{
+  position:absolute;bottom:12%;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  animation:splash-fade .5s .3s ease forwards;opacity:0;
+}
 .splash-name{font-size:2.2rem;font-weight:900;color:#f0b90b;letter-spacing:-.04em;
-  animation:splash-fade .6s .4s ease forwards;opacity:0}
-.splash-tag{font-size:.9rem;color:#848e9c;animation:splash-fade .6s .6s ease forwards;opacity:0}
-@keyframes splash-fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.splash-dots{display:flex;gap:8px;margin-top:8px;animation:splash-fade .6s .8s ease forwards;opacity:0}
-.splash-dots span{width:6px;height:6px;border-radius:50%;background:#f0b90b;
-  animation:dot-pulse 1.2s 1s ease-in-out infinite}
-.splash-dots span:nth-child(2){animation-delay:1.15s}
-.splash-dots span:nth-child(3){animation-delay:1.3s}
+  animation:splash-fade .4s .3s ease forwards;opacity:0}
+.splash-tag{font-size:.88rem;color:#848e9c;animation:splash-fade .4s .5s ease forwards;opacity:0}
+@keyframes splash-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.splash-dots{display:flex;gap:8px;margin-top:6px;animation:splash-fade .4s .7s ease forwards;opacity:0}
+.splash-dots span{width:5px;height:5px;border-radius:50%;background:#f0b90b;
+  animation:dot-pulse .9s .8s ease-in-out infinite}
+.splash-dots span:nth-child(2){animation-delay:.95s}
+.splash-dots span:nth-child(3){animation-delay:1.1s}
 @keyframes dot-pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
 
 /* Onboarding */
@@ -676,47 +691,68 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 }
 .notif-overlay.open{opacity:1;pointer-events:all}
 .notif-panel{
-  position:fixed;top:0;right:0;bottom:0;width:340px;max-width:100vw;
-  background:var(--bg2);border-left:1px solid var(--border2);
-  z-index:500;display:flex;flex-direction:column;
-  transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);
-  box-shadow:-8px 0 40px rgba(0,0,0,.12);
+  position:fixed;
+  top:calc(54px + env(safe-area-inset-top,0px));
+  right:0;bottom:0;width:360px;max-width:100vw;
+  background:var(--bg1);border-left:1px solid var(--border2);
+  z-index:499;display:flex;flex-direction:column;
+  transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
+  box-shadow:-12px 0 48px rgba(0,0,0,.18);
 }
 .notif-panel.open{transform:translateX(0)}
 .notif-panel-head{
   display:flex;align-items:center;justify-content:space-between;
-  padding:16px 18px;border-bottom:1px solid var(--border);flex-shrink:0;
+  padding:18px 20px 14px;border-bottom:1px solid var(--border);flex-shrink:0;
+  background:var(--bg2);
 }
-.notif-panel-title{font-size:.95rem;font-weight:800;color:var(--txt)}
+.notif-panel-title{font-size:1rem;font-weight:800;color:var(--txt)}
+.notif-panel-count{font-size:.75rem;color:var(--txt2);font-weight:500}
 .notif-close-btn{
-  width:30px;height:30px;border-radius:50%;border:1px solid var(--border2);
-  background:var(--bg3);color:var(--txt2);font-size:.9rem;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;transition:.15s;
+  width:32px;height:32px;border-radius:50%;border:1px solid var(--border2);
+  background:var(--bg3);color:var(--txt2);font-size:.95rem;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:.15s;flex-shrink:0;
 }
 .notif-close-btn:hover{background:var(--bg4);color:var(--txt)}
-.notif-list{flex:1;overflow-y:auto;padding:10px 10px 80px}
+.notif-list{flex:1;overflow-y:auto;padding:12px 12px 80px}
 .notif-item{
-  display:flex;gap:11px;align-items:flex-start;
-  padding:12px 12px;border-radius:12px;margin-bottom:7px;
+  display:flex;gap:12px;align-items:flex-start;
+  padding:14px 14px;border-radius:14px;margin-bottom:8px;
   border:1px solid transparent;transition:.15s;cursor:default;
 }
-.notif-item.urgent{background:#ef444412;border-color:#ef444430}
-.notif-item.soon{background:#f59e0b10;border-color:#f59e0b28}
-.notif-item.normal{background:var(--bg3);border-color:var(--border)}
-.notif-item-ico{font-size:1.3rem;flex-shrink:0;margin-top:1px}
-.notif-item-body{flex:1;min-width:0}
-.notif-item-title{font-size:.78rem;font-weight:700;color:var(--txt);margin-bottom:3px}
+.notif-item.urgent{
+  background:linear-gradient(135deg,#ef444415,#ef444408);
+  border-color:#ef444435;
+}
+.notif-item.soon{
+  background:linear-gradient(135deg,#f59e0b12,#f59e0b06);
+  border-color:#f59e0b30;
+}
+.notif-item.normal{background:var(--bg2);border-color:var(--border)}
+.notif-item-ico{
+  font-size:1.5rem;flex-shrink:0;
+  width:40px;height:40px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--bg3);
+}
+.notif-item.urgent .notif-item-ico{background:#ef444415}
+.notif-item.soon .notif-item-ico{background:#f59e0b12}
+.notif-item-body{flex:1;min-width:0;padding-top:2px}
+.notif-item-title{font-size:.82rem;font-weight:700;color:var(--txt);margin-bottom:4px;line-height:1.3}
 .notif-item.urgent .notif-item-title{color:#f87171}
 .notif-item.soon .notif-item-title{color:#fbbf24}
-.notif-item-msg{font-size:.74rem;color:var(--txt2);line-height:1.45}
-.notif-item-days{font-size:.67rem;font-weight:700;margin-top:4px;opacity:.7}
-.notif-item.urgent .notif-item-days{color:#f87171}
-.notif-item.soon .notif-item-days{color:#fbbf24}
-.notif-empty{text-align:center;padding:52px 20px;color:var(--txt2);font-size:.88rem}
-.notif-empty-ico{font-size:2.8rem;margin-bottom:12px;opacity:.5}
+.notif-item-msg{font-size:.77rem;color:var(--txt2);line-height:1.5;margin-bottom:6px}
+.notif-item-days{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:6px;
+  background:var(--bg3);color:var(--txt2);
+}
+.notif-item.urgent .notif-item-days{background:#ef444420;color:#f87171}
+.notif-item.soon .notif-item-days{background:#f59e0b18;color:#fbbf24}
+.notif-empty{text-align:center;padding:60px 24px;color:var(--txt2);font-size:.9rem}
+.notif-empty-ico{font-size:3rem;margin-bottom:14px}
 .notif-section-lbl{
-  font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
-  color:var(--txt2);padding:8px 12px 4px;opacity:.7;
+  font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;
+  color:var(--txt2);padding:10px 4px 6px;opacity:.6;
 }
 
 /* ── TOP HEADER ─────────────────────────────────────────────── */
@@ -1177,7 +1213,7 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
 <div id="splash-screen">
   <div class="splash-bg"></div>
 
-  <!-- Para yığını — sağda sabit -->
+  <!-- Para yığını — sağda -->
   <div class="splash-money">
     <span class="sm-coin sm-c1">💰</span>
     <span class="sm-coin sm-c2">💵</span>
@@ -1189,9 +1225,13 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
   <!-- Kirpi yürüyor -->
   <div class="splash-kirpi" id="splash-kirpi">🦔</div>
 
+  <!-- Gülücük — kirpi ekrana bakınca belirir -->
+  <div id="splash-smile">✨</div>
+
   <!-- Alt yazı -->
   <div class="splash-bottom">
     <div class="splash-name">Kirpi <span style="color:#f0b90b;font-weight:900">Finans</span></div>
+    <div class="splash-tag">Nakit akışın, cebinde.</div>
     <div class="splash-dots">
       <span></span><span></span><span></span>
     </div>
@@ -1394,7 +1434,10 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
 <div class="notif-overlay" id="notif-overlay" onclick="closeNotifPanel()"></div>
 <div class="notif-panel" id="notif-panel">
   <div class="notif-panel-head">
-    <span class="notif-panel-title">🔔 Bildirimler</span>
+    <div>
+      <span class="notif-panel-title">🔔 Bildirimler</span>
+      <div id="notif-panel-count" class="notif-panel-count" style="margin-top:2px">Yükleniyor…</div>
+    </div>
     <button class="notif-close-btn" onclick="closeNotifPanel()">✕</button>
   </div>
   <div class="notif-list" id="notif-list">
@@ -2722,10 +2765,24 @@ function confirmDeleteAccount(){
 (function(){
   var splash = document.getElementById('splash-screen');
   if(!splash) return;
+
+  // 2.0s: kirpi ekrana döndüğünde emoji değiş
+  setTimeout(function(){
+    var k = document.getElementById('splash-kirpi');
+    if(k) k.textContent = '🦔';
+  }, 2000);
+
+  // 2.4s: gülücük + kirpi biraz büyür (CSS ile halloldu)
+  setTimeout(function(){
+    var s = document.getElementById('splash-smile');
+    if(s) s.style.opacity = '1';
+  }, 2400);
+
+  // 3.4s: splash kapan
   setTimeout(function(){
     splash.classList.add('hide');
     setTimeout(function(){ splash.style.display='none'; }, 500);
-  }, 6000);
+  }, 3400);
 })();
 
 // ── NATIVE APP FEEL ──────────────────────────────────────────────────────────
@@ -3175,6 +3232,8 @@ function updateNotifBadge(){
 function renderNotifList(){
   var el=document.getElementById('notif-list');
   if(!el) return;
+  var countEl=document.getElementById('notif-panel-count');
+  if(countEl) countEl.textContent=_notifItems.length===0?'Bildirim yok':_notifItems.length+' bildirim';
   if(_notifItems.length===0){
     el.innerHTML='<div class="notif-empty"><div class="notif-empty-ico">✅</div>Harika! Yaklaşan bildirim yok.</div>';
     return;
@@ -3231,10 +3290,13 @@ function closeNotifPanel(){
 
 function requestBrowserNotifPermission(){
   if(!('Notification' in window)) return;
-  if(Notification.permission==='default'){
+  // Sadece hiç sorulmamışsa sor — daha önce izin verilmişse veya reddedilmişse bir daha sorma
+  if(Notification.permission==='default' && !localStorage.getItem('notif_asked')){
     setTimeout(function(){
-      Notification.requestPermission();
-    },3000);
+      Notification.requestPermission().then(function(){
+        localStorage.setItem('notif_asked','1');
+      });
+    }, 5000);
   }
 }
 
@@ -3242,23 +3304,23 @@ function sendUrgentBrowserNotifs(){
   if(!('Notification' in window)) return;
   if(Notification.permission!=='granted') return;
   var urgent=_notifItems.filter(function(x){return x.urgency==='urgent';});
-  var sent=sessionStorage.getItem('notif_sent_'+new Date().toISOString().split('T')[0]);
-  if(sent) return;
-  if(urgent.length>0){
-    sessionStorage.setItem('notif_sent_'+new Date().toISOString().split('T')[0],'1');
-    urgent.slice(0,3).forEach(function(item,i){
-      setTimeout(function(){
-        try{
-          new Notification('🦔 Kirpi — '+item.title,{
-            body:item.body,
-            icon:'/icon-192.png',
-            tag:'kirpi-'+item.category+'-'+i,
-            badge:'/icon-192.png'
-          });
-        }catch(e){}
-      },i*800);
-    });
-  }
+  if(!urgent.length) return;
+  // Her bildirim ID'si için localStorage'da kayıt — bir kez göster
+  urgent.slice(0,3).forEach(function(item,i){
+    var key='notif_done_'+(item.id||item.title);
+    if(localStorage.getItem(key)) return;
+    localStorage.setItem(key,'1');
+    setTimeout(function(){
+      try{
+        new Notification('🦔 Kirpi — '+item.title,{
+          body:item.body,
+          icon:'/icon-192.png',
+          tag:'kirpi-notif-'+i,
+          badge:'/icon-192.png'
+        });
+      }catch(e){}
+    }, i*800);
+  });
 }
 
 // ── SETTINGS PAGE ────────────────────────────────────────────────────────────
