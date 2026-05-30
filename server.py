@@ -2184,29 +2184,30 @@ def telegram_webhook():
                 "Bağlandıktan sonra /help yazın.")
             return "ok"
 
-        if text_l == "/help" or text_l == "/yardim":
+        if text_l in ("/help", "/yardim", "yardim", "yardım", "ne yapabilirsin",
+                      "komutlar", "ne yazabilirim"):
             tg_send(chat_id,
-                "📖 <b>Kirpi Bot Komutları</b>\n\n"
-                "<b>💰 İşlem Ekleme:</b>\n"
-                "  <code>market 250</code> — gider ekle\n"
-                "  <code>maaş 15000</code> — gelir ekle\n"
-                "  <code>dün benzin 500</code> — dünkü tarihle ekle\n"
+                "📖 <b>Kirpi Bot — Ne Yapabilirsin?</b>\n\n"
+                "<b>💸 İşlem Kaydetme</b> (sadece yaz, slash gerekmez):\n"
+                "  <code>market 250</code>\n"
+                "  <code>maaş 15000</code>\n"
+                "  <code>dün benzin 500</code>\n"
                 "  <code>2 gün önce kira 8000</code>\n"
-                "  <code>yemek 350 #eğlence</code> — kategori override\n"
-                "  <code>/gelir 5000 serbest iş</code> — zorunlu gelir\n"
-                "  <code>/gider 300 market</code> — zorunlu gider\n\n"
-                "<b>📊 Sorgular:</b>\n"
-                "  /bakiye — anlık finansal durum\n"
-                "  /bugun — bugünkü işlemler\n"
-                "  /son — son 5 işlem\n"
-                "  /ay — bu ayın özeti\n"
-                "  /butce — bütçe durumu\n"
-                "  /kartlar — kart bakiyeleri\n"
-                "  /yatirim — yatırım özeti\n"
-                "  /hedef — hedefler\n\n"
-                "<b>✏️ Diğer:</b>\n"
-                "  /sil — son işlemi sil\n"
-                "  /iptal — bekleyen işlemi iptal et")
+                "  <code>yemek 350 #eğlence</code> → kategori belirle\n"
+                "  <code>gelir 5000 serbest iş</code>\n"
+                "  <code>gider 300 eczane</code>\n\n"
+                "<b>📊 Sorgular</b> (slash'sız da yazabilirsin):\n"
+                "  <code>bakiye</code> → anlık finansal durum\n"
+                "  <code>bugun</code> → bugünkü işlemler\n"
+                "  <code>son</code> → son 5 işlem\n"
+                "  <code>ay</code> → bu ayın özeti\n"
+                "  <code>butce</code> → bütçe durumu\n"
+                "  <code>kartlar</code> → kart borçları\n"
+                "  <code>yatirim</code> → portföy özeti\n"
+                "  <code>hedef</code> → hedefler\n\n"
+                "<b>✏️ Yönetim:</b>\n"
+                "  <code>sil</code> → son işlemi sil\n"
+                "  <code>iptal</code> → bekleyen işlemi iptal et")
             return "ok"
 
         link = db.execute("SELECT user_id, profile_id FROM telegram_links WHERE tg_user_id=%s", (tg_uid,)).fetchone()
@@ -2218,37 +2219,43 @@ def telegram_webhook():
 
         # ── KOMUTLAR ───────────────────────────────────────────────────────────
 
-        if text_l in ("/bakiye", "/balance", "bakiye", "ne kadar param var", "param ne kadar",
-                      "kalan ne", "elimde ne kadar var"):
+        if text_l in ("/bakiye", "/balance", "bakiye", "balance",
+                      "ne kadar param var", "param ne kadar", "kalan ne", "elimde ne kadar var",
+                      "finansal durum", "durum"):
             tg_send(chat_id, _tg_summary_msg(uid, pid, db, "bakiye"))
             return "ok"
 
-        if text_l in ("/bugun", "/bugün", "bugün ne harcadım", "bugün ne harcadim",
-                      "bugünün özeti", "bugunun ozeti"):
+        if text_l in ("/bugun", "/bugün", "bugun", "bugün",
+                      "bugün ne harcadım", "bugun ne harcadim",
+                      "bugünün özeti", "bugunun ozeti", "bugun ozet"):
             tg_send(chat_id, _tg_summary_msg(uid, pid, db, "bugun"))
             return "ok"
 
-        if text_l in ("/ay", "/aylik", "/aylık", "bu ayın özeti", "bu ayin ozeti",
-                      "aylık özet", "bu ay ne harcadım"):
+        if text_l in ("/ay", "/aylik", "/aylık", "ay", "aylik", "aylık",
+                      "bu ayın özeti", "bu ayin ozeti", "aylık özet", "bu ay ne harcadım",
+                      "bu ay ozet", "aylik ozet"):
             tg_send(chat_id, _tg_summary_msg(uid, pid, db, "ay"))
             return "ok"
 
-        if text_l.startswith("/son"):
+        if text_l.startswith(("/son", "son")) and (len(text_l) <= 3 or text_l[3:].strip().isdigit()):
             parts = text_l.split()
             n = int(parts[1]) if len(parts)>1 and parts[1].isdigit() else 5
             n = min(n, 20)
             tg_send(chat_id, _tg_last_tx(uid, pid, db, n))
             return "ok"
 
-        if text_l in ("/butce", "/bütçe", "bütçem nasıl", "butce durum"):
+        if text_l in ("/butce", "/bütçe", "butce", "bütçe",
+                      "bütçem nasıl", "butce durum", "butce ozet"):
             tg_send(chat_id, _tg_budget_msg(pid, db))
             return "ok"
 
-        if text_l in ("/kartlar", "/kart", "kart borçları", "kart borclarim"):
+        if text_l in ("/kartlar", "/kart", "kartlar", "kart",
+                      "kart borçları", "kart borclarim", "kartlarim"):
             tg_send(chat_id, _tg_cards_msg(pid, db))
             return "ok"
 
-        if text_l in ("/yatirim", "/yatırım", "yatırımlarım", "portföy"):
+        if text_l in ("/yatirim", "/yatırım", "yatirim", "yatırım",
+                      "yatırımlarım", "portfoy", "portföy", "yatirimlarim"):
             rows = db.execute(
                 "SELECT name,itype,quantity,buy_price FROM investments WHERE profile_id=%s ORDER BY quantity*buy_price DESC LIMIT 10",
                 (pid,)
@@ -2265,7 +2272,7 @@ def telegram_webhook():
                 tg_send(chat_id, "\n".join(lines))
             return "ok"
 
-        if text_l in ("/hedef", "/hedefler", "hedeflerim"):
+        if text_l in ("/hedef", "/hedefler", "hedef", "hedefler", "hedeflerim"):
             rows = db.execute(
                 "SELECT name,goal_type,monthly_target FROM goals WHERE profile_id=%s ORDER BY id LIMIT 10",
                 (pid,)
@@ -2279,7 +2286,7 @@ def telegram_webhook():
                 tg_send(chat_id, "\n".join(lines))
             return "ok"
 
-        if text_l in ("/sil", "/son_sil", "son işlemi sil"):
+        if text_l in ("/sil", "/son_sil", "sil", "son islemi sil", "son işlemi sil", "sil son"):
             last = db.execute(
                 "SELECT id,type,amount,category,date FROM transactions WHERE profile_id=%s ORDER BY id DESC LIMIT 1",
                 (pid,)
@@ -2299,7 +2306,7 @@ def telegram_webhook():
                 )
             return "ok"
 
-        if text_l in ("/iptal", "iptal"):
+        if text_l in ("/iptal", "iptal", "vazgec", "vazgeç", "hayir", "hayır"):
             db.execute("DELETE FROM telegram_pending WHERE tg_user_id=%s", (tg_uid,))
             db.commit()
             tg_send(chat_id, "✅ Bekleyen tüm işlemler iptal edildi.")
