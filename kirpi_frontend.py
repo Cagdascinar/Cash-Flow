@@ -231,8 +231,8 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
   /* Spacer — Ekle butonunun flex alanı */
   .nl-spacer{flex:1;display:block!important;height:56px}
 
-  /* Ana, İşlemler, Görevler */
-  .nl:not(.nl-add){
+  /* Ana, İşlemler, Görevler — sadece bunlar görünür */
+  .nl:not(.nl-add):not(.nl-desktop):not(.nl-desktop-only):not(.nl-menu):not(.nl-more):not(.nl-more){
     flex:1!important;height:56px;
     display:flex!important;flex-direction:column;
     align-items:center;justify-content:center;
@@ -241,17 +241,19 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
     border-radius:0;cursor:pointer;
     -webkit-tap-highlight-color:transparent;
   }
-  .nl:not(.nl-add) .ico{
+  .nl:not(.nl-add):not(.nl-desktop):not(.nl-desktop-only) .ico{
     font-size:1.3rem;line-height:1;
     transition:transform .14s cubic-bezier(.34,1.4,.64,1);
     display:block;
   }
-  .nl:not(.nl-add) span:not(.ico){
+  .nl:not(.nl-add):not(.nl-desktop):not(.nl-desktop-only) span:not(.ico){
     font-size:.57rem;font-weight:500;color:var(--txt2);
   }
-  .nl:not(.nl-add).active .ico{transform:scale(1.12)}
-  .nl:not(.nl-add).active span:not(.ico){color:var(--b);font-weight:700}
+  .nl:not(.nl-add):not(.nl-desktop):not(.nl-desktop-only).active .ico{transform:scale(1.12)}
+  .nl:not(.nl-add):not(.nl-desktop):not(.nl-desktop-only).active span:not(.ico){color:var(--b);font-weight:700}
   .nl::after{display:none!important}
+  /* Desktop item'ları kesinlikle gizle — en sona yaz */
+  .nl-desktop,.nl-desktop-only,.nl-menu,.nl-more,.nav-sect{display:none!important}
 
   /* ➕ Ekle — position:absolute, left:50%, tam merkez */
   .nl-add{
