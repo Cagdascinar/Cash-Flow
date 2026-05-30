@@ -1094,14 +1094,27 @@ def api_report_settings_save():
     return jsonify({"ok":True})
 
 def get_pid():
-    """Return active profile_id from session (fallback: first profile of user)."""
+    """Return active profile_id for the current user — always validates ownership."""
+    uid = session.get("user_id")
+    if not uid:
+        return None
     pid = session.get("profile_id")
-    if not pid:
-        uid = session.get("user_id")
-        with pg_connect() as con:
-            row = con.execute("SELECT id FROM profiles WHERE user_id=? ORDER BY id LIMIT 1",(uid,)).fetchone()
-            if row: pid = row["id"]; session["profile_id"] = pid
-    return pid
+    with pg_connect() as con:
+        if pid:
+            # Verify this pid actually belongs to the current user
+            valid = con.execute(
+                "SELECT id FROM profiles WHERE id=%s AND user_id=%s", (pid, uid)
+            ).fetchone()
+            if valid:
+                return pid
+        # Fallback: use first profile of this user
+        row = con.execute(
+            "SELECT id FROM profiles WHERE user_id=%s ORDER BY id LIMIT 1", (uid,)
+        ).fetchone()
+        if row:
+            session["profile_id"] = row["id"]
+            return row["id"]
+    return None
 
 # ── PROFILES API ──────────────────────────────────────────────────────────────
 

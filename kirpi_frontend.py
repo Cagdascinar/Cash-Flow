@@ -317,21 +317,22 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
   animation:kw 3.8s ease forwards;
 }
 @keyframes kw{
-  0%  {opacity:0;transform:translateX(0)    translateY(0)     scale(.9)}
-  6%  {opacity:1;transform:translateX(0)    translateY(0)     scale(1)}
-  13% {transform:translateX(12vw) translateY(-12px) scale(1)}
-  19% {transform:translateX(24vw) translateY(4px)   scale(1)}
-  25% {transform:translateX(36vw) translateY(-12px) scale(1)}
-  31% {transform:translateX(48vw) translateY(4px)   scale(1)}
-  37% {transform:translateX(56vw) translateY(-12px) scale(1)}
-  43% {transform:translateX(62vw) translateY(0)     scale(1)}
-  50% {transform:translateX(62vw) translateY(-28px) scale(1.3) rotate(12deg)}
-  56% {transform:translateX(62vw) translateY(4px)   scale(1)   rotate(0)}
-  63% {transform:translateX(62vw) translateY(-18px) scale(1.2) rotate(-8deg)}
-  69% {transform:translateX(62vw) translateY(4px)   scale(1)   rotate(0)}
-  78% {transform:translateX(62vw) translateY(-6px)  scale(1.15)}
-  86% {transform:translateX(62vw) translateY(0)     scale(1.12)}
-  100%{transform:translateX(62vw) translateY(0)     scale(1.12);opacity:1}
+  /* scaleX(-1): kirpi emoji ters çevrilerek sağa bakıyor */
+  0%  {opacity:0;transform:translateX(0)    translateY(0)     scale(.9) scaleX(-1)}
+  6%  {opacity:1;transform:translateX(0)    translateY(0)     scale(1)  scaleX(-1)}
+  13% {transform:translateX(12vw) translateY(-12px) scale(1)   scaleX(-1)}
+  19% {transform:translateX(24vw) translateY(4px)   scale(1)   scaleX(-1)}
+  25% {transform:translateX(36vw) translateY(-12px) scale(1)   scaleX(-1)}
+  31% {transform:translateX(48vw) translateY(4px)   scale(1)   scaleX(-1)}
+  37% {transform:translateX(56vw) translateY(-12px) scale(1)   scaleX(-1)}
+  43% {transform:translateX(62vw) translateY(0)     scale(1)   scaleX(-1)}
+  50% {transform:translateX(62vw) translateY(-28px) scale(1.3) scaleX(-1) rotate(-12deg)}
+  56% {transform:translateX(62vw) translateY(4px)   scale(1)   scaleX(-1) rotate(0)}
+  63% {transform:translateX(62vw) translateY(-18px) scale(1.2) scaleX(-1) rotate(8deg)}
+  69% {transform:translateX(62vw) translateY(4px)   scale(1)   scaleX(-1) rotate(0)}
+  78% {transform:translateX(62vw) translateY(-6px)  scale(1.15) scaleX(-1)}
+  86% {transform:translateX(62vw) translateY(0)     scale(1.12) scaleX(-1)}
+  100%{transform:translateX(62vw) translateY(0)     scale(1.12) scaleX(-1);opacity:1}
 }
 
 /* Alt yazı */
@@ -1665,26 +1666,62 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
     </div>
   </div>
 
-  <div class="ledger-toolbar">
-    <input class="search-box" id="ledger-search" placeholder="🔍  Ara…" oninput="filterLedger()">
-    <select class="filter-sel" id="f-type" onchange="filterLedger()">
-      <option value="">Tümü</option>
-      <option value="gelir">Gelir</option>
-      <option value="gider">Gider</option>
-    </select>
-    <select class="filter-sel" id="ledger-f-cat" onchange="filterLedger()"><option value="">Tüm Kategoriler</option></select>
-    <select class="filter-sel" id="f-year" onchange="onYearFilterChange()"></select>
-    <div style="display:flex;gap:6px;flex-shrink:0">
-      <button class="btn btn-ghost" onclick="exportCsv()" title="CSV İndir" style="padding:7px 10px">⬇</button>
-      <button class="btn btn-ghost" onclick="exportPDF()" title="PDF Rapor" style="padding:7px 10px">📄</button>
+  <!-- Filtre Paneli — Temiz & Premium -->
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:14px 16px;margin-bottom:12px">
+
+    <!-- Arama -->
+    <div style="position:relative;margin-bottom:12px">
+      <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--txt2);font-size:.9rem;pointer-events:none">🔍</span>
+      <input id="ledger-search" oninput="filterLedger()" placeholder="İşlem ara…"
+        style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--txt);padding:10px 12px 10px 36px;border-radius:10px;font-size:.88rem;outline:none;font-family:inherit">
     </div>
-  </div>
-  <div class="ledger-toolbar" style="margin-top:-6px;margin-bottom:10px">
-    <span style="font-size:.78rem;color:var(--txt2);white-space:nowrap">Tarih aralığı:</span>
-    <input type="date" class="filter-sel" id="f-date-from" onchange="filterLedger()" style="font-size:.8rem;padding:6px 8px">
-    <span style="font-size:.78rem;color:var(--txt2)">—</span>
-    <input type="date" class="filter-sel" id="f-date-to" onchange="filterLedger()" style="font-size:.8rem;padding:6px 8px">
-    <button class="btn btn-ghost" onclick="clearDateRange()" style="font-size:.78rem;padding:6px 10px">✕ Temizle</button>
+
+    <!-- Tür pilleri + Yıl + Kategori -->
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <!-- Tür seçimi: pill butonlar -->
+      <div style="display:flex;gap:4px;background:var(--bg3);border-radius:9px;padding:3px;flex-shrink:0" id="type-pill-group">
+        <button onclick="setTypePill('')"    id="pill-all"    class="type-pill active" style="padding:5px 14px;border:none;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;transition:.15s;background:#fff;color:var(--txt);box-shadow:0 1px 4px rgba(0,0,0,.1)">Tümü</button>
+        <button onclick="setTypePill('gelir')" id="pill-gelir" class="type-pill"       style="padding:5px 14px;border:none;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;transition:.15s;background:transparent;color:var(--txt2)">↑ Gelir</button>
+        <button onclick="setTypePill('gider')" id="pill-gider" class="type-pill"       style="padding:5px 14px;border:none;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;transition:.15s;background:transparent;color:var(--txt2)">↓ Gider</button>
+      </div>
+
+      <!-- Gizli select (filterLedger için gerekli) -->
+      <select id="f-type" style="display:none" onchange="filterLedger()">
+        <option value="">Tümü</option><option value="gelir">Gelir</option><option value="gider">Gider</option>
+      </select>
+
+      <!-- Kategori -->
+      <select id="ledger-f-cat" onchange="filterLedger()"
+        style="flex:1;min-width:110px;background:var(--bg3);border:1px solid var(--border2);color:var(--txt2);padding:7px 10px;border-radius:9px;font-size:.8rem;outline:none">
+        <option value="">Tüm Kategoriler</option>
+      </select>
+
+      <!-- Yıl -->
+      <select id="f-year" onchange="onYearFilterChange()"
+        style="background:var(--bg3);border:1px solid var(--border2);color:var(--txt2);padding:7px 10px;border-radius:9px;font-size:.8rem;outline:none;flex-shrink:0"></select>
+
+      <!-- Export ikonları -->
+      <div style="display:flex;gap:4px;flex-shrink:0;margin-left:auto">
+        <button onclick="exportCsv()" title="CSV İndir" style="width:32px;height:32px;border:1px solid var(--border2);background:var(--bg3);color:var(--txt2);border-radius:8px;cursor:pointer;font-size:.8rem">⬇</button>
+        <button onclick="exportPDFWithTheme()" title="PDF Rapor" style="width:32px;height:32px;border:1px solid var(--border2);background:var(--bg3);color:var(--txt2);border-radius:8px;cursor:pointer;font-size:.8rem">📄</button>
+      </div>
+    </div>
+
+    <!-- Tarih aralığı (toggle ile) -->
+    <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <button onclick="toggleDateRange()" id="date-range-toggle"
+        style="font-size:.75rem;color:var(--txt2);background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;gap:4px">
+        📅 Tarih Aralığı <span id="date-range-arrow">▸</span>
+      </button>
+      <div id="date-range-row" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
+        <input type="date" id="f-date-from" onchange="filterLedger()"
+          style="background:var(--bg3);border:1px solid var(--border2);color:var(--txt);padding:5px 8px;border-radius:8px;font-size:.78rem;outline:none">
+        <span style="color:var(--txt2);font-size:.78rem">—</span>
+        <input type="date" id="f-date-to" onchange="filterLedger()"
+          style="background:var(--bg3);border:1px solid var(--border2);color:var(--txt);padding:5px 8px;border-radius:8px;font-size:.78rem;outline:none">
+        <button onclick="clearDateRange()" style="font-size:.72rem;color:var(--r);background:none;border:none;cursor:pointer;padding:2px 6px">✕ Temizle</button>
+      </div>
+    </div>
   </div>
 
   <div id="monthly-summary" style="display:none;overflow-x:auto;margin-bottom:12px">
@@ -2885,7 +2922,7 @@ function goPage(id, el){
       });
     });
     playClick();
-    if(id==='ledger') renderLedger();
+    if(id==='ledger') loadAllTx();
     if(id==='dashboard') loadDashboard();
     if(id==='recurring') initRecurringPage();
     if(id==='invest') initInvestPage();
@@ -4514,6 +4551,27 @@ function populateYearFilter(){
 }
 
 var _sortIcos={};
+function setTypePill(val){
+  document.getElementById('f-type').value=val;
+  ['all','gelir','gider'].forEach(function(k){
+    var btn=document.getElementById('pill-'+k);
+    if(!btn) return;
+    var isActive=(k==='all'&&val==='')||(k===val);
+    btn.style.background=isActive?'#fff':'transparent';
+    btn.style.color=isActive?'var(--txt)':'var(--txt2)';
+    btn.style.boxShadow=isActive?'0 1px 4px rgba(0,0,0,.1)':'none';
+  });
+  filterLedger();
+}
+
+function toggleDateRange(){
+  var row=document.getElementById('date-range-row');
+  var arrow=document.getElementById('date-range-arrow');
+  var visible=row.style.display!=='none';
+  row.style.display=visible?'none':'flex';
+  if(arrow) arrow.textContent=visible?'▸':'▾';
+}
+
 function sortBy(col){
   if(sortCol===col) sortDir*=-1; else{sortCol=col;sortDir=-1}
   document.querySelectorAll('.sort-ico').forEach(function(s){s.textContent='↕';s.style.opacity='.3'});
