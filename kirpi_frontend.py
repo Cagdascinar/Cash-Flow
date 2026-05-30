@@ -5549,6 +5549,95 @@ function exportPDF(year, month){
   </div>
 </div>
 
+<!-- TRIAL BANNER -->
+<div id="trial-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:8500;background:linear-gradient(90deg,#6366f1,#a855f7);padding:8px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;box-shadow:0 2px 12px rgba(99,102,241,.4)">
+  <span id="trial-banner-text" style="font-size:.8rem;color:#fff;font-weight:600"></span>
+  <div style="display:flex;gap:8px;flex-shrink:0">
+    <a href="/premium" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:4px 10px;font-size:.75rem;font-weight:700;text-decoration:none">Premium Al</a>
+    <button onclick="this.parentElement.parentElement.style.display='none'" style="background:none;border:none;color:rgba(255,255,255,.7);font-size:.9rem;cursor:pointer;padding:0 4px">✕</button>
+  </div>
+</div>
+
+<!-- PREMIUM REQUIRED MODAL -->
+<div id="premium-modal" style="display:none;position:fixed;inset:0;z-index:9200;background:rgba(0,0,0,.75);align-items:center;justify-content:center">
+  <div style="background:#111318;border:1px solid #1e2233;border-radius:20px;padding:36px 32px;max-width:380px;width:90%;text-align:center">
+    <div style="font-size:2.5rem;margin-bottom:12px">🔒</div>
+    <div style="font-size:1.1rem;font-weight:800;color:#e2e8f0;margin-bottom:8px">Premium Özellik</div>
+    <div id="premium-modal-text" style="font-size:.85rem;color:#64748b;margin-bottom:24px;line-height:1.6">Bu özellik Premium üyelik gerektirir.</div>
+    <div style="display:flex;gap:10px">
+      <a href="/premium" style="flex:1;padding:12px;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff;border-radius:10px;text-decoration:none;font-weight:700;font-size:.88rem">Premium'a Geç →</a>
+      <button onclick="closePremiumModal()" style="flex:1;padding:12px;background:#1e2233;color:#94a3b8;border:none;border-radius:10px;font-size:.88rem;cursor:pointer">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── ABONELİK DURUMU ──────────────────────────────────────────────────────────
+var _kirpiSub = null;
+
+function loadSubStatus() {
+  fetch('/api/me').then(r => r.json()).then(d => {
+    if (!d.subscription) return;
+    _kirpiSub = d.subscription;
+    if (_kirpiSub.status === 'trial' && _kirpiSub.days_left <= 7) {
+      var banner = document.getElementById('trial-banner');
+      var text   = document.getElementById('trial-banner-text');
+      if (banner && text) {
+        text.textContent = '🎁 Ücretsiz deneme süreniz: ' + _kirpiSub.days_left + ' gün kaldı';
+        banner.style.display = 'flex';
+      }
+    } else if (_kirpiSub.status === 'free') {
+      var banner = document.getElementById('trial-banner');
+      var text   = document.getElementById('trial-banner-text');
+      if (banner && text) {
+        text.textContent = '⚠️ Deneme süreniz doldu — bazı özellikler kilitli';
+        banner.style.display = 'flex';
+      }
+    }
+    applyPremiumLocks();
+  }).catch(function(){});
+}
+
+function isPremium() {
+  return _kirpiSub && _kirpiSub.is_premium;
+}
+
+function showPremiumModal(msg) {
+  var m = document.getElementById('premium-modal');
+  var t = document.getElementById('premium-modal-text');
+  if (t) t.textContent = msg || 'Bu özellik Premium üyelik gerektirir. İlk 30 gün ücretsiz deniyebilirsiniz.';
+  if (m) m.style.display = 'flex';
+}
+
+function closePremiumModal() {
+  var m = document.getElementById('premium-modal');
+  if (m) m.style.display = 'none';
+}
+
+function guardPremium(msg, callback) {
+  if (isPremium()) { callback(); return; }
+  showPremiumModal(msg);
+}
+
+function applyPremiumLocks() {
+  if (isPremium()) return;
+  // Sidebar menü öğelerine kilit ikonu ekle
+  var premiumMenuIds = ['nav-investments','nav-assets','nav-suppliers'];
+  premiumMenuIds.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el && !el.querySelector('.lock-icon')) {
+      var lock = document.createElement('span');
+      lock.className = 'lock-icon';
+      lock.textContent = ' 🔒';
+      lock.style.cssText = 'font-size:.7rem;opacity:.6';
+      el.appendChild(lock);
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', loadSubStatus);
+</script>
+
 </body>
 </html>"""
 

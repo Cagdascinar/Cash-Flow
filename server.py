@@ -436,6 +436,16 @@ def init_db():
             description TEXT NOT NULL DEFAULT '',
             created_at  TEXT NOT NULL
         )""",
+        """CREATE TABLE IF NOT EXISTS subscriptions (
+            id         SERIAL PRIMARY KEY,
+            user_id    INTEGER NOT NULL UNIQUE,
+            plan       TEXT NOT NULL DEFAULT 'premium',
+            status     TEXT NOT NULL DEFAULT 'active',
+            started_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL DEFAULT '',
+            note       TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL
+        )""",
     ]
     migrations = [
         ("users",        "email",          "TEXT NOT NULL DEFAULT ''"),
@@ -456,6 +466,7 @@ def init_db():
         ("transactions", "account_id",      "INTEGER DEFAULT NULL"),
         ("users",        "avatar",          "TEXT NOT NULL DEFAULT ''"),
         ("accounts",     "limit_",          "DOUBLE PRECISION NOT NULL DEFAULT 0"),
+        ("users",        "trial_start",     "TEXT NOT NULL DEFAULT ''"),
     ]
     with pg_connect() as con:
         for stmt in stmts:
@@ -726,6 +737,68 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
+# ── ABONELİK ──────────────────────────────────────────────────────────────────
+
+TRIAL_DAYS = 30
+
+def get_sub_status(user_id: int) -> dict:
+    """Returns dict: status ('trial'|'premium'|'free'), is_premium (bool), days_left (int)"""
+    with pg_connect() as con:
+        user = con.execute("SELECT created_at FROM users WHERE id=%s", (user_id,)).fetchone()
+        if not user:
+            return {"status": "free", "is_premium": False, "days_left": 0}
+        try:
+            created = datetime.fromisoformat(user["created_at"])
+            trial_days_left = max(0, TRIAL_DAYS - (datetime.now() - created).days)
+        except Exception:
+            trial_days_left = 0
+        if trial_days_left > 0:
+            return {"status": "trial", "is_premium": True, "days_left": trial_days_left}
+        sub = con.execute(
+            "SELECT * FROM subscriptions WHERE user_id=%s AND status='active'", (user_id,)
+        ).fetchone()
+        if sub and sub["expires_at"]:
+            try:
+                expires = datetime.fromisoformat(sub["expires_at"])
+                if expires > datetime.now():
+                    return {"status": "premium", "is_premium": True, "days_left": (expires - datetime.now()).days}
+            except Exception:
+                pass
+    return {"status": "free", "is_premium": False, "days_left": 0}
+
+def premium_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        uid = session.get("user_id")
+        if not uid:
+            if request.path.startswith("/api/"):
+                return jsonify({"ok": False, "error": "Giriş gerekli", "auth": False}), 401
+            return redirect("/login")
+        sub = get_sub_status(uid)
+        if not sub["is_premium"]:
+            if request.path.startswith("/api/"):
+                return jsonify({"ok": False, "error": "Bu özellik Premium üyelik gerektirir.", "premium_required": True}), 403
+            return redirect("/premium?required=1")
+        return f(*args, **kwargs)
+    return decorated
+
+ADMIN_USER = os.environ.get("ADMIN_USERNAME", "")
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("user_id"):
+            return redirect("/login")
+        if ADMIN_USER and session.get("username") != ADMIN_USER:
+            return "Yetkisiz erişim", 403
+        if not ADMIN_USER:
+            with pg_connect() as con:
+                first = con.execute("SELECT username FROM users ORDER BY id LIMIT 1").fetchone()
+                if first and session.get("username") != first["username"]:
+                    return "Yetkisiz erişim", 403
+        return f(*args, **kwargs)
+    return decorated
+
 @app.route("/register", methods=["GET", "POST"])
 @limiter.limit("5 per hour", methods=["POST"])
 def register():
@@ -912,6 +985,7 @@ def api_me():
     db  = get_db()
     row = db.execute("SELECT display_name,username,email,avatar FROM users WHERE id=?", (uid,)).fetchone()
     avatar = row["avatar"] if row else ""
+    sub    = get_sub_status(uid)
     return jsonify({
         "username":     session.get("username"),
         "display":      session.get("display") or (row["display_name"] if row else ""),
@@ -920,6 +994,7 @@ def api_me():
         "profile_type": session.get("profile_type"),
         "email":        row["email"] if row else "",
         "avatar":       avatar or "",
+        "subscription": sub,
     })
 
 @app.route("/api/me/update", methods=["POST"])
@@ -1279,14 +1354,14 @@ def del_todo(tid):
 # ── SUPPLIERS ────────────────────────────────────────────────────────────────
 
 @app.route("/api/suppliers", methods=["GET"])
-@login_required
+@premium_required
 def list_suppliers():
     pid = get_pid(); db = get_db()
     rows = db.execute("SELECT * FROM suppliers WHERE profile_id=? ORDER BY name", (pid,)).fetchall()
     return jsonify([dict(r) for r in rows])
 
 @app.route("/api/suppliers", methods=["POST"])
-@login_required
+@premium_required
 def add_supplier():
     uid = session["user_id"]; pid = get_pid()
     d = request.get_json(force=True)
@@ -1303,7 +1378,7 @@ def add_supplier():
     return jsonify({"ok":True,"id":cur.lastrowid})
 
 @app.route("/api/suppliers/<int:sid>", methods=["PUT"])
-@login_required
+@premium_required
 def update_supplier(sid):
     pid = get_pid(); db = get_db()
     d = request.get_json(force=True)
@@ -1319,7 +1394,7 @@ def update_supplier(sid):
     return jsonify({"ok":True})
 
 @app.route("/api/suppliers/<int:sid>", methods=["DELETE"])
-@login_required
+@premium_required
 def del_supplier(sid):
     pid = get_pid(); db = get_db()
     db.execute("DELETE FROM suppliers WHERE id=? AND profile_id=?", (sid, pid))
@@ -1329,7 +1404,7 @@ def del_supplier(sid):
 # ── SUPPLIER INVOICES ─────────────────────────────────────────────────────────
 
 @app.route("/api/supplier-invoices", methods=["GET"])
-@login_required
+@premium_required
 def list_supplier_invoices():
     pid = get_pid(); db = get_db()
     status = request.args.get("status","")
@@ -1344,7 +1419,7 @@ def list_supplier_invoices():
     return jsonify([dict(r) for r in rows])
 
 @app.route("/api/supplier-invoices", methods=["POST"])
-@login_required
+@premium_required
 def add_supplier_invoice():
     uid = session["user_id"]; pid = get_pid()
     d = request.get_json(force=True)
@@ -1366,7 +1441,7 @@ def add_supplier_invoice():
     return jsonify({"ok":True,"id":cur.lastrowid})
 
 @app.route("/api/supplier-invoices/<int:iid>", methods=["PUT"])
-@login_required
+@premium_required
 def update_supplier_invoice(iid):
     pid = get_pid(); db = get_db()
     d = request.get_json(force=True)
@@ -1382,7 +1457,7 @@ def update_supplier_invoice(iid):
     return jsonify({"ok":True})
 
 @app.route("/api/supplier-invoices/<int:iid>", methods=["DELETE"])
-@login_required
+@premium_required
 def del_supplier_invoice(iid):
     pid = get_pid(); db = get_db()
     db.execute("DELETE FROM supplier_invoices WHERE id=? AND profile_id=?", (iid, pid))
@@ -1390,7 +1465,7 @@ def del_supplier_invoice(iid):
     return jsonify({"ok":True})
 
 @app.route("/api/supplier-invoices/<int:iid>/pay", methods=["POST"])
-@login_required
+@premium_required
 def pay_supplier_invoice(iid):
     pid = get_pid(); db = get_db()
     d = request.get_json(force=True)
@@ -1403,7 +1478,7 @@ def pay_supplier_invoice(iid):
     return jsonify({"ok":True})
 
 @app.route("/api/supplier-invoices/aging")
-@login_required
+@premium_required
 def supplier_invoices_aging():
     pid = get_pid(); db = get_db()
     today_d = date.today()
@@ -1435,7 +1510,7 @@ def supplier_invoices_aging():
     return jsonify({"ok":True,"buckets":buckets,"totals":totals,"grand_total":grand_total})
 
 @app.route("/api/supplier-invoices/float-gain")
-@login_required
+@premium_required
 def supplier_invoices_float_gain():
     pid = get_pid(); db = get_db()
     today_d = date.today()
@@ -1481,7 +1556,7 @@ DEPRECIATION_RATES = {
 
 
 @app.route("/api/assets", methods=["GET"])
-@login_required
+@premium_required
 def list_assets():
     pid = get_pid(); db = get_db()
     rows = db.execute("SELECT * FROM assets WHERE profile_id=? AND active=1 ORDER BY name", (pid,)).fetchall()
@@ -1497,7 +1572,7 @@ def list_assets():
     return jsonify(result)
 
 @app.route("/api/assets", methods=["POST"])
-@login_required
+@premium_required
 def add_asset():
     uid = session["user_id"]; pid = get_pid()
     d = request.get_json(force=True)
@@ -1520,7 +1595,7 @@ def add_asset():
     return jsonify({"ok":True,"id":cur.lastrowid})
 
 @app.route("/api/assets/<int:aid>", methods=["PUT"])
-@login_required
+@premium_required
 def update_asset(aid):
     pid = get_pid(); db = get_db()
     d = request.get_json(force=True)
@@ -1538,7 +1613,7 @@ def update_asset(aid):
     return jsonify({"ok":True})
 
 @app.route("/api/assets/<int:aid>", methods=["DELETE"])
-@login_required
+@premium_required
 def del_asset(aid):
     pid = get_pid(); db = get_db()
     db.execute("UPDATE assets SET active=0 WHERE id=? AND profile_id=?", (aid, pid))
@@ -1546,7 +1621,7 @@ def del_asset(aid):
     return jsonify({"ok":True})
 
 @app.route("/api/assets/<int:aid>/maintenance", methods=["GET"])
-@login_required
+@premium_required
 def list_asset_maintenance(aid):
     pid = get_pid(); db = get_db()
     rows = db.execute(
@@ -1556,7 +1631,7 @@ def list_asset_maintenance(aid):
     return jsonify([dict(r) for r in rows])
 
 @app.route("/api/assets/<int:aid>/maintenance", methods=["POST"])
-@login_required
+@premium_required
 def add_asset_maintenance(aid):
     uid = session["user_id"]; pid = get_pid()
     d = request.get_json(force=True)
@@ -1576,7 +1651,7 @@ def add_asset_maintenance(aid):
     return jsonify({"ok":True,"id":cur.lastrowid})
 
 @app.route("/api/assets/maintenance/<int:mid>", methods=["DELETE"])
-@login_required
+@premium_required
 def del_asset_maintenance(mid):
     pid = get_pid(); db = get_db()
     db.execute("DELETE FROM asset_maintenance WHERE id=? AND profile_id=?", (mid, pid))
@@ -1891,7 +1966,7 @@ def telegram_webhook():
     return "ok"
 
 @app.route("/api/telegram/link-code", methods=["POST"])
-@login_required
+@premium_required
 def telegram_link_code():
     uid = session["user_id"]; pid = get_pid()
     code = secrets.token_hex(3).upper()
@@ -1904,7 +1979,7 @@ def telegram_link_code():
     return jsonify({"ok": True, "code": code, "bot": TELEGRAM_BOT_USERNAME})
 
 @app.route("/api/telegram/status", methods=["GET"])
-@login_required
+@premium_required
 def telegram_status():
     uid = session["user_id"]
     links = get_db().execute(
@@ -1913,7 +1988,7 @@ def telegram_status():
     return jsonify({"count": len(links), "links": [row_to_dict(r) for r in links]})
 
 @app.route("/api/telegram/unlink", methods=["DELETE"])
-@login_required
+@premium_required
 def telegram_unlink():
     uid = session["user_id"]
     data = request.get_json(force=True, silent=True) or {}
@@ -1927,7 +2002,7 @@ def telegram_unlink():
     return jsonify({"ok": True})
 
 @app.route("/api/telegram/setup-webhook", methods=["POST"])
-@login_required
+@premium_required
 def setup_telegram_webhook():
     if not TELEGRAM_TOKEN:
         return jsonify({"ok": False, "error": "TELEGRAM_BOT_TOKEN ayarlanmamış"}), 400
@@ -2024,7 +2099,7 @@ def delete_account(aid):
 # ── EXCEL EXPORT ──────────────────────────────────────────────────────────────
 
 @app.route("/api/export/excel")
-@login_required
+@premium_required
 def export_excel():
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -2763,7 +2838,7 @@ def export_excel():
 
 
 @app.route("/api/export/pdf")
-@login_required
+@premium_required
 def export_pdf():
     pid     = get_pid()
     db      = get_db()
@@ -3116,7 +3191,7 @@ def reminders():
     })
 
 @app.route("/api/insights")
-@login_required
+@premium_required
 def insights():
     pid     = get_pid(); db = get_db()
     today_d = date.today()
@@ -3799,14 +3874,14 @@ def api_rates():
     return jsonify(get_rates())
 
 @app.route("/api/investments", methods=["GET"])
-@login_required
+@premium_required
 def list_investments():
     pid = get_pid()
     rows = get_db().execute("SELECT * FROM investments WHERE profile_id=? ORDER BY buy_date DESC",(pid,)).fetchall()
     return jsonify([row_to_dict(r) for r in rows])
 
 @app.route("/api/investments", methods=["POST"])
-@login_required
+@premium_required
 def add_investment():
     uid = session["user_id"]; pid = get_pid()
     d = request.get_json(force=True)
@@ -3827,14 +3902,14 @@ def add_investment():
     return jsonify({"ok": True, "id": cur.lastrowid})
 
 @app.route("/api/investments/<int:iid>", methods=["DELETE"])
-@login_required
+@premium_required
 def del_investment(iid):
     pid = get_pid()
     get_db().execute("DELETE FROM investments WHERE id=? AND profile_id=?", (iid,pid)); get_db().commit()
     return jsonify({"ok": True})
 
 @app.route("/api/investments/value", methods=["GET"])
-@login_required
+@premium_required
 def investment_values():
     pid   = get_pid()
     rows  = get_db().execute("SELECT * FROM investments WHERE profile_id=?",(pid,)).fetchall()
@@ -3880,7 +3955,7 @@ def investment_values():
     return jsonify(result)
 
 @app.route("/api/investments/<int:iid>/book-income", methods=["POST"])
-@login_required
+@premium_required
 def book_investment_income(iid):
     """Add investment profit as a gelir transaction for this month."""
     d = request.get_json(force=True)
@@ -4347,6 +4422,184 @@ def sw(): return SW_JS, 200, {"Content-Type": "application/javascript"}
 @app.route("/manifest.json")
 def manifest(): return MANIFEST, 200, {"Content-Type": "application/manifest+json"}
 
+@app.route("/health")
+def health():
+    try:
+        with pg_connect() as con:
+            con.execute("SELECT 1")
+        return jsonify({"ok": True, "db": "ok"}), 200
+    except Exception as exc:
+        return jsonify({"ok": False, "db": str(exc)}), 503
+
+# ── PREMIUM SAYFASI ───────────────────────────────────────────────────────────
+
+@app.route("/premium")
+def premium_page():
+    uid = session.get("user_id")
+    if uid:
+        sub = get_sub_status(uid)
+        if sub["is_premium"] and sub["status"] == "premium":
+            current_info = f'<div style="background:#22c55e18;border:1px solid #22c55e40;border-radius:12px;padding:16px 20px;margin-bottom:24px;color:#22c55e;font-size:.9rem;font-weight:600">✅ Aktif Premium üyeliğiniz var — {sub["days_left"]} gün kaldı.</div>'
+        elif sub["is_premium"] and sub["status"] == "trial":
+            current_info = f'<div style="background:#6366f118;border:1px solid #6366f140;border-radius:12px;padding:16px 20px;margin-bottom:24px;color:#818cf8;font-size:.9rem;font-weight:600">🎁 Ücretsiz deneme süreniz: {sub["days_left"]} gün kaldı.</div>'
+        else:
+            current_info = '<div style="background:#ef444418;border:1px solid #ef444440;border-radius:12px;padding:16px 20px;margin-bottom:24px;color:#f87171;font-size:.9rem;font-weight:600">⚠️ Deneme süreniz dolmuş. Aşağıdan Premium\'a geçin.</div>'
+    else:
+        current_info = ""
+
+    required = request.args.get("required")
+    req_banner = '<div style="background:#f59e0b18;border:1px solid #f59e0b40;border-radius:12px;padding:14px 20px;margin-bottom:20px;color:#fbbf24;font-size:.85rem">🔒 Erişmek istediğiniz özellik Premium üyelik gerektirir.</div>' if required else ""
+
+    csrf = get_csrf_token() if uid else ""
+
+    return f"""<!DOCTYPE html>
+<html lang="tr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Premium — Kirpi</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{background:#0a0c12;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;padding:40px 20px;min-height:100vh}}
+.wrap{{max-width:760px;margin:0 auto}}
+.back{{display:inline-flex;align-items:center;gap:8px;color:#818cf8;text-decoration:none;font-size:.85rem;margin-bottom:32px}}
+h1{{font-size:2rem;font-weight:900;margin-bottom:8px;background:linear-gradient(135deg,#818cf8,#a78bfa,#f472b6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}}
+.sub{{color:#64748b;font-size:.9rem;margin-bottom:36px}}
+.plans{{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:36px}}
+@media(max-width:600px){{.plans{{grid-template-columns:1fr}}}}
+.plan{{background:#111318;border:1px solid #1e2233;border-radius:16px;padding:28px 24px}}
+.plan.featured{{border-color:#6366f1;background:linear-gradient(145deg,#111318,#16182a)}}
+.plan-name{{font-size:.8rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#64748b;margin-bottom:12px}}
+.plan.featured .plan-name{{color:#818cf8}}
+.plan-price{{font-size:2.4rem;font-weight:900;color:#e2e8f0;margin-bottom:4px}}
+.plan-price span{{font-size:1rem;font-weight:400;color:#64748b}}
+.plan-period{{font-size:.8rem;color:#64748b;margin-bottom:24px}}
+.plan-features{{list-style:none;margin-bottom:28px}}
+.plan-features li{{font-size:.85rem;color:#94a3b8;padding:6px 0;display:flex;align-items:center;gap:8px;border-bottom:1px solid #1a1d26}}
+.plan-features li:last-child{{border-bottom:none}}
+.plan-features li .icon{{flex-shrink:0}}
+.btn-plan{{width:100%;padding:13px;border:none;border-radius:10px;font-size:.92rem;font-weight:700;cursor:pointer;transition:.2s}}
+.btn-free{{background:#1e2233;color:#94a3b8}}
+.btn-premium{{background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff}}
+.btn-premium:hover{{opacity:.9}}
+.contact-box{{background:#111318;border:1px solid #1e2233;border-radius:12px;padding:24px;text-align:center}}
+.contact-box h2{{font-size:1rem;font-weight:700;color:#c7d2fe;margin-bottom:10px}}
+.contact-box p{{font-size:.85rem;color:#64748b;margin-bottom:16px;line-height:1.6}}
+.contact-box a{{color:#818cf8;font-weight:600}}
+.badge{{display:inline-block;background:#6366f120;color:#818cf8;border:1px solid #6366f140;border-radius:20px;padding:3px 10px;font-size:.7rem;font-weight:700;margin-left:6px}}
+</style></head>
+<body><div class="wrap">
+<a class="back" href="/">← Uygulamaya Dön</a>
+{req_banner}
+{current_info}
+<h1>🦔 Kirpi Premium</h1>
+<p class="sub">İlk {TRIAL_DAYS} gün ücretsiz — tüm özellikler açık. Sonrasında istediğiniz planı seçin.</p>
+
+<div class="plans">
+  <div class="plan">
+    <div class="plan-name">Ücretsiz</div>
+    <div class="plan-price">₺0 <span>/ay</span></div>
+    <div class="plan-period">Sonsuza kadar ücretsiz</div>
+    <ul class="plan-features">
+      <li><span class="icon">✅</span> Gelir / Gider takibi</li>
+      <li><span class="icon">✅</span> Bütçe yönetimi</li>
+      <li><span class="icon">✅</span> Hesaplar &amp; kartlar</li>
+      <li><span class="icon">✅</span> Hedefler &amp; görevler</li>
+      <li><span class="icon">✅</span> 1 profil (Şahıs)</li>
+      <li><span class="icon">❌</span> Yatırım takibi</li>
+      <li><span class="icon">❌</span> Kıymet yönetimi</li>
+      <li><span class="icon">❌</span> Tedarikçi / fatura</li>
+      <li><span class="icon">❌</span> Excel &amp; PDF export</li>
+      <li><span class="icon">❌</span> Telegram entegrasyonu</li>
+      <li><span class="icon">❌</span> Gelişmiş AI analiz</li>
+    </ul>
+    <button class="btn-plan btn-free" disabled>Mevcut Plan</button>
+  </div>
+
+  <div class="plan featured">
+    <div class="plan-name">Premium <span class="badge">ÖNERİLEN</span></div>
+    <div class="plan-price">₺49 <span>/ay</span></div>
+    <div class="plan-period">veya ₺499/yıl (%15 indirim)</div>
+    <ul class="plan-features">
+      <li><span class="icon">✅</span> Tüm ücretsiz özellikler</li>
+      <li><span class="icon">✅</span> Yatırım takibi (hisse, fon, altın…)</li>
+      <li><span class="icon">✅</span> Kıymet &amp; amortisman</li>
+      <li><span class="icon">✅</span> Tedarikçi &amp; fatura yönetimi</li>
+      <li><span class="icon">✅</span> Excel &amp; PDF raporu</li>
+      <li><span class="icon">✅</span> Telegram bot entegrasyonu</li>
+      <li><span class="icon">✅</span> Gelişmiş AI finansal analiz</li>
+      <li><span class="icon">✅</span> Çoklu profil (Şahıs + Şirket)</li>
+      <li><span class="icon">✅</span> Öncelikli destek</li>
+    </ul>
+    <button class="btn-plan btn-premium" onclick="requestPremium()">Premium'a Geç →</button>
+  </div>
+</div>
+
+<div class="contact-box">
+  <h2>Nasıl Satın Alırım?</h2>
+  <p>Şu anda online ödeme sistemi kurulum aşamasındadır.<br>Premium almak için aşağıdaki adrese e-posta gönderin:</p>
+  <p><a href="mailto:destek@kirpiapp.com">destek@kirpiapp.com</a></p>
+  <p style="font-size:.78rem;margin-top:12px">Konu: Premium Üyelik Talebi · Kullanıcı adınızı belirtin</p>
+</div>
+
+</div>
+<script>
+function requestPremium(){{
+  window.location.href = 'mailto:destek@kirpiapp.com?subject=Premium%20Üyelik%20Talebi&body=Merhaba%2C%0AKullanıcı%20adım%3A%20{html_escape(session.get("username","") if uid else "")}%0APremium%20üyelik%20almak%20istiyorum.';
+}}
+</script>
+</body></html>"""
+
+# ── ABONELİK API ──────────────────────────────────────────────────────────────
+
+@app.route("/api/subscription/status")
+@login_required
+def api_sub_status():
+    return jsonify(get_sub_status(session["user_id"]))
+
+@app.route("/api/subscription/activate", methods=["POST"])
+@admin_required
+def api_sub_activate():
+    """Admin only: activate premium for a user."""
+    if not validate_csrf():
+        return jsonify({"ok": False, "error": "CSRF"}), 403
+    data     = request.get_json(force=True)
+    username = (data.get("username") or "").strip().lower()
+    months   = int(data.get("months") or 1)
+    if months < 1 or months > 120:
+        return jsonify({"ok": False, "error": "Geçersiz süre"}), 400
+    with pg_connect() as con:
+        user = con.execute("SELECT id FROM users WHERE username=%s", (username,)).fetchone()
+        if not user:
+            return jsonify({"ok": False, "error": "Kullanıcı bulunamadı"}), 404
+        uid = user["id"]
+        expires = (datetime.now() + timedelta(days=30 * months)).isoformat()
+        now_iso = datetime.now().isoformat()
+        existing = con.execute("SELECT id FROM subscriptions WHERE user_id=%s", (uid,)).fetchone()
+        if existing:
+            con.execute(
+                "UPDATE subscriptions SET status='active', expires_at=%s, note=%s WHERE user_id=%s",
+                (expires, f"Admin activated {months}mo", uid)
+            )
+        else:
+            con.execute(
+                "INSERT INTO subscriptions (user_id,plan,status,started_at,expires_at,note,created_at) VALUES (%s,'premium','active',%s,%s,%s,%s)",
+                (uid, now_iso, expires, f"Admin activated {months}mo", now_iso)
+            )
+    return jsonify({"ok": True, "expires_at": expires})
+
+@app.route("/api/subscription/revoke", methods=["POST"])
+@admin_required
+def api_sub_revoke():
+    """Admin only: revoke subscription."""
+    if not validate_csrf():
+        return jsonify({"ok": False, "error": "CSRF"}), 403
+    data     = request.get_json(force=True)
+    username = (data.get("username") or "").strip().lower()
+    with pg_connect() as con:
+        user = con.execute("SELECT id FROM users WHERE username=%s", (username,)).fetchone()
+        if not user:
+            return jsonify({"ok": False, "error": "Kullanıcı bulunamadı"}), 404
+        con.execute("UPDATE subscriptions SET status='cancelled' WHERE user_id=%s", (user["id"],))
+    return jsonify({"ok": True})
+
 @app.route("/icon.svg")
 def icon_svg(): return ICON_SVG, 200, {"Content-Type": "image/svg+xml"}
 
@@ -4491,65 +4744,79 @@ def kullanim_kosullari():
 <h2>6. Hesap Sonlandırma</h2>
 <p>Koşulları ihlal eden hesaplar önceden bildirim yapılmaksızın askıya alınabilir veya silinebilir.</p>
 
-<h2>7. Değişiklikler</h2>
+<h2>7. Abonelik ve Ücretlendirme</h2>
+<div class="box">
+<ul>
+<li><strong>Ücretsiz Deneme:</strong> Yeni kullanıcılar kayıt tarihinden itibaren 30 gün boyunca tüm Premium özelliklere ücretsiz erişir.</li>
+<li><strong>Ücretsiz Plan:</strong> Deneme süresi sonunda temel özellikler (işlem takibi, bütçe, hesaplar, hedefler) ücretsiz kullanılmaya devam eder.</li>
+<li><strong>Premium Plan:</strong> Yatırım takibi, kıymet yönetimi, tedarikçi/fatura modülleri, Excel/PDF dışa aktarma, Telegram entegrasyonu ve gelişmiş AI analizi Premium üyelik gerektirir.</li>
+<li><strong>Ücret:</strong> Premium aylık ₺49, yıllık ₺499 olarak uygulanır (KDV dahil). Fiyatlar değiştirilebilir; mevcut abonelere 30 gün önceden bildirim yapılır.</li>
+<li><strong>Abonelik İptali:</strong> İstediğiniz zaman aboneliğinizi iptal edebilirsiniz. İptal sonrası mevcut dönem sonuna kadar erişim devam eder; kısmi iade yapılmaz.</li>
+<li><strong>İade Politikası:</strong> İlk 7 gün içinde yapılan ücretli abonelik taleplerinde tam iade yapılır. Sonrasında iade yapılmaz.</li>
+</ul>
+</div>
+
+<h2>8. Değişiklikler</h2>
 <p>Bu koşullar zaman zaman güncellenebilir. Önemli değişiklikler e-posta ile bildirilir.</p>
 
-<h2>8. Uygulanacak Hukuk</h2>
+<h2>9. Uygulanacak Hukuk</h2>
 <p>Bu sözleşme <strong>Türkiye Cumhuriyeti hukuku</strong> kapsamında yorumlanır. Uyuşmazlıklarda İstanbul Mahkemeleri yetkilidir.</p>
 
-<h2>9. İletişim</h2>
+<h2>10. İletişim</h2>
 <p>Sorularınız için: <strong>destek@kirpiapp.com</strong></p>
 """
     return legal_page("Kullanım Koşulları", body)
 
 # ── ADMIN PANEL ───────────────────────────────────────────────────────────────
 
-ADMIN_USER = os.environ.get("ADMIN_USERNAME", "")
-
-def admin_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if not session.get("user_id"):
-            return redirect("/login")
-        if ADMIN_USER and session.get("username") != ADMIN_USER:
-            return "Yetkisiz erişim", 403
-        if not ADMIN_USER:
-            with pg_connect() as con:
-                first = con.execute("SELECT username FROM users ORDER BY id LIMIT 1").fetchone()
-                if first and session.get("username") != first["username"]:
-                    return "Yetkisiz erişim", 403
-        return f(*args, **kwargs)
-    return decorated
-
 @app.route("/admin")
 @admin_required
 def admin_panel():
     db = get_db()
-    total_users    = db.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"]
-    total_profiles = db.execute("SELECT COUNT(*) AS n FROM profiles").fetchone()["n"]
-    sahis_count    = db.execute("SELECT COUNT(*) AS n FROM profiles WHERE type='sahis'").fetchone()["n"]
-    sirket_count   = db.execute("SELECT COUNT(*) AS n FROM profiles WHERE type='sirket'").fetchone()["n"]
-    total_txn      = db.execute("SELECT COUNT(*) AS n FROM transactions").fetchone()["n"]
-    total_cards    = db.execute("SELECT COUNT(*) AS n FROM cards").fetchone()["n"]
-    total_invest   = db.execute("SELECT COUNT(*) AS n FROM investments").fetchone()["n"]
-    recent_users   = db.execute("SELECT username,display_name,email,created_at FROM users ORDER BY id DESC LIMIT 20").fetchall()
-    txn_by_day     = db.execute("SELECT LEFT(created_at, 10) as d, COUNT(*) as c FROM transactions GROUP BY d ORDER BY d DESC LIMIT 14").fetchall()
-    new_users_week = db.execute("SELECT COUNT(*) AS n FROM users WHERE created_at >= (NOW() - INTERVAL '7 days')::TEXT").fetchone()["n"]
-    new_users_month= db.execute("SELECT COUNT(*) AS n FROM users WHERE created_at >= (NOW() - INTERVAL '30 days')::TEXT").fetchone()["n"]
+    total_users     = db.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"]
+    total_profiles  = db.execute("SELECT COUNT(*) AS n FROM profiles").fetchone()["n"]
+    sahis_count     = db.execute("SELECT COUNT(*) AS n FROM profiles WHERE type='sahis'").fetchone()["n"]
+    sirket_count    = db.execute("SELECT COUNT(*) AS n FROM profiles WHERE type='sirket'").fetchone()["n"]
+    total_txn       = db.execute("SELECT COUNT(*) AS n FROM transactions").fetchone()["n"]
+    total_cards     = db.execute("SELECT COUNT(*) AS n FROM cards").fetchone()["n"]
+    total_invest    = db.execute("SELECT COUNT(*) AS n FROM investments").fetchone()["n"]
+    premium_count   = db.execute("SELECT COUNT(*) AS n FROM subscriptions WHERE status='active'").fetchone()["n"]
+    recent_users    = db.execute(
+        "SELECT u.id, u.username, u.display_name, u.email, u.created_at, "
+        "s.status AS sub_status, s.expires_at "
+        "FROM users u LEFT JOIN subscriptions s ON s.user_id=u.id "
+        "ORDER BY u.id DESC LIMIT 20"
+    ).fetchall()
+    txn_by_day      = db.execute("SELECT LEFT(created_at, 10) as d, COUNT(*) as c FROM transactions GROUP BY d ORDER BY d DESC LIMIT 14").fetchall()
+    new_users_week  = db.execute("SELECT COUNT(*) AS n FROM users WHERE created_at >= (NOW() - INTERVAL '7 days')::TEXT").fetchone()["n"]
+    new_users_month = db.execute("SELECT COUNT(*) AS n FROM users WHERE created_at >= (NOW() - INTERVAL '30 days')::TEXT").fetchone()["n"]
 
     rows_html = ""
     for u in recent_users:
-        uname = html_escape(u['username'])
         safe_uname = html_escape(u['username'])
+        sub_s = u['sub_status'] or ""
+        exp   = (u['expires_at'] or "")[:10]
+        # determine badge
+        sub_info = get_sub_status(u['id'])
+        if sub_info['status'] == 'trial':
+            badge = f'<span style="background:#6366f120;color:#818cf8;border:1px solid #6366f140;border-radius:4px;padding:2px 6px;font-size:.7rem">Deneme ({sub_info["days_left"]}g)</span>'
+        elif sub_info['status'] == 'premium':
+            badge = f'<span style="background:#22c55e20;color:#22c55e;border:1px solid #22c55e40;border-radius:4px;padding:2px 6px;font-size:.7rem">Premium · {exp}</span>'
+        else:
+            badge = '<span style="background:#64748b20;color:#64748b;border:1px solid #64748b40;border-radius:4px;padding:2px 6px;font-size:.7rem">Ücretsiz</span>'
         rows_html += f"""<tr>
         <td>{safe_uname}</td>
         <td>{html_escape(u['display_name'])}</td>
-        <td>{html_escape(u['email'])}</td>
+        <td style="font-size:.78rem;color:#64748b">{html_escape(u['email'])}</td>
         <td style="color:#64748b;font-size:.8rem">{u['created_at'][:10]}</td>
-        <td><form method="POST" action="/admin/delete-user/{safe_uname}" onsubmit="return confirm('Bu kullanıcıyı ve tüm verilerini silmek istediğinize emin misiniz?')">
-          <input type="hidden" name="csrf_token" value="{get_csrf_token()}">
-          <button type="submit" style="background:#ef444420;color:#ef4444;border:1px solid #ef444440;border-radius:6px;padding:4px 10px;font-size:.75rem;cursor:pointer">Sil</button>
-        </form></td>
+        <td>{badge}</td>
+        <td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <button onclick="activateSub('{safe_uname}')" style="background:#6366f120;color:#818cf8;border:1px solid #6366f140;border-radius:6px;padding:4px 8px;font-size:.72rem;cursor:pointer">+Premium</button>
+          <form method="POST" action="/admin/delete-user/{safe_uname}" onsubmit="return confirm('Bu kullanıcıyı ve tüm verilerini silmek istediğinize emin misiniz?')" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{get_csrf_token()}">
+            <button type="submit" style="background:#ef444420;color:#ef4444;border:1px solid #ef444440;border-radius:6px;padding:4px 8px;font-size:.72rem;cursor:pointer">Sil</button>
+          </form>
+        </td>
         </tr>"""
 
     chart_labels = [r['d'] for r in reversed(list(txn_by_day))]
@@ -4564,18 +4831,26 @@ body{{background:#0a0c12;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;
 .wrap{{max-width:1100px;margin:0 auto}}
 .back{{display:inline-flex;align-items:center;gap:8px;color:#818cf8;text-decoration:none;font-size:.85rem;margin-bottom:28px}}
 h1{{font-size:1.6rem;font-weight:900;margin-bottom:28px;background:linear-gradient(135deg,#818cf8,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}}
-.stats{{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:32px}}
+.stats{{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;margin-bottom:32px}}
 .stat{{background:#111318;border:1px solid #1e2233;border-radius:12px;padding:20px;text-align:center}}
 .stat-val{{font-size:2rem;font-weight:900;color:#818cf8}}
 .stat-lbl{{font-size:.78rem;color:#64748b;margin-top:4px}}
 .stat-sub{{font-size:.72rem;color:#22c55e;margin-top:2px}}
 .card{{background:#111318;border:1px solid #1e2233;border-radius:12px;padding:24px;margin-bottom:24px}}
 h2{{font-size:1rem;font-weight:700;margin-bottom:16px;color:#c7d2fe}}
-table{{width:100%;border-collapse:collapse;font-size:.85rem}}
+table{{width:100%;border-collapse:collapse;font-size:.82rem}}
 th{{text-align:left;color:#64748b;font-weight:500;padding:8px 12px;border-bottom:1px solid #1e2233}}
-td{{padding:10px 12px;border-bottom:1px solid #0d0f18;color:#cbd5e1}}
+td{{padding:9px 12px;border-bottom:1px solid #0d0f18;color:#cbd5e1}}
 tr:hover td{{background:#13161f}}
 canvas{{width:100%!important;height:200px!important}}
+.modal-bg{{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center}}
+.modal{{background:#111318;border:1px solid #1e2233;border-radius:16px;padding:32px;min-width:320px;max-width:440px;width:90%}}
+.modal h3{{color:#c7d2fe;font-size:1rem;margin-bottom:20px}}
+.modal input{{width:100%;background:#0a0c12;border:1px solid #1e2233;color:#e2e8f0;padding:10px 12px;border-radius:8px;font-size:.9rem;margin-bottom:12px}}
+.modal label{{font-size:.78rem;color:#64748b;display:block;margin-bottom:5px}}
+.modal-btns{{display:flex;gap:10px;margin-top:4px}}
+.btn-ok{{flex:1;padding:10px;background:#6366f1;color:#fff;border:none;border-radius:8px;font-size:.88rem;font-weight:700;cursor:pointer}}
+.btn-cancel{{flex:1;padding:10px;background:#1e2233;color:#94a3b8;border:none;border-radius:8px;font-size:.88rem;cursor:pointer}}
 </style></head>
 <body><div class="wrap">
 <a class="back" href="/">← Uygulamaya Dön</a>
@@ -4586,6 +4861,8 @@ canvas{{width:100%!important;height:200px!important}}
     <div class="stat-sub">+{new_users_week} bu hafta · +{new_users_month} bu ay</div></div>
   <div class="stat"><div class="stat-val">{total_profiles}</div><div class="stat-lbl">Profil</div>
     <div class="stat-sub">👤 {sahis_count} şahıs · 🏢 {sirket_count} şirket</div></div>
+  <div class="stat"><div class="stat-val">{premium_count}</div><div class="stat-lbl">Premium Üye</div>
+    <div class="stat-sub" style="color:#f59e0b">{total_users - premium_count} ücretsiz / deneme</div></div>
   <div class="stat"><div class="stat-val">{total_txn}</div><div class="stat-lbl">Toplam İşlem</div></div>
   <div class="stat"><div class="stat-val">{total_cards}</div><div class="stat-lbl">Kayıtlı Kart</div></div>
   <div class="stat"><div class="stat-val">{total_invest}</div><div class="stat-lbl">Yatırım Kaydı</div></div>
@@ -4597,11 +4874,26 @@ canvas{{width:100%!important;height:200px!important}}
 </div>
 
 <div class="card">
-  <h2>👥 Son Kayıt Olan Kullanıcılar</h2>
+  <h2>👥 Kullanıcılar &amp; Abonelikler</h2>
   <table>
-    <thead><tr><th>Kullanıcı Adı</th><th>Ad Soyad</th><th>Email</th><th>Kayıt Tarihi</th><th></th></tr></thead>
+    <thead><tr><th>Kullanıcı Adı</th><th>Ad Soyad</th><th>Email</th><th>Kayıt</th><th>Plan</th><th>İşlem</th></tr></thead>
     <tbody>{rows_html}</tbody>
   </table>
+</div>
+
+<!-- Premium Aktivasyon Modal -->
+<div class="modal-bg" id="subModal">
+  <div class="modal">
+    <h3>Premium Abonelik Aktiflestir</h3>
+    <label>Kullanıcı Adı</label>
+    <input type="text" id="subUsername" readonly>
+    <label>Süre (ay)</label>
+    <input type="number" id="subMonths" value="1" min="1" max="120">
+    <div class="modal-btns">
+      <button class="btn-ok" onclick="confirmActivate()">Aktifleştir</button>
+      <button class="btn-cancel" onclick="closeSubModal()">İptal</button>
+    </div>
+  </div>
 </div>
 
 </div>
@@ -4639,7 +4931,28 @@ data.forEach(function(v,i){{
   }}
 }});
 
-
+function activateSub(username) {{
+  document.getElementById('subUsername').value = username;
+  document.getElementById('subMonths').value = 1;
+  var m = document.getElementById('subModal');
+  m.style.display = 'flex';
+}}
+function closeSubModal() {{
+  document.getElementById('subModal').style.display = 'none';
+}}
+function confirmActivate() {{
+  var username = document.getElementById('subUsername').value;
+  var months   = parseInt(document.getElementById('subMonths').value) || 1;
+  fetch('/api/subscription/activate', {{
+    method: 'POST',
+    headers: {{'Content-Type': 'application/json'}},
+    body: JSON.stringify({{username: username, months: months, csrf_token: '{get_csrf_token()}'}})
+  }}).then(r => r.json()).then(d => {{
+    closeSubModal();
+    if(d.ok) {{ alert(username + ' için Premium aktifleştirildi. Bitiş: ' + d.expires_at.slice(0,10)); location.reload(); }}
+    else {{ alert('Hata: ' + d.error); }}
+  }});
+}}
 </script>
 </body></html>"""
 
