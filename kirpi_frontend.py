@@ -199,10 +199,17 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 @media(max-width:768px){
   .nl-desktop-only{display:none!important}
   .nl-menu{display:flex}
-  .nav-links{flex-direction:row;padding:0;gap:0;justify-content:space-between;align-items:center;height:56px;overflow:visible}
-  .nav-sect{display:none}
-  .nl{flex-direction:column;gap:3px;font-size:.6rem;padding:0 4px 2px;min-width:0;flex:1;
-      border-radius:0;box-shadow:none!important;background:transparent!important;align-items:center}
+  .nav-links{
+    display:grid!important;
+    grid-template-columns:1fr 1fr 1fr 1fr 1fr;
+    padding:0;height:56px;overflow:visible;
+    align-items:center;
+  }
+  .nav-sect{display:none!important}
+  .nl-desktop,.nl-desktop-only{display:none!important}
+  .nl{flex-direction:column;gap:3px;font-size:.6rem;padding:0 4px 2px;min-width:0;
+      border-radius:0;box-shadow:none!important;background:transparent!important;
+      display:flex!important;align-items:center;justify-content:center;width:100%}
   .nl .ico{font-size:1.35rem;line-height:1.2;display:flex;align-items:center;justify-content:center;
            background:transparent;transition:transform .15s cubic-bezier(.34,1.4,.64,1)}
   .nl span:not(.ico){color:var(--txt2);transition:color .15s;font-weight:500;font-size:.58rem}
