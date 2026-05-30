@@ -4703,9 +4703,17 @@ def AUTH_HTML_render(mode, msg="", token=None):
       <label>Telefon <span style="color:#8e8e93;font-size:.72rem;font-weight:400">(opsiyonel — şifre sıfırlama için)</span></label>
       <input type="tel" name="phone" placeholder="05XX XXX XX XX" autocomplete="tel">
       <label>Şifre (en az 6 karakter)</label>
-      <input type="password" name="password" required autocomplete="new-password">
+      <div style="position:relative;margin-bottom:14px">
+        <input type="password" name="password" id="reg-pw" required autocomplete="new-password" style="width:100%;padding-right:44px">
+        <button type="button" onclick="togglePw('reg-pw','reg-eye')" id="reg-eye"
+          style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1rem;color:#8e8e93;padding:4px">👁</button>
+      </div>
       <label>Şifre Tekrar</label>
-      <input type="password" name="confirm" required autocomplete="new-password">
+      <div style="position:relative;margin-bottom:14px">
+        <input type="password" name="confirm" id="reg-pw2" required autocomplete="new-password" style="width:100%;padding-right:44px">
+        <button type="button" onclick="togglePw('reg-pw2','reg-eye2')" id="reg-eye2"
+          style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1rem;color:#8e8e93;padding:4px">👁</button>
+      </div>
       <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:14px">
         <input type="checkbox" id="kvkk-check" required style="width:auto;margin:3px 0 0;flex-shrink:0">
         <label for="kvkk-check" style="font-size:.75rem;color:#64748b;cursor:pointer">
@@ -4718,6 +4726,14 @@ def AUTH_HTML_render(mode, msg="", token=None):
     </form>
     <div class="link">Zaten hesabın var mı? <a href="/login">Giriş Yap</a></div>
     <script>
+    function togglePw(inputId,btnId){
+      var inp=document.getElementById(inputId);
+      var btn=document.getElementById(btnId);
+      if(!inp)return;
+      var show=inp.type==="password";
+      inp.type=show?"text":"password";
+      if(btn) btn.textContent=show?"🙈":"👁";
+    }
     function setRegType(el,t){
       document.getElementById("reg-type-val").value=t;
       document.getElementById("reg-sahis").style.borderColor=t==="sahis"?"#6366f1":"#2a2f45";
@@ -4754,7 +4770,11 @@ def AUTH_HTML_render(mode, msg="", token=None):
       <label id="login-uname-label">Kullanıcı Adı</label>
       <input type="text" name="username" required autocomplete="username">
       <label>Şifre</label>
-      <input type="password" name="password" required autocomplete="current-password">
+      <div style="position:relative;margin-bottom:14px">
+        <input type="password" name="password" id="login-pw" required autocomplete="current-password" style="width:100%;padding-right:44px">
+        <button type="button" onclick="togglePw('login-pw','login-eye')" id="login-eye"
+          style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1rem;color:#8e8e93;padding:4px">👁</button>
+      </div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;margin-top:-6px">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.82rem;color:#6d6d72;margin-bottom:0">
           <div id="remember-toggle" onclick="toggleRemember()" style="width:40px;height:24px;border-radius:12px;background:#c7c7cc;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0">
@@ -4775,6 +4795,14 @@ def AUTH_HTML_render(mode, msg="", token=None):
       document.getElementById("remember-toggle").style.background=_rem?"#007aff":"#c7c7cc";
       document.getElementById("remember-knob").style.left=_rem?"18px":"2px";
       document.getElementById("remember-lbl").style.color=_rem?"#007aff":"#aaa";
+    }
+    function togglePw(inputId,btnId){
+      var inp=document.getElementById(inputId);
+      var btn=document.getElementById(btnId);
+      if(!inp)return;
+      var show=inp.type==="password";
+      inp.type=show?"text":"password";
+      if(btn) btn.textContent=show?"🙈":"👁";
     }
     </script>
     <script>
