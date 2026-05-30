@@ -1783,11 +1783,24 @@ def save_card_daily_balance():
 
 # ── TELEGRAM BOT ──────────────────────────────────────────────────────────────
 
-def tg_send(chat_id, text, parse_mode="HTML", reply_markup=None):
+_TG_MAIN_KEYBOARD = {
+    "keyboard": [
+        [{"text": "💰 Bakiye"}, {"text": "📅 Bugün"}, {"text": "📆 Bu Ay"}],
+        [{"text": "💳 Kartlar"}, {"text": "📊 Bütçe"}, {"text": "📈 Yatırım"}],
+        [{"text": "🗒️ Son 5"},   {"text": "🎯 Hedefler"}, {"text": "❓ Yardım"}],
+        [{"text": "🗑️ Son İşlemi Sil"}],
+    ],
+    "resize_keyboard": True,
+    "persistent": True,
+}
+
+def tg_send(chat_id, text, parse_mode="HTML", reply_markup=None, show_keyboard=True):
     if not TELEGRAM_TOKEN: return
     payload = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
     if reply_markup:
         payload["reply_markup"] = reply_markup
+    elif show_keyboard:
+        payload["reply_markup"] = _TG_MAIN_KEYBOARD
     try:
         requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
                       json=payload, timeout=6)
@@ -2168,7 +2181,13 @@ def telegram_webhook():
                                (uid, pid, tg_uid, datetime.now().isoformat()))
                 db.execute("DELETE FROM telegram_link_codes WHERE code=%s", (code,))
                 db.commit()
-                tg_send(chat_id, "✅ <b>Hesabınız bağlandı!</b>\n\n<b>Örnekler:</b>\n• <code>market 250</code>\n• <code>10 bin yemek</code>\n• <code>maaş 15000</code>\n• <code>benzin 1.500</code>")
+                tg_send(chat_id,
+                    "✅ <b>Hesabınız bağlandı!</b>\n\n"
+                    "Aşağıdaki tuşları kullanabilir ya da doğrudan yazabilirsin:\n\n"
+                    "• <code>market 250</code> → gider\n"
+                    "• <code>maaş 15000</code> → gelir\n"
+                    "• <code>dün benzin 500</code> → tarihli kayıt\n\n"
+                    "❓ Yardım için <b>yardım</b> yaz.")
             else:
                 tg_send(chat_id, "❌ Geçersiz veya süresi dolmuş kod.\nKirpi Ayarlar sayfasından yeni kod alın.")
             return "ok"
@@ -2185,7 +2204,7 @@ def telegram_webhook():
             return "ok"
 
         if text_l in ("/help", "/yardim", "yardim", "yardım", "ne yapabilirsin",
-                      "komutlar", "ne yazabilirim"):
+                      "komutlar", "ne yazabilirim", "❓ yardım"):
             tg_send(chat_id,
                 "📖 <b>Kirpi Bot — Ne Yapabilirsin?</b>\n\n"
                 "<b>💸 İşlem Kaydetme</b> (sadece yaz, slash gerekmez):\n"
@@ -2219,42 +2238,42 @@ def telegram_webhook():
 
         # ── KOMUTLAR ───────────────────────────────────────────────────────────
 
-        if text_l in ("/bakiye", "/balance", "bakiye", "balance",
+        if text_l in ("/bakiye", "/balance", "bakiye", "balance", "💰 bakiye",
                       "ne kadar param var", "param ne kadar", "kalan ne", "elimde ne kadar var",
                       "finansal durum", "durum"):
             tg_send(chat_id, _tg_summary_msg(uid, pid, db, "bakiye"))
             return "ok"
 
-        if text_l in ("/bugun", "/bugün", "bugun", "bugün",
+        if text_l in ("/bugun", "/bugün", "bugun", "bugün", "📅 bugün",
                       "bugün ne harcadım", "bugun ne harcadim",
                       "bugünün özeti", "bugunun ozeti", "bugun ozet"):
             tg_send(chat_id, _tg_summary_msg(uid, pid, db, "bugun"))
             return "ok"
 
-        if text_l in ("/ay", "/aylik", "/aylık", "ay", "aylik", "aylık",
+        if text_l in ("/ay", "/aylik", "/aylık", "ay", "aylik", "aylık", "📆 bu ay",
                       "bu ayın özeti", "bu ayin ozeti", "aylık özet", "bu ay ne harcadım",
                       "bu ay ozet", "aylik ozet"):
             tg_send(chat_id, _tg_summary_msg(uid, pid, db, "ay"))
             return "ok"
 
-        if text_l.startswith(("/son", "son")) and (len(text_l) <= 3 or text_l[3:].strip().isdigit()):
+        if text_l.startswith(("/son", "son", "🗒️ son 5")) and (len(text_l) <= 3 or text_l[3:].strip().isdigit()):
             parts = text_l.split()
             n = int(parts[1]) if len(parts)>1 and parts[1].isdigit() else 5
             n = min(n, 20)
             tg_send(chat_id, _tg_last_tx(uid, pid, db, n))
             return "ok"
 
-        if text_l in ("/butce", "/bütçe", "butce", "bütçe",
+        if text_l in ("/butce", "/bütçe", "butce", "bütçe", "📊 bütçe",
                       "bütçem nasıl", "butce durum", "butce ozet"):
             tg_send(chat_id, _tg_budget_msg(pid, db))
             return "ok"
 
-        if text_l in ("/kartlar", "/kart", "kartlar", "kart",
+        if text_l in ("/kartlar", "/kart", "kartlar", "kart", "💳 kartlar",
                       "kart borçları", "kart borclarim", "kartlarim"):
             tg_send(chat_id, _tg_cards_msg(pid, db))
             return "ok"
 
-        if text_l in ("/yatirim", "/yatırım", "yatirim", "yatırım",
+        if text_l in ("/yatirim", "/yatırım", "yatirim", "yatırım", "📈 yatırım",
                       "yatırımlarım", "portfoy", "portföy", "yatirimlarim"):
             rows = db.execute(
                 "SELECT name,itype,quantity,buy_price FROM investments WHERE profile_id=%s ORDER BY quantity*buy_price DESC LIMIT 10",
@@ -2272,7 +2291,7 @@ def telegram_webhook():
                 tg_send(chat_id, "\n".join(lines))
             return "ok"
 
-        if text_l in ("/hedef", "/hedefler", "hedef", "hedefler", "hedeflerim"):
+        if text_l in ("/hedef", "/hedefler", "hedef", "hedefler", "hedeflerim", "🎯 hedefler"):
             rows = db.execute(
                 "SELECT name,goal_type,monthly_target FROM goals WHERE profile_id=%s ORDER BY id LIMIT 10",
                 (pid,)
@@ -2286,7 +2305,7 @@ def telegram_webhook():
                 tg_send(chat_id, "\n".join(lines))
             return "ok"
 
-        if text_l in ("/sil", "/son_sil", "sil", "son islemi sil", "son işlemi sil", "sil son"):
+        if text_l in ("/sil", "/son_sil", "sil", "son islemi sil", "son işlemi sil", "sil son", "🗑️ son i̇şlemi sil", "🗑️ son işlemi sil"):
             last = db.execute(
                 "SELECT id,type,amount,category,date FROM transactions WHERE profile_id=%s ORDER BY id DESC LIMIT 1",
                 (pid,)
