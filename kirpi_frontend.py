@@ -243,6 +243,22 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
   .nl.active span:not(.ico) { color:var(--b); font-weight:700 }
   .nl::after { display:none }
 
+  /* Gizli spacer — Görevler'in sağındaki yer tutucu */
+  .nl-add-ghost { flex:1; visibility:hidden; display:block!important }
+
+  /* Ekle — position:absolute, kesinlikle %50 merkez */
+  .nl-add {
+    position:absolute!important;
+    left:50%!important;
+    transform:translateX(-50%)!important;
+    bottom:4px!important;
+    flex:none!important;
+    width:56px;
+    display:flex!important;flex-direction:column;
+    align-items:center;gap:3px;
+    background:transparent!important;box-shadow:none!important;
+    cursor:pointer;-webkit-tap-highlight-color:transparent;
+  }
   /* Ekle butonu — yükseltilmiş sarı daire */
   .nl-add .ico {
     background:linear-gradient(145deg,#f0b90b,#d4a017);
@@ -1207,11 +1223,12 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
     <div class="nl" data-page="ledger" onclick="goPage('ledger',this)">
       <span class="ico">📋</span>İşlemler
     </div>
-    <div class="nl nl-add" data-page="add" onclick="goPage('add',this)">
-      <span class="ico">➕</span>Ekle
-    </div>
+    <div class="nl-add-ghost"></div>
     <div class="nl" data-page="todos" onclick="goPage('todos',this)">
       <span class="ico">✅</span>Görevler
+    </div>
+    <div class="nl nl-add" data-page="add" onclick="goPage('add',this)">
+      <span class="ico">➕</span>Ekle
     </div>
     <div class="nl nl-menu" onclick="openMoreSheet()">
       <span class="ico">☰</span>Menü
