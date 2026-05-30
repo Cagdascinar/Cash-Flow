@@ -1948,7 +1948,47 @@ def _tg_match_category(kw_text):
             return cat
     return None
 
-def _tg_summary_msg(uid, pid, db, period="bugun"):
+_MONTHS_TR_MAP = {
+    "ocak":1,"january":1,"jan":1,
+    "şubat":2,"subat":2,"february":2,"feb":2,
+    "mart":3,"march":3,"mar":3,
+    "nisan":4,"april":4,"apr":4,
+    "mayıs":5,"mayis":5,"may":5,
+    "haziran":6,"june":6,"jun":6,
+    "temmuz":7,"july":7,"jul":7,
+    "ağustos":8,"agustos":8,"august":8,"aug":8,
+    "eylül":9,"eylul":9,"september":9,"sep":9,
+    "ekim":10,"october":10,"oct":10,
+    "kasım":11,"kasim":11,"november":11,"nov":11,
+    "aralık":12,"aralik":12,"december":12,"dec":12,
+}
+
+def _tg_parse_month(text_l):
+    """'haziran', 'geçen ay', 'mayıs 2024' gibi ifadelerden (year,month) döner. None→bugün."""
+    today = date.today()
+    if "geçen ay" in text_l or "gecen ay" in text_l:
+        if today.month == 1:
+            return today.year - 1, 12
+        return today.year, today.month - 1
+    if "önceki ay" in text_l or "onceki ay" in text_l:
+        if today.month == 1:
+            return today.year - 1, 12
+        return today.year, today.month - 1
+    if "bu ay" in text_l:
+        return today.year, today.month
+    # "haziran 2024" veya "haziran" gibi
+    for mn, mi in _MONTHS_TR_MAP.items():
+        if mn in text_l:
+            # Yıl var mı?
+            ym = re.search(r'\b(20\d{2})\b', text_l)
+            yr = int(ym.group(1)) if ym else today.year
+            # Gelecek yılsa geçen yıla çek (tahmin)
+            if yr == today.year and mi > today.month:
+                yr -= 1
+            return yr, mi
+    return None
+
+def _tg_summary_msg(uid, pid, db, period="bugun", year=None, month=None):
     """Bakiye veya özet mesajı oluştur."""
     today = date.today()
     if period == "bugun":
@@ -1969,9 +2009,11 @@ def _tg_summary_msg(uid, pid, db, period="bugun"):
         return "\n".join(lines)
 
     elif period == "ay":
-        s = f"{today.year}-{today.month:02d}-01"
-        import calendar; last = calendar.monthrange(today.year, today.month)[1]
-        e = f"{today.year}-{today.month:02d}-{last:02d}"
+        import calendar as _cal
+        yr  = year  or today.year
+        mo  = month or today.month
+        s   = f"{yr}-{mo:02d}-01"
+        e   = f"{yr}-{mo:02d}-{_cal.monthrange(yr, mo)[1]:02d}"
         rows = db.execute(
             "SELECT type,SUM(amount) as t,category FROM transactions WHERE profile_id=%s AND date BETWEEN %s AND %s GROUP BY type,category ORDER BY t DESC",
             (pid, s, e)
@@ -1979,12 +2021,17 @@ def _tg_summary_msg(uid, pid, db, period="bugun"):
         gelir = sum(r["t"] for r in rows if r["type"]=="gelir")
         gider = sum(r["t"] for r in rows if r["type"]=="gider")
         MONTHS_TR = ["","Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"]
-        lines = [f"📆 <b>{MONTHS_TR[today.month]} {today.year} Özeti</b>\n"]
+        net = gelir - gider
+        is_current = (yr == today.year and mo == today.month)
+        period_lbl = MONTHS_TR[mo] + (" " + str(yr) if yr != today.year else "")
+        lines = [f"📆 <b>{period_lbl} Özeti</b>"
+                 + (f" ({today.day}. güne kadar)" if is_current else "") + "\n"]
         lines.append(f"📈 Toplam Gelir: <b>{_tg_fmt_amount(gelir)}</b>")
         lines.append(f"📉 Toplam Gider: <b>{_tg_fmt_amount(gider)}</b>")
-        net = gelir-gider
-        lines.append(f"{'✅' if net>=0 else '⚠️'} Net: <b>{_tg_fmt_amount(net)}</b>")
-        # Gider kategorileri
+        lines.append(f"{'✅' if net>=0 else '⚠️'} Net Kalan: <b>{_tg_fmt_amount(net)}</b>")
+        if gelir > 0:
+            tasarruf_pct = round(net/gelir*100) if gelir else 0
+            lines.append(f"💡 Tasarruf oranı: %{tasarruf_pct}")
         gider_cats = [(r["category"], r["t"]) for r in rows if r["type"]=="gider"]
         gider_cats.sort(key=lambda x: -x[1])
         if gider_cats:
@@ -1992,6 +2039,8 @@ def _tg_summary_msg(uid, pid, db, period="bugun"):
             for cat, amt in gider_cats[:5]:
                 pct = round(amt/gider*100) if gider else 0
                 lines.append(f"  • {cat}: {_tg_fmt_amount(amt)} (%{pct})")
+        if not rows:
+            lines.append("\n(Bu dönemde işlem bulunamadı)")
         return "\n".join(lines)
 
     elif period == "bakiye":
@@ -2258,10 +2307,22 @@ def telegram_webhook():
             tg_send(chat_id, _tg_summary_msg(uid, pid, db, "bugun"))
             return "ok"
 
-        if text_l in ("/ay", "/aylik", "/aylık", "ay", "aylik", "aylık", "📆 bu ay",
-                      "bu ayın özeti", "bu ayin ozeti", "aylık özet", "bu ay ne harcadım",
-                      "bu ay ozet", "aylik ozet"):
-            tg_send(chat_id, _tg_summary_msg(uid, pid, db, "ay"))
+        # Belirli ay sorgusu: "haziran", "geçen ay", "mayıs 2024 özeti" vb.
+        _parsed_month = _tg_parse_month(text_l)
+        _is_month_query = (
+            text_l in ("/ay", "/aylik", "/aylık", "ay", "aylik", "aylık", "📆 bu ay",
+                       "bu ayın özeti", "bu ayin ozeti", "aylık özet", "bu ay ne harcadım",
+                       "bu ay ozet", "aylik ozet", "geçen ay", "gecen ay", "önceki ay")
+            or (_parsed_month and any(kw in text_l for kw in
+                ["özet","ozet","harca","kalanı","kalan","ne kadar","para","para kaldı",
+                 "ayı","ayi","ayinda","ayında","bütçe","butce","gelir","gider","ay"]))
+        )
+        if _is_month_query:
+            if _parsed_month:
+                yr, mo = _parsed_month
+            else:
+                yr, mo = date.today().year, date.today().month
+            tg_send(chat_id, _tg_summary_msg(uid, pid, db, "ay", year=yr, month=mo))
             return "ok"
 
         if text_l.startswith(("/son", "son", "🗒️ son 5")) and (len(text_l) <= 3 or text_l[3:].strip().isdigit()):
