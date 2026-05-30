@@ -174,9 +174,8 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
       background:rgba(17,18,20,.92);
       backdrop-filter:blur(28px) saturate(200%);-webkit-backdrop-filter:blur(28px) saturate(200%);
       box-shadow:0 -0.5px 0 rgba(255,255,255,.08),0 -12px 40px rgba(0,0,0,.6)}
-  [data-theme="light"] nav{background:rgba(255,255,255,.92);box-shadow:0 -0.5px 0 rgba(0,0,0,.1),0 -12px 40px rgba(0,0,0,.08)}
-  .main{margin-left:0;margin-bottom:calc(70px + env(safe-area-inset-bottom,0px));position:relative;z-index:1}
-  .nav-logo{display:none}
+  [data-theme="light"] nav{background:rgba(255,255,255,.95);box-shadow:0 -0.5px 0 rgba(0,0,0,.1)}
+  .main{margin-left:0!important;margin-bottom:calc(64px + env(safe-area-inset-bottom,0px));position:relative;z-index:1}
 }
 
 /* ── NAV ── */
@@ -195,56 +194,92 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
   box-shadow:inset 3px 0 0 var(--b)}
 .nl .ico{font-size:1.1rem;width:22px;text-align:center;flex-shrink:0}
 
-/* ── MOBILE NAV — iOS Tab Bar style ── */
+/* ══════════════════════════════════════════════
+   MOBİL ALT NAV — TEK BLOK
+   Ana | İşlemler | [➕ merkez] | Görevler
+   ══════════════════════════════════════════════ */
 @media(max-width:768px){
-  .nl-desktop-only{display:none!important}
-  .nl-menu{display:flex}
-  .nav-links{
-    display:flex!important;flex-direction:row;
-    padding:0;height:56px;overflow:visible;
-    align-items:center;position:relative;
+  /* Gizlenenler */
+  .nav-sect,.nl-desktop,.nl-desktop-only,.nl-menu,.nl-more{display:none!important}
+  .nav-logo{display:none!important}
+
+  /* Nav container */
+  nav{
+    position:fixed!important;bottom:0;left:0;right:0;top:auto!important;
+    z-index:9999;height:auto!important;
+    flex-direction:row!important;
+    padding:0 0 env(safe-area-inset-bottom,0px);
+    background:rgba(17,18,20,.95);
+    backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+    box-shadow:0 -0.5px 0 rgba(255,255,255,.06);
+    overflow:visible!important;
+    width:100%!important;
   }
-  .nav-sect{display:none!important}
-  .nl-desktop,.nl-desktop-only,.nl-menu{display:none!important}
-  /* 4 normal sekme eşit dağılım, Ekle absolute merkez */
-  .nl:not(.nl-add){flex:1;flex-direction:column;gap:3px;font-size:.6rem;padding:0 4px 2px;
-      border-radius:0;box-shadow:none!important;background:transparent!important;
-      display:flex!important;align-items:center;justify-content:center}
-  /* Ekle — kesin %50 merkez */
+  [data-theme="light"] nav{
+    background:rgba(255,255,255,.95);
+    box-shadow:0 -0.5px 0 rgba(0,0,0,.1);
+  }
+
+  /* nav-links kapsayıcı */
+  .nav-links{
+    display:flex!important;flex-direction:row!important;
+    width:100%;height:56px;
+    position:relative;overflow:visible;
+    padding:0;gap:0;align-items:center;
+  }
+
+  /* Spacer — Ekle butonunun flex alanı */
+  .nl-spacer{flex:1;display:block!important;height:56px}
+
+  /* Ana, İşlemler, Görevler */
+  .nl:not(.nl-add){
+    flex:1!important;height:56px;
+    display:flex!important;flex-direction:column;
+    align-items:center;justify-content:center;
+    gap:4px;padding:0;
+    background:transparent!important;box-shadow:none!important;
+    border-radius:0;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .nl:not(.nl-add) .ico{
+    font-size:1.3rem;line-height:1;
+    transition:transform .14s cubic-bezier(.34,1.4,.64,1);
+    display:block;
+  }
+  .nl:not(.nl-add) span:not(.ico){
+    font-size:.57rem;font-weight:500;color:var(--txt2);
+  }
+  .nl:not(.nl-add).active .ico{transform:scale(1.12)}
+  .nl:not(.nl-add).active span:not(.ico){color:var(--b);font-weight:700}
+  .nl::after{display:none!important}
+
+  /* ➕ Ekle — position:absolute, left:50%, tam merkez */
   .nl-add{
     position:absolute!important;
-    left:50%;transform:translateX(-50%);
-    width:64px;flex:none;
-    flex-direction:column;gap:3px;font-size:.6rem;padding:0 4px 2px;
-    display:flex!important;align-items:center;justify-content:center;
-    background:transparent!important;box-shadow:none!important
+    left:50%!important;
+    transform:translateX(-50%)!important;
+    bottom:6px!important;
+    width:56px!important;
+    display:flex!important;flex-direction:column;
+    align-items:center;gap:3px;
+    background:transparent!important;box-shadow:none!important;
+    cursor:pointer;-webkit-tap-highlight-color:transparent;
   }
-  .nl .ico{font-size:1.35rem;line-height:1.2;display:flex;align-items:center;justify-content:center;
-           background:transparent;transition:transform .15s cubic-bezier(.34,1.4,.64,1)}
-  .nl span:not(.ico){color:var(--txt2);transition:color .15s;font-weight:500;font-size:.58rem}
-  .nl.active .ico{transform:scale(1.1)}
-  .nl.active span:not(.ico){color:var(--b);font-weight:700}
-  .nl::after{display:none}
-}
-
-/* ── ADD BUTTON (mobile center floating) ── */
-@media(max-width:768px){
-  .nl-add{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;padding-top:0}
   .nl-add .ico{
-    background:linear-gradient(145deg,#f0b90b 0%,#d4a017 100%);
-    color:#1e2026;border-radius:50%;
-    width:48px;height:48px;
+    width:48px;height:48px;border-radius:50%;
+    background:linear-gradient(145deg,#f0b90b,#d4a017);
+    color:#1e2026;
     display:flex;align-items:center;justify-content:center;
-    font-size:1.5rem;
-    box-shadow:0 4px 0 #a07800,0 6px 20px rgba(240,185,11,.4);
-    margin-top:-20px;
+    font-size:1.45rem;
+    box-shadow:0 4px 0 #a07800,0 6px 18px rgba(240,185,11,.38);
     border:3px solid var(--bg);
-    transition:transform .15s cubic-bezier(.34,1.56,.64,1),box-shadow .15s;
-    background-clip:padding-box;
+    transition:transform .14s cubic-bezier(.34,1.56,.64,1),box-shadow .14s;
   }
-  .nl-add:active .ico{transform:scale(.93) translateY(3px);box-shadow:0 1px 0 #a07800,0 3px 10px rgba(240,185,11,.3)}
-  .nl-add.active .ico{background:linear-gradient(145deg,#f0b90b,#d4a017)}
-  .nl-add span:not(.ico){color:var(--b);font-weight:800;font-size:.56rem;margin-top:4px}
+  .nl-add:active .ico{
+    transform:scale(.91) translateY(3px)!important;
+    box-shadow:0 1px 0 #a07800,0 2px 8px rgba(240,185,11,.2)!important;
+  }
+  .nl-add span:not(.ico){font-size:.56rem;font-weight:700;color:var(--b)}
 }
 
 /* ── MORE SHEET ── */
@@ -1191,14 +1226,16 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
     <div class="nl" data-page="ledger" onclick="goPage('ledger',this)">
       <span class="ico">📋</span>İşlemler
     </div>
-    <div class="nl nl-add" data-page="add" onclick="goPage('add',this)">
-      <span class="ico">➕</span>Ekle
-    </div>
+    <div class="nl-spacer"></div>
     <div class="nl" data-page="todos" onclick="goPage('todos',this)">
       <span class="ico">✅</span>Görevler
     </div>
     <div class="nl nl-more nl-desktop-only" onclick="openMoreSheet()">
       <span class="ico">⋯</span>Daha
+    </div>
+    <!-- Ekle butonu absolute — tam %50 merkez -->
+    <div class="nl nl-add" data-page="add" onclick="goPage('add',this)">
+      <span class="ico">➕</span>Ekle
     </div>
 
     <div class="nav-sect">Araçlar</div>
