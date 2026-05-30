@@ -164,7 +164,8 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
 .shell{display:flex;min-height:100vh}
 nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.06);
     display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;height:100vh;z-index:100}
-.main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden;min-width:0}
+.main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden;min-width:0;
+  padding-top:calc(54px + env(safe-area-inset-top,0px))}
 @media(max-width:768px){
   nav{width:100%;height:auto;flex-direction:row;border-right:none;border-top:none;border-bottom:none;
       position:fixed;bottom:0;left:0;right:0;top:auto;z-index:9999;
@@ -678,16 +679,16 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 
 /* ── TOP HEADER ─────────────────────────────────────────────── */
 .top-header{
-  position:sticky;top:0;z-index:90;
+  position:fixed;top:0;left:0;right:0;z-index:9998;
   height:calc(54px + env(safe-area-inset-top,0px));
   padding-top:env(safe-area-inset-top,0px);
-  background:rgba(242,242,247,.92);backdrop-filter:blur(20px) saturate(180%);
+  background:rgba(17,18,20,.92);backdrop-filter:blur(20px) saturate(180%);
   -webkit-backdrop-filter:blur(20px) saturate(180%);
-  border-bottom:1px solid rgba(0,0,0,.08);
+  border-bottom:1px solid rgba(255,255,255,.06);
   display:flex;align-items:center;justify-content:flex-end;
-  padding-left:24px;padding-right:24px;flex-shrink:0;
+  padding-left:16px;padding-right:16px;flex-shrink:0;
 }
-[data-theme="dark"] .top-header{background:rgba(10,12,18,.92)}
+[data-theme="light"] .top-header{background:rgba(255,255,255,.92);border-bottom:1px solid rgba(0,0,0,.08)}
 @media(max-width:768px){.top-header{padding-left:16px;padding-right:16px;justify-content:space-between}}
 .top-header-logo{font-size:.95rem;font-weight:800;display:none;align-items:center;gap:8px;color:var(--txt)}
 @media(max-width:768px){
