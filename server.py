@@ -3995,36 +3995,40 @@ def update_recurring(rid):
 def apply_recurring():
     uid = session["user_id"]; pid = get_pid()
     d = request.get_json(force=True)
-    year        = int(d.get("year", date.today().year))
+    today_y     = date.today().year
+    year_start  = int(d.get("year_start",  d.get("year", today_y)))
+    year_end    = int(d.get("year_end",    year_start))
     month_start = int(d.get("month_start", 1))
     month_end   = int(d.get("month_end",   12))
-    months      = list(range(month_start, month_end + 1))
+
+    if year_end < year_start: year_end = year_start
+    if year_end > today_y + 5: year_end = today_y + 5  # max 5 yıl ileri
 
     db        = get_db()
     templates = db.execute("SELECT * FROM recurring WHERE profile_id=? AND active=1",(pid,)).fetchall()
     created   = 0; skipped = 0
 
-    from calendar import monthrange
-    for tpl in templates:
-        days_raw = (tpl["days_of_month"] or "").strip()
-        if days_raw:
-            days_list = [int(x.strip()) for x in days_raw.split(",") if x.strip().isdigit()]
-        else:
-            days_list = [tpl["day_of_month"]]
-        for m in months:
-            _, last_day = monthrange(year, m)
-            for d_val in days_list:
-                day = min(d_val, last_day)
-                dt  = f"{year:04d}-{m:02d}-{day:02d}"
-                exists = db.execute(
-                    "SELECT id FROM transactions WHERE profile_id=? AND type=? AND category=? AND description=? AND date=? AND amount=?",
-                    (pid, tpl["type"], tpl["category"], tpl["description"], dt, tpl["amount"])
-                ).fetchone()
-                if exists: skipped += 1; continue
-                db.execute(
-                    "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?,?)",
-                    (uid, pid, tpl["type"], tpl["amount"], tpl["category"], tpl["description"], dt, datetime.now().isoformat()))
-                created += 1
+    from calendar import monthrange as _monthrange
+    for yr in range(year_start, year_end + 1):
+        m_from = month_start if yr == year_start else 1
+        m_to   = month_end   if yr == year_end   else 12
+        for tpl in templates:
+            days_raw = (tpl["days_of_month"] or "").strip()
+            days_list = [int(x.strip()) for x in days_raw.split(",") if x.strip().isdigit()] if days_raw else [tpl["day_of_month"]]
+            for m in range(m_from, m_to + 1):
+                _, last_day = _monthrange(yr, m)
+                for d_val in days_list:
+                    day = min(d_val, last_day)
+                    dt  = f"{yr:04d}-{m:02d}-{day:02d}"
+                    exists = db.execute(
+                        "SELECT id FROM transactions WHERE profile_id=? AND type=? AND category=? AND description=? AND date=? AND amount=?",
+                        (pid, tpl["type"], tpl["category"], tpl["description"], dt, tpl["amount"])
+                    ).fetchone()
+                    if exists: skipped += 1; continue
+                    db.execute(
+                        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?,?)",
+                        (uid, pid, tpl["type"], tpl["amount"], tpl["category"], tpl["description"], dt, datetime.now().isoformat()))
+                    created += 1
 
     db.commit()
     return jsonify({"ok": True, "created": created, "skipped": skipped})

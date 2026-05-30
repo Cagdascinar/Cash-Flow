@@ -1691,9 +1691,15 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
       </p>
       <div class="form-row" style="margin-bottom:10px">
         <div>
-          <label>Yıl</label>
+          <label>Başlangıç Yılı</label>
           <select class="f-input" id="rec-apply-year"></select>
         </div>
+        <div>
+          <label>Bitiş Yılı</label>
+          <select class="f-input" id="rec-apply-year-end"></select>
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom:10px">
         <div>
           <label>Başlangıç Ayı</label>
           <select class="f-input" id="rec-apply-month-start">
@@ -4437,12 +4443,15 @@ function _updateDaysLbl(){
 
 function initRecurringPage(){
   fillSel('rec-cat', CATS[recTab]);
-  var ys = document.getElementById('rec-apply-year');
-  ys.innerHTML = '';
   var now = new Date().getFullYear();
-  for(var y=now-1; y<=now+2; y++){
-    ys.innerHTML += '<option value="'+y+'"'+(y===now?' selected':'')+'>'+y+'</option>';
+  var opts = '';
+  for(var y=now-2; y<=now+5; y++){
+    opts += '<option value="'+y+'"'+(y===now?' selected':'')+'>'+y+'</option>';
   }
+  var ys = document.getElementById('rec-apply-year');
+  var ye = document.getElementById('rec-apply-year-end');
+  if(ys) ys.innerHTML = opts;
+  if(ye) ye.innerHTML = opts;
   _buildDayChips();
   loadRecurring();
 }
@@ -4511,11 +4520,12 @@ function delRecurring(id){
 }
 
 function applyRecurring(){
-  var year  = parseInt(document.getElementById('rec-apply-year').value);
-  var mStart= parseInt(document.getElementById('rec-apply-month-start').value);
-  var mEnd  = parseInt(document.getElementById('rec-apply-month-end').value);
-  if(mEnd < mStart){ showToast('Bitiş ayı başlangıç ayından önce olamaz','#ef4444'); return; }
-  var body  = {year: year, month_start: mStart, month_end: mEnd};
+  var yearStart = parseInt(document.getElementById('rec-apply-year').value);
+  var yearEnd   = parseInt((document.getElementById('rec-apply-year-end')||{}).value || yearStart);
+  var mStart    = parseInt(document.getElementById('rec-apply-month-start').value);
+  var mEnd      = parseInt(document.getElementById('rec-apply-month-end').value);
+  if(yearEnd < yearStart){ toast('Bitiş yılı başlangıç yılından önce olamaz'); return; }
+  var body = {year_start: yearStart, year_end: yearEnd, month_start: mStart, month_end: mEnd};
   xhr('/api/recurring/apply', body, function(r){
     var el = document.getElementById('rec-apply-result');
     if(r.ok){
