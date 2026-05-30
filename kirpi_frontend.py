@@ -132,10 +132,9 @@ HTML = r"""<!DOCTYPE html>
 <link rel="manifest" href="/manifest.json">
 <title>Kirpi — Finansal Kontrol</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;max-width:100%}
-img,video,canvas,svg{max-width:100%;display:block}
-html{overflow-x:hidden;max-width:100vw}
-html,body{position:relative;width:100%;max-width:100vw}
+*{box-sizing:border-box;margin:0;padding:0}
+html{overflow-x:hidden}
+body{position:relative;overflow-x:hidden}
 :root{
   --bg:#f2f2f7;--bg2:#ffffff;--bg3:#e5e5ea;--bg4:#d1d1d6;
   --g:#34c759;--r:#ff3b30;--b:#007aff;--b2:#5856d6;--y:#ff9500;--p:#af52de;--c:#32ade6;
@@ -160,7 +159,7 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
 .shell{display:flex;min-height:100vh}
 nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
     display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;height:100vh;z-index:100}
-.main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+.main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden;min-width:0}
 @media(max-width:768px){
   nav{width:100%;height:auto;flex-direction:row;border-right:none;border-top:1px solid rgba(0,0,0,.07);border-bottom:none;
       position:fixed;bottom:0;top:auto;z-index:200;
