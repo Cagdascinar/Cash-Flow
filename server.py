@@ -434,6 +434,7 @@ def init_db():
             amount      DOUBLE PRECISION NOT NULL,
             category    TEXT NOT NULL,
             description TEXT NOT NULL DEFAULT '',
+            tx_date     TEXT NOT NULL DEFAULT '',
             created_at  TEXT NOT NULL
         )""",
         """CREATE TABLE IF NOT EXISTS subscriptions (
@@ -470,7 +471,8 @@ def init_db():
         ("users",        "report_name",     "TEXT NOT NULL DEFAULT ''"),
         ("users",        "report_contact",  "TEXT NOT NULL DEFAULT ''"),
         ("users",        "report_logo",     "TEXT NOT NULL DEFAULT ''"),
-        ("users",        "phone",           "TEXT NOT NULL DEFAULT ''"),
+        ("users",           "phone",    "TEXT NOT NULL DEFAULT ''"),
+        ("telegram_pending","tx_date",  "TEXT NOT NULL DEFAULT ''"),
     ]
     with pg_connect() as con:
         for stmt in stmts:
@@ -1892,6 +1894,178 @@ def _parse_tg_msg(text):
 
 TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "")
 
+# ── TELEGRAM YARDIMCI FONKSİYONLARI ──────────────────────────────────────────
+
+def _tg_fmt_amount(n):
+    return f"₺{n:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+def _tg_parse_date(text_l):
+    """'dün', 'bugün', '2 gün önce' gibi ifadeleri tarihe çevirir. None → bugün."""
+    today = date.today()
+    if "dün" in text_l or "dun" in text_l:
+        return today - timedelta(days=1)
+    if "evvelsi" in text_l:
+        return today - timedelta(days=2)
+    m = re.search(r'(\d+)\s*gün\s*önce', text_l)
+    if m:
+        return today - timedelta(days=int(m.group(1)))
+    return today
+
+def _tg_strip_date_words(text_l):
+    text_l = re.sub(r'\d+\s*gün\s*önce', '', text_l)
+    return text_l.replace("dün","").replace("dun","").replace("bugün","").replace("evvelsi gün","").strip()
+
+def _tg_parse_category_override(text):
+    """'#kategori' ifadesini bulur ve döner (None yoksa)."""
+    m = re.search(r'#([^\s]+)', text)
+    return m.group(1) if m else None
+
+def _tg_match_category(kw_text):
+    """Keyword'den kategori bul."""
+    for kw, cat in _TG_CAT_KW:
+        if kw in kw_text:
+            return cat
+    return None
+
+def _tg_summary_msg(uid, pid, db, period="bugun"):
+    """Bakiye veya özet mesajı oluştur."""
+    today = date.today()
+    if period == "bugun":
+        rows = db.execute(
+            "SELECT type,amount,category,description FROM transactions WHERE profile_id=%s AND date=%s ORDER BY id DESC",
+            (pid, today.isoformat())
+        ).fetchall()
+        if not rows:
+            return "📅 <b>Bugün henüz işlem yok.</b>"
+        gelir = sum(r["amount"] for r in rows if r["type"]=="gelir")
+        gider = sum(r["amount"] for r in rows if r["type"]=="gider")
+        lines = [f"📅 <b>Bugün — {today.strftime('%d.%m.%Y')}</b>\n"]
+        for r in rows:
+            ico = "📈" if r["type"]=="gelir" else "📉"
+            lines.append(f"{ico} {r['category']} — <b>{_tg_fmt_amount(r['amount'])}</b>"
+                        + (f" <i>({r['description']})</i>" if r["description"] else ""))
+        lines.append(f"\n📊 Gelir: <b>{_tg_fmt_amount(gelir)}</b>  |  Gider: <b>{_tg_fmt_amount(gider)}</b>  |  Net: <b>{_tg_fmt_amount(gelir-gider)}</b>")
+        return "\n".join(lines)
+
+    elif period == "ay":
+        s = f"{today.year}-{today.month:02d}-01"
+        import calendar; last = calendar.monthrange(today.year, today.month)[1]
+        e = f"{today.year}-{today.month:02d}-{last:02d}"
+        rows = db.execute(
+            "SELECT type,SUM(amount) as t,category FROM transactions WHERE profile_id=%s AND date BETWEEN %s AND %s GROUP BY type,category ORDER BY t DESC",
+            (pid, s, e)
+        ).fetchall()
+        gelir = sum(r["t"] for r in rows if r["type"]=="gelir")
+        gider = sum(r["t"] for r in rows if r["type"]=="gider")
+        MONTHS_TR = ["","Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"]
+        lines = [f"📆 <b>{MONTHS_TR[today.month]} {today.year} Özeti</b>\n"]
+        lines.append(f"📈 Toplam Gelir: <b>{_tg_fmt_amount(gelir)}</b>")
+        lines.append(f"📉 Toplam Gider: <b>{_tg_fmt_amount(gider)}</b>")
+        net = gelir-gider
+        lines.append(f"{'✅' if net>=0 else '⚠️'} Net: <b>{_tg_fmt_amount(net)}</b>")
+        # Gider kategorileri
+        gider_cats = [(r["category"], r["t"]) for r in rows if r["type"]=="gider"]
+        gider_cats.sort(key=lambda x: -x[1])
+        if gider_cats:
+            lines.append("\n<b>En Büyük Giderler:</b>")
+            for cat, amt in gider_cats[:5]:
+                pct = round(amt/gider*100) if gider else 0
+                lines.append(f"  • {cat}: {_tg_fmt_amount(amt)} (%{pct})")
+        return "\n".join(lines)
+
+    elif period == "bakiye":
+        # Hesap bakiyesi
+        acc = db.execute(
+            "SELECT COALESCE(SUM(initial_balance),0) as ib FROM accounts WHERE profile_id=%s AND active=1", (pid,)
+        ).fetchone()
+        tx_bal = db.execute(
+            "SELECT COALESCE(SUM(CASE WHEN type='gelir' THEN amount ELSE -amount END),0) as b FROM transactions WHERE profile_id=%s AND date<=%s",
+            (pid, today.isoformat())
+        ).fetchone()
+        card_debt = db.execute(
+            "SELECT COALESCE(SUM(used_),0) as d FROM cards WHERE profile_id=%s", (pid,)
+        ).fetchone()
+        invest = db.execute(
+            "SELECT COALESCE(SUM(quantity*buy_price),0) as v FROM investments WHERE profile_id=%s", (pid,)
+        ).fetchone()
+        hesap = float((acc["ib"] or 0)) + float((tx_bal["b"] or 0))
+        borç  = float(card_debt["d"] or 0)
+        yat   = float(invest["v"] or 0)
+        likid = hesap - borç
+        net_w = hesap + yat - borç
+        lines = ["💰 <b>Anlık Finansal Durum</b>\n",
+                 f"🏦 Hesap Bakiyesi: <b>{_tg_fmt_amount(hesap)}</b>",
+                 f"💳 Kart Borcu: <b>-{_tg_fmt_amount(borç)}</b>",
+                 f"{'✅' if likid>=0 else '⚠️'} Net Likidite: <b>{_tg_fmt_amount(likid)}</b>"]
+        if yat > 0:
+            lines.append(f"📈 Yatırım (maliyet): <b>{_tg_fmt_amount(yat)}</b>")
+            lines.append(f"📊 Net Varlık: <b>{_tg_fmt_amount(net_w)}</b>")
+        return "\n".join(lines)
+
+    return "❓"
+
+def _tg_last_tx(uid, pid, db, n=5):
+    rows = db.execute(
+        "SELECT id,type,amount,category,description,date FROM transactions WHERE profile_id=%s ORDER BY date DESC,id DESC LIMIT %s",
+        (pid, n)
+    ).fetchall()
+    if not rows:
+        return "📋 Henüz işlem yok."
+    lines = [f"🗒️ <b>Son {len(rows)} İşlem</b>\n"]
+    for r in rows:
+        ico = "📈" if r["type"]=="gelir" else "📉"
+        lines.append(f"{ico} <code>#{r['id']}</code> {r['date'][5:]} — {r['category']} <b>{_tg_fmt_amount(r['amount'])}</b>"
+                    + (f" <i>{r['description']}</i>" if r["description"] else ""))
+    return "\n".join(lines)
+
+def _tg_budget_msg(pid, db):
+    today = date.today()
+    s = f"{today.year}-{today.month:02d}-01"
+    import calendar; last = calendar.monthrange(today.year, today.month)[1]
+    e = f"{today.year}-{today.month:02d}-{last:02d}"
+    budgets = {r["category"]:r["limit_"] for r in db.execute("SELECT category,limit_ FROM budgets WHERE profile_id=%s",(pid,)).fetchall()}
+    if not budgets:
+        return "📊 Bütçe tanımlanmamış.\nKirpi uygulamasından kategori bütçesi belirleyin."
+    spending = {}
+    for r in db.execute("SELECT category,SUM(amount) as t FROM transactions WHERE profile_id=%s AND type='gider' AND date BETWEEN %s AND %s GROUP BY category",(pid,s,e)).fetchall():
+        spending[r["category"]] = r["t"]
+    lines = [f"📊 <b>Bütçe Durumu — {today.month:02d}/{today.year}</b>\n"]
+    for cat, limit in sorted(budgets.items()):
+        spent = spending.get(cat, 0)
+        pct = round(spent/limit*100) if limit else 0
+        bar = "█"*(pct//10) + "░"*(10-min(pct//10,10))
+        warn = "🔴" if pct>=100 else "🟡" if pct>=80 else "🟢"
+        lines.append(f"{warn} <b>{cat}</b>\n   {bar} %{pct}\n   {_tg_fmt_amount(spent)} / {_tg_fmt_amount(limit)}")
+    return "\n".join(lines)
+
+def _tg_cards_msg(pid, db):
+    cards = db.execute("SELECT * FROM cards WHERE profile_id=%s ORDER BY bank_name",(pid,)).fetchall()
+    if not cards:
+        return "💳 Kayıtlı kart yok."
+    today = date.today()
+    lines = ["💳 <b>Kredi Kartları</b>\n"]
+    for c in cards:
+        used = c["used_"] or 0
+        lim  = c["limit_"] or 0
+        pct  = round(used/lim*100) if lim else 0
+        # Son ödeme tarihi
+        due_day = c["due_day"] or 1
+        if today.day <= due_day:
+            due_date = today.replace(day=due_day)
+        else:
+            if today.month == 12:
+                due_date = date(today.year+1, 1, due_day)
+            else:
+                import calendar
+                last = calendar.monthrange(today.year, today.month+1)[1]
+                due_date = date(today.year, today.month+1, min(due_day, last))
+        days_left = (due_date - today).days
+        warn = "🔴" if pct>=90 else "🟡" if pct>=70 else "🟢"
+        lines.append(f"{warn} <b>{c['bank_name']}</b> {c.get('card_name','')}\n"
+                    f"   Borç: {_tg_fmt_amount(used)} / {_tg_fmt_amount(lim)} (%{pct})\n"
+                    f"   Son ödeme: {due_date.strftime('%d.%m')} ({days_left} gün)")
+    return "\n".join(lines)
+
 @app.route("/api/telegram/webhook", methods=["POST"])
 def telegram_webhook():
     if not TELEGRAM_TOKEN: return "ok"
@@ -1918,10 +2092,11 @@ def telegram_webhook():
                     (pid_pending, tg_uid)
                 ).fetchone()
                 if row:
+                    tx_date_val = row.get("tx_date") or date.today().isoformat()
                     db.execute(
                         "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
                         (row["user_id"], row["profile_id"], row["type"], row["amount"],
-                         row["category"], row["description"], date.today().isoformat(),
+                         row["category"], row["description"], tx_date_val,
                          datetime.now().isoformat())
                     )
                     db.execute("DELETE FROM telegram_pending WHERE id=%s", (pid_pending,))
@@ -1942,6 +2117,26 @@ def telegram_webhook():
                 db.commit()
                 tg_edit_msg(chat_id, msg_id, "❌ İptal edildi.")
                 tg_answer_cb(cb_id, "İptal edildi.")
+            elif cdata.startswith("deltx:"):
+                val = cdata.split(":")[1]
+                if val == "cancel":
+                    tg_edit_msg(chat_id, msg_id, "↩️ Silme iptal edildi.")
+                    tg_answer_cb(cb_id, "İptal.")
+                else:
+                    tx_id = int(val)
+                    # Güvenlik: bu işlem kullanıcıya ait mi?
+                    link2 = db.execute("SELECT user_id,profile_id FROM telegram_links WHERE tg_user_id=%s",(tg_uid,)).fetchone()
+                    if link2:
+                        row = db.execute("SELECT * FROM transactions WHERE id=%s AND profile_id=%s",(tx_id,link2["profile_id"])).fetchone()
+                        if row:
+                            db.execute("DELETE FROM transactions WHERE id=%s",(tx_id,))
+                            db.commit()
+                            tg_edit_msg(chat_id, msg_id, f"🗑 <b>Silindi!</b>\n{row['category']} — {_tg_fmt_amount(row['amount'])}")
+                            tg_answer_cb(cb_id, "Silindi!")
+                        else:
+                            tg_answer_cb(cb_id, "İşlem bulunamadı.")
+                    else:
+                        tg_answer_cb(cb_id, "Yetki hatası.")
         except Exception as e:
             log.error("Telegram callback error: %s", e)
             tg_answer_cb(cb_id, "Hata oluştu.")
@@ -1978,38 +2173,199 @@ def telegram_webhook():
                 tg_send(chat_id, "❌ Geçersiz veya süresi dolmuş kod.\nKirpi Ayarlar sayfasından yeni kod alın.")
             return "ok"
 
-        if text.lower() == "/start":
-            tg_send(chat_id, "🦔 <b>Kirpi Bot'a hoş geldiniz!</b>\n\n<b>Önce hesabınızı bağlayın:</b>\n1. Kirpi → <b>Ayarlar</b> → <b>Telegram → Kişi Ekle</b>\n2. Gelen kodu buraya <code>/link KOD</code> şeklinde gönderin")
+        text_l = text.lower().strip()
+
+        if text_l == "/start":
+            tg_send(chat_id,
+                "🦔 <b>Kirpi Finans Bot'a hoş geldiniz!</b>\n\n"
+                "<b>Önce hesabınızı bağlayın:</b>\n"
+                "1. Kirpi → Ayarlar → Telegram → Bağlantı Kodu Al\n"
+                "2. Buraya <code>/link KOD</code> gönderin\n\n"
+                "Bağlandıktan sonra /help yazın.")
             return "ok"
-        if text.lower() == "/help":
-            tg_send(chat_id, "📖 <b>Kullanım:</b>\n\n<code>market 250</code>\n<code>10 bin yemek</code>\n<code>benzin 1.500</code>\n<code>maaş 15 bin</code>\n<code>fatura 3.200</code>\n\nTutar + açıklama yaz, onay ver, kaydedilir.")
+
+        if text_l == "/help" or text_l == "/yardim":
+            tg_send(chat_id,
+                "📖 <b>Kirpi Bot Komutları</b>\n\n"
+                "<b>💰 İşlem Ekleme:</b>\n"
+                "  <code>market 250</code> — gider ekle\n"
+                "  <code>maaş 15000</code> — gelir ekle\n"
+                "  <code>dün benzin 500</code> — dünkü tarihle ekle\n"
+                "  <code>2 gün önce kira 8000</code>\n"
+                "  <code>yemek 350 #eğlence</code> — kategori override\n"
+                "  <code>/gelir 5000 serbest iş</code> — zorunlu gelir\n"
+                "  <code>/gider 300 market</code> — zorunlu gider\n\n"
+                "<b>📊 Sorgular:</b>\n"
+                "  /bakiye — anlık finansal durum\n"
+                "  /bugun — bugünkü işlemler\n"
+                "  /son — son 5 işlem\n"
+                "  /ay — bu ayın özeti\n"
+                "  /butce — bütçe durumu\n"
+                "  /kartlar — kart bakiyeleri\n"
+                "  /yatirim — yatırım özeti\n"
+                "  /hedef — hedefler\n\n"
+                "<b>✏️ Diğer:</b>\n"
+                "  /sil — son işlemi sil\n"
+                "  /iptal — bekleyen işlemi iptal et")
             return "ok"
 
         link = db.execute("SELECT user_id, profile_id FROM telegram_links WHERE tg_user_id=%s", (tg_uid,)).fetchone()
         if not link:
-            tg_send(chat_id, "⚠️ Hesabınız bağlı değil.\n/start yazın.")
+            tg_send(chat_id, "⚠️ Hesabınız bağlı değil.\n/start yazarak başlayın.")
             return "ok"
 
         uid, pid = link["user_id"], link["profile_id"]
-        parsed = _parse_tg_msg(text)
-        if not parsed:
-            tg_send(chat_id, "❓ Anlamadım.\nÖrnek: <code>market 250</code> veya <code>10 bin yemek</code>")
+
+        # ── KOMUTLAR ───────────────────────────────────────────────────────────
+
+        if text_l in ("/bakiye", "/balance", "bakiye", "ne kadar param var", "param ne kadar",
+                      "kalan ne", "elimde ne kadar var"):
+            tg_send(chat_id, _tg_summary_msg(uid, pid, db, "bakiye"))
             return "ok"
+
+        if text_l in ("/bugun", "/bugün", "bugün ne harcadım", "bugün ne harcadim",
+                      "bugünün özeti", "bugunun ozeti"):
+            tg_send(chat_id, _tg_summary_msg(uid, pid, db, "bugun"))
+            return "ok"
+
+        if text_l in ("/ay", "/aylik", "/aylık", "bu ayın özeti", "bu ayin ozeti",
+                      "aylık özet", "bu ay ne harcadım"):
+            tg_send(chat_id, _tg_summary_msg(uid, pid, db, "ay"))
+            return "ok"
+
+        if text_l.startswith("/son"):
+            parts = text_l.split()
+            n = int(parts[1]) if len(parts)>1 and parts[1].isdigit() else 5
+            n = min(n, 20)
+            tg_send(chat_id, _tg_last_tx(uid, pid, db, n))
+            return "ok"
+
+        if text_l in ("/butce", "/bütçe", "bütçem nasıl", "butce durum"):
+            tg_send(chat_id, _tg_budget_msg(pid, db))
+            return "ok"
+
+        if text_l in ("/kartlar", "/kart", "kart borçları", "kart borclarim"):
+            tg_send(chat_id, _tg_cards_msg(pid, db))
+            return "ok"
+
+        if text_l in ("/yatirim", "/yatırım", "yatırımlarım", "portföy"):
+            rows = db.execute(
+                "SELECT name,itype,quantity,buy_price FROM investments WHERE profile_id=%s ORDER BY quantity*buy_price DESC LIMIT 10",
+                (pid,)
+            ).fetchall()
+            if not rows:
+                tg_send(chat_id, "📈 Kayıtlı yatırım yok.")
+            else:
+                total = sum(r["quantity"]*r["buy_price"] for r in rows)
+                lines = ["📈 <b>Yatırım Portföyü</b> (maliyet bazlı)\n"]
+                for r in rows:
+                    val = r["quantity"] * r["buy_price"]
+                    lines.append(f"  • {r['name']} ({r['itype']}): <b>{_tg_fmt_amount(val)}</b>")
+                lines.append(f"\n💼 Toplam: <b>{_tg_fmt_amount(total)}</b>")
+                tg_send(chat_id, "\n".join(lines))
+            return "ok"
+
+        if text_l in ("/hedef", "/hedefler", "hedeflerim"):
+            rows = db.execute(
+                "SELECT name,goal_type,monthly_target FROM goals WHERE profile_id=%s ORDER BY id LIMIT 10",
+                (pid,)
+            ).fetchall()
+            if not rows:
+                tg_send(chat_id, "🎯 Kayıtlı hedef yok.")
+            else:
+                lines = ["🎯 <b>Hedefler</b>\n"]
+                for r in rows:
+                    lines.append(f"  • {r['name']} — Aylık hedef: <b>{_tg_fmt_amount(r['monthly_target'])}</b>")
+                tg_send(chat_id, "\n".join(lines))
+            return "ok"
+
+        if text_l in ("/sil", "/son_sil", "son işlemi sil"):
+            last = db.execute(
+                "SELECT id,type,amount,category,date FROM transactions WHERE profile_id=%s ORDER BY id DESC LIMIT 1",
+                (pid,)
+            ).fetchone()
+            if not last:
+                tg_send(chat_id, "❌ Silinecek işlem yok.")
+            else:
+                icon = "📈" if last["type"]=="gelir" else "📉"
+                tg_send(chat_id,
+                    f"🗑 Son işlemi silmek istiyor musunuz?\n\n"
+                    f"{icon} {last['category']} — <b>{_tg_fmt_amount(last['amount'])}</b>\n"
+                    f"Tarih: {last['date']}",
+                    reply_markup={"inline_keyboard": [[
+                        {"text": "✅ Evet, sil", "callback_data": f"deltx:{last['id']}"},
+                        {"text": "❌ İptal",     "callback_data": "deltx:cancel"}
+                    ]]}
+                )
+            return "ok"
+
+        if text_l in ("/iptal", "iptal"):
+            db.execute("DELETE FROM telegram_pending WHERE tg_user_id=%s", (tg_uid,))
+            db.commit()
+            tg_send(chat_id, "✅ Bekleyen tüm işlemler iptal edildi.")
+            return "ok"
+
+        # ── /gelir ve /gider komutları ──
+        forced_type = None
+        if text_l.startswith("/gelir ") or text_l.startswith("gelir "):
+            forced_type = "gelir"
+            text = re.sub(r'^/?gelir\s+', '', text, flags=re.IGNORECASE)
+            text_l = text.lower()
+        elif text_l.startswith("/gider ") or text_l.startswith("gider "):
+            forced_type = "gider"
+            text = re.sub(r'^/?gider\s+', '', text, flags=re.IGNORECASE)
+            text_l = text.lower()
+
+        # ── Doğal dil: tarih + kategori override + işlem ──
+        tx_date  = _tg_parse_date(text_l)
+        clean_text = _tg_strip_date_words(text_l)
+        cat_override = _tg_parse_category_override(text)
+        if cat_override:
+            clean_text = re.sub(r'#[^\s]+', '', clean_text).strip()
+
+        parsed = _parse_tg_msg(clean_text if clean_text else text)
+        if not parsed:
+            tg_send(chat_id,
+                "❓ Anlamadım.\n\n"
+                "Örnekler:\n"
+                "  <code>market 250</code>\n"
+                "  <code>maaş 15000</code>\n"
+                "  <code>dün benzin 500</code>\n"
+                "  <code>yemek 350 #eğlence</code>\n\n"
+                "/help — tüm komutlar")
+            return "ok"
+
+        # Kategori override uygula
+        if cat_override:
+            for kw, cat in _TG_CAT_KW:
+                if kw == cat_override.lower():
+                    parsed["category"] = cat; break
+            else:
+                # Direkt kategori adı dene
+                parsed["category"] = cat_override.capitalize()
+
+        # Zorunlu tür uygula
+        if forced_type:
+            parsed["type"] = forced_type
+
+        parsed["date"] = tx_date.isoformat()
 
         # Pending olarak kaydet
         cur = db.execute(
-            "INSERT INTO telegram_pending (tg_user_id,user_id,profile_id,type,amount,category,description,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+            "INSERT INTO telegram_pending (tg_user_id,user_id,profile_id,type,amount,category,description,tx_date,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
             (tg_uid, uid, pid, parsed["type"], parsed["amount"],
-             parsed["category"], parsed["description"], datetime.now().isoformat())
+             parsed["category"], parsed["description"],
+             parsed.get("date", date.today().isoformat()), datetime.now().isoformat())
         )
         db.commit()
         pending_id = cur.lastrowid
 
         icon = "📈" if parsed["type"] == "gelir" else "📉"
+        date_str = f" ({tx_date.strftime('%d.%m')})" if tx_date != date.today() else ""
         tg_send(chat_id,
-            f"{icon} <b>{'Gelir' if parsed['type']=='gelir' else 'Gider'}: ₺{parsed['amount']:,.2f}</b>\n"
-            f"Kategori: {parsed['category']}\n"
-            f"Not: {parsed['description']}\n\n"
+            f"{icon} <b>{'Gelir' if parsed['type']=='gelir' else 'Gider'}: {_tg_fmt_amount(parsed['amount'])}</b>{date_str}\n"
+            f"📂 Kategori: {parsed['category']}\n"
+            f"📝 Not: {parsed['description']}\n\n"
             f"Kayıt edilsin mi?",
             reply_markup={
                 "inline_keyboard": [[
