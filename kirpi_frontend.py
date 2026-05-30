@@ -162,13 +162,13 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
 .main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden;min-width:0}
 @media(max-width:768px){
   nav{width:100%;height:auto;flex-direction:row;border-right:none;border-top:none;border-bottom:none;
-      position:fixed;bottom:0;top:auto;z-index:200;
+      position:fixed;bottom:0;left:0;right:0;top:auto;z-index:9999;
       padding-bottom:env(safe-area-inset-bottom,0px);
-      background:rgba(255,255,255,.82);
-      backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
-      box-shadow:0 -1px 0 rgba(0,0,0,.08),0 -8px 32px rgba(0,0,0,.06)}
-  [data-theme="dark"] nav{background:rgba(18,18,20,.88)}
-  .main{margin-left:0;margin-bottom:calc(62px + env(safe-area-inset-bottom,0px))}
+      background:rgba(255,255,255,.88);
+      backdrop-filter:blur(28px) saturate(200%);-webkit-backdrop-filter:blur(28px) saturate(200%);
+      box-shadow:0 -0.5px 0 rgba(0,0,0,.15),0 -12px 40px rgba(0,0,0,.08)}
+  [data-theme="dark"] nav{background:rgba(15,15,17,.9);box-shadow:0 -0.5px 0 rgba(255,255,255,.1),0 -12px 40px rgba(0,0,0,.5)}
+  .main{margin-left:0;margin-bottom:calc(58px + env(safe-area-inset-bottom,0px));position:relative;z-index:1}
   .nav-logo{display:none}
 }
 
@@ -190,14 +190,15 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
 
 /* ── MOBILE NAV — iOS Tab Bar style ── */
 @media(max-width:768px){
-  .nav-links{flex-direction:row;padding:4px 8px 0;gap:0;justify-content:space-around;align-items:flex-start;height:50px}
+  .nl-desktop-only{display:none!important}
+  .nav-links{flex-direction:row;padding:6px 0 0;gap:0;justify-content:space-around;align-items:flex-start;height:52px}
   .nav-sect{display:none}
-  .nl{flex-direction:column;gap:3px;font-size:.6rem;padding:4px 4px 2px;min-width:52px;flex:1;
-      max-width:80px;border-radius:0;box-shadow:none!important;background:transparent!important;align-items:center}
-  .nl .ico{font-size:1.4rem;width:28px;height:28px;display:flex;align-items:center;justify-content:center;
-           border-radius:0;background:transparent;transition:transform .15s cubic-bezier(.34,1.4,.64,1),opacity .15s}
-  .nl span:not(.ico){color:var(--txt2);transition:color .15s;font-weight:500;letter-spacing:-.01em;font-size:.59rem}
-  .nl.active .ico{transform:scale(1.08)}
+  .nl{flex-direction:column;gap:3px;font-size:.6rem;padding:0 4px 2px;min-width:0;flex:1;
+      border-radius:0;box-shadow:none!important;background:transparent!important;align-items:center}
+  .nl .ico{font-size:1.35rem;line-height:1.2;display:flex;align-items:center;justify-content:center;
+           background:transparent;transition:transform .15s cubic-bezier(.34,1.4,.64,1)}
+  .nl span:not(.ico){color:var(--txt2);transition:color .15s;font-weight:500;font-size:.58rem}
+  .nl.active .ico{transform:scale(1.1)}
   .nl.active span:not(.ico){color:var(--b);font-weight:700}
   .nl::after{display:none}
 }
@@ -583,7 +584,10 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 [data-theme="dark"] .top-header{background:rgba(10,12,18,.92)}
 @media(max-width:768px){.top-header{padding-left:16px;padding-right:16px;justify-content:space-between}}
 .top-header-logo{font-size:.95rem;font-weight:800;display:none;align-items:center;gap:8px;color:var(--txt)}
-@media(max-width:768px){.top-header-logo{display:flex}}
+@media(max-width:768px){
+  .top-header-logo{display:flex}
+  #hamburger-btn{display:flex!important}
+}
 .top-header-right{display:flex;align-items:center;gap:10px}
 .avatar-btn{
   width:36px;height:36px;border-radius:50%;
@@ -1013,18 +1017,18 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
   <div class="nav-links">
     <div class="nav-sect">Ana</div>
     <div class="nl active" data-page="dashboard" onclick="goPage('dashboard',this)">
-      <span class="ico">🏠</span>Anasayfa
+      <span class="ico">🏠</span>Ana
     </div>
     <div class="nl" data-page="ledger" onclick="goPage('ledger',this)">
       <span class="ico">📋</span>İşlemler
     </div>
     <div class="nl nl-add" data-page="add" onclick="goPage('add',this)">
-      <span class="ico">➕</span>Gider Ekle
+      <span class="ico">➕</span>Ekle
     </div>
     <div class="nl" data-page="todos" onclick="goPage('todos',this)">
       <span class="ico">✅</span>Görevler
     </div>
-    <div class="nl nl-more" onclick="openMoreSheet()">
+    <div class="nl nl-more nl-desktop-only" onclick="openMoreSheet()">
       <span class="ico">⋯</span>Daha
     </div>
 
@@ -1128,7 +1132,14 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 
 <!-- TOP HEADER -->
 <div class="top-header">
-  <div class="top-header-logo tappable" onclick="goPage('dashboard',document.querySelector('[data-page=dashboard]'))" style="cursor:pointer">🦔 Kirpi</div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <button id="hamburger-btn" onclick="openMoreSheet()" style="display:none;flex-direction:column;gap:4.5px;background:none;border:none;cursor:pointer;padding:4px;border-radius:8px;-webkit-tap-highlight-color:transparent" aria-label="Menü">
+      <span style="display:block;width:20px;height:2px;background:var(--txt);border-radius:2px;transition:.2s"></span>
+      <span style="display:block;width:16px;height:2px;background:var(--txt);border-radius:2px;transition:.2s"></span>
+      <span style="display:block;width:20px;height:2px;background:var(--txt);border-radius:2px;transition:.2s"></span>
+    </button>
+    <div class="top-header-logo tappable" onclick="goPage('dashboard',document.querySelector('[data-page=dashboard]'))" style="cursor:pointer">🦔 Kirpi</div>
+  </div>
   <div class="top-header-right">
     <div class="notif-bell-wrap">
       <button class="notif-bell" id="notif-bell" onclick="toggleNotifPanel()" title="Bildirimler">🔔</button>
