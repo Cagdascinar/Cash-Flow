@@ -484,6 +484,36 @@ def init_db():
 
 # ── EMAIL ─────────────────────────────────────────────────────────────────────
 
+# ── ACCOUNT LOCKOUT ───────────────────────────────────────────────────────────
+import threading as _threading
+_login_attempts: dict = {}  # {username: [timestamp, ...]}
+_lockout_lock = _threading.Lock()
+_MAX_ATTEMPTS = 5
+_LOCKOUT_SECS = 15 * 60  # 15 dakika
+
+def _record_failed_login(username: str):
+    now = time.time()
+    with _lockout_lock:
+        attempts = [t for t in _login_attempts.get(username, []) if now - t < _LOCKOUT_SECS]
+        attempts.append(now)
+        _login_attempts[username] = attempts
+
+def _is_locked_out(username: str) -> int:
+    """Returns seconds remaining, or 0 if not locked out."""
+    now = time.time()
+    with _lockout_lock:
+        attempts = [t for t in _login_attempts.get(username, []) if now - t < _LOCKOUT_SECS]
+        _login_attempts[username] = attempts
+        if len(attempts) >= _MAX_ATTEMPTS:
+            oldest = min(attempts)
+            remaining = int(_LOCKOUT_SECS - (now - oldest))
+            return max(remaining, 0)
+    return 0
+
+def _clear_login_attempts(username: str):
+    with _lockout_lock:
+        _login_attempts.pop(username, None)
+
 SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.zoho.eu")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
 
@@ -673,6 +703,17 @@ def _daily_backup_loop():
             send_backup_email(BACKUP_EMAIL)
         time.sleep(86400)  # 24 hours
 
+# ── INPUT VALIDATION ──────────────────────────────────────────────────────────
+_MAX_LEN = {
+    "username": 40, "display_name": 80, "email": 120,
+    "password": 128, "description": 500, "category": 60,
+    "note": 500, "name": 100,
+}
+
+def check_max_len(value: str, field: str) -> bool:
+    limit = _MAX_LEN.get(field, 300)
+    return len(value) <= limit
+
 # ── AUTH ──────────────────────────────────────────────────────────────────────
 
 def login_required(f):
@@ -701,10 +742,16 @@ def register():
         error = None
         if not username or not password or not email:
             error = "Kullanıcı adı, email ve şifre zorunlu"
+        elif not check_max_len(username, "username") or not username.replace("_","").replace("-","").isalnum():
+            error = "Kullanıcı adı en fazla 40 karakter, sadece harf/rakam/_ içerebilir"
         elif "@" not in email or "." not in email.split("@")[-1]:
             error = "Geçerli bir email adresi girin"
-        elif len(password) < 6:
-            error = "Şifre en az 6 karakter olmalı"
+        elif not check_max_len(email, "email"):
+            error = "Email adresi çok uzun"
+        elif len(password) < 8:
+            error = "Şifre en az 8 karakter olmalı"
+        elif not check_max_len(password, "password"):
+            error = "Şifre çok uzun"
         elif password != confirm:
             error = "Şifreler eşleşmiyor"
         if error:
@@ -740,11 +787,17 @@ def login():
             return AUTH_HTML_render("login", "Geçersiz istek. Lütfen sayfayı yenileyin."), 403
         username = request.form.get("username","").strip().lower()
         password = request.form.get("password","")
+        # Hesap kilitleme kontrolü
+        remaining = _is_locked_out(username)
+        if remaining > 0:
+            mins = remaining // 60 + 1
+            return AUTH_HTML_render("login", f"⛔ Çok fazla hatalı deneme. {mins} dakika sonra tekrar deneyin.")
         with pg_connect() as con:
             row = con.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
         if row and check_password_hash(row["password_hash"], password):
             if not row["email_verified"]:
                 return AUTH_HTML_render("login", "✉️ Email adresiniz doğrulanmamış. Şifreyi biliyorsanız <a href='/forgot-password' style='color:#818cf8'>şifre sıfırla</a> yaparak hem şifreyi sıfırlayın hem de emailinizi doğrulatın. Ya da <a href='/resend-verify' style='color:#818cf8'>yeni doğrulama maili al</a>.")
+            _clear_login_attempts(username)
             session.permanent   = True
             session["user_id"]  = row["id"]
             session["username"] = row["username"]
@@ -755,7 +808,10 @@ def login():
                     session["profile_id"]   = prof["id"]
                     session["profile_name"] = prof["name"]
                     session["profile_type"] = prof["type"]
+            log.info("Login success: %s", username)
             return redirect("/")
+        _record_failed_login(username)
+        log.warning("Login failed: %s from %s", username, request.remote_addr)
         return AUTH_HTML_render("login", "Kullanıcı adı veya şifre hatalı")
     msg = ""
     if request.args.get("verify_sent"):
@@ -2709,16 +2765,29 @@ def export_excel():
 @app.route("/api/export/pdf")
 @login_required
 def export_pdf():
-    pid   = get_pid()
-    db    = get_db()
+    pid     = get_pid()
+    db      = get_db()
     today_d = date.today()
-    year  = request.args.get("year",  today_d.year,  type=int)
-    month = request.args.get("month", today_d.month, type=int)
-    start, end = month_range(year, month)
 
     MONTHS_TR = ["","Ocak","Şubat","Mart","Nisan","Mayıs","Haziran",
                  "Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"]
-    period_label = f"{MONTHS_TR[month]} {year}"
+
+    # Tarih aralığı: önce start/end, yoksa year/month, yoksa bu ay
+    raw_start = request.args.get("start", "")
+    raw_end   = request.args.get("end",   "")
+    if raw_start and raw_end:
+        try:
+            date.fromisoformat(raw_start); date.fromisoformat(raw_end)
+            start, end = raw_start, raw_end
+            period_label = f"{start} — {end}"
+        except ValueError:
+            start, end = month_range(today_d.year, today_d.month)
+            period_label = f"{MONTHS_TR[today_d.month]} {today_d.year}"
+    else:
+        year  = request.args.get("year",  today_d.year,  type=int)
+        month = request.args.get("month", today_d.month, type=int)
+        start, end = month_range(year, month)
+        period_label = f"{MONTHS_TR[month]} {year}"
 
     profile = db.execute("SELECT name FROM profiles WHERE id=?", (pid,)).fetchone()
     prof_name = profile["name"] if profile else ""

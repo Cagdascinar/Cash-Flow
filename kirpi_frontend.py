@@ -5179,9 +5179,19 @@ function exportExcel(){
   window.location.href = '/api/export/excel';
 }
 function exportPDF(year, month){
-  var y = year  || curYear;
-  var m = month || curMonth;
-  window.open('/api/export/pdf?year='+y+'&month='+m,'_blank');
+  var fromEl = document.getElementById('f-date-from');
+  var toEl   = document.getElementById('f-date-to');
+  var from   = fromEl && fromEl.value;
+  var to     = toEl   && toEl.value;
+  var url;
+  if(from && to){
+    url = '/api/export/pdf?start='+from+'&end='+to;
+  } else {
+    var y = year  || curYear;
+    var m = month || curMonth;
+    url = '/api/export/pdf?year='+y+'&month='+m;
+  }
+  window.open(url, '_blank');
 }
 </script>
 
