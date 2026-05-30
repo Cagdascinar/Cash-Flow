@@ -1371,6 +1371,9 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
           </div>
         </div>
         <div class="udrop-divider"></div>
+        <!-- Abonelik satırı — JS tarafından doldurulur -->
+        <div id="udrop-sub-row" style="padding:8px 8px 0"></div>
+        <div class="udrop-divider" style="margin-top:4px"></div>
         <div class="udrop-actions">
           <button class="udrop-action" onclick="goPage('settings',document.querySelector('[data-page=settings]'));toggleUserMenu()">
             <span class="udrop-action-ico" style="background:#6366f118;color:var(--b2)">⚙️</span>Ayarlar
@@ -2305,6 +2308,38 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
       </div>
     </div>
     <button class="btn btn-primary" style="width:100%;padding:11px;font-size:.86rem" onclick="getTgCode()">🔗 Bağlantı Kodu Al</button>
+  </div>
+
+  <!-- Rapor Ayarları -->
+  <div class="settings-card">
+    <div class="settings-sect-title">📄 PDF Rapor Ayarları</div>
+    <p style="font-size:.8rem;color:var(--txt2);margin-bottom:14px">Raporlarda görünecek logo, firma adı ve iletişim bilgisi.</p>
+
+    <!-- Logo -->
+    <label style="font-size:.78rem;color:var(--txt2);margin-bottom:6px;display:block">Firma / Kişi Logosu</label>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <div id="report-logo-preview" style="width:64px;height:48px;border:1px dashed var(--border2);border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--bg3);overflow:hidden;flex-shrink:0">
+        <span style="font-size:.65rem;color:var(--txt2);text-align:center">Logo<br>yok</span>
+      </div>
+      <div>
+        <button class="btn btn-ghost" style="margin-bottom:6px" onclick="document.getElementById('report-logo-input').click()">📷 Logo Yükle</button>
+        <button class="btn btn-ghost" style="font-size:.75rem;color:var(--r)" onclick="clearReportLogo()">Kaldır</button>
+        <input type="file" id="report-logo-input" accept="image/*" style="display:none" onchange="handleReportLogoUpload(this)">
+        <div style="font-size:.68rem;color:var(--txt2);margin-top:4px">PNG, JPG, SVG — max 375 KB</div>
+      </div>
+    </div>
+
+    <label>Firma / Kişi Adı</label>
+    <input type="text" class="f-input" id="report-name-inp" placeholder="Örn: ABC Danışmanlık Ltd. Şti." style="margin-bottom:10px">
+
+    <label>İletişim / Adres <span style="color:var(--txt2);font-size:.7rem">(opsiyonel)</span></label>
+    <input type="text" class="f-input" id="report-contact-inp" placeholder="Örn: info@firma.com · 0212 000 00 00" style="margin-bottom:14px">
+
+    <!-- Tema seçici -->
+    <label style="font-size:.78rem;color:var(--txt2);margin-bottom:8px;display:block">Rapor Teması</label>
+    <div id="pdf-theme-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;margin-bottom:16px"></div>
+
+    <button class="btn btn-primary" onclick="saveReportSettings()" style="width:100%">Kaydet</button>
   </div>
 
   <div class="settings-card">
@@ -3248,6 +3283,7 @@ function initSettingsPage(){
   if(el) el.textContent=_curCode+' '+c.sym;
   _syncSoundToggleUI();
   initTelegramSection();
+  initReportSettings();
 }
 
 function _renderAccountCard(me){
@@ -3341,6 +3377,102 @@ function saveAccountInfo(){
       showToast('Bilgiler kaydedildi ✓','#22c55e');
     }
   });
+}
+
+// ── RAPOR AYARLARI ────────────────────────────────────────────────────────────
+var _reportLogo='';
+var _pdfTheme='profesyonel';
+var _PDF_THEMES=[
+  {key:'profesyonel',name:'Profesyonel',color:'#2563eb'},
+  {key:'minimal',name:'Minimal',color:'#111827'},
+  {key:'yeşil',name:'Doğa',color:'#16a34a'},
+  {key:'mor',name:'Modern',color:'#7c3aed'},
+  {key:'turuncu',name:'Sıcak',color:'#ea580c'},
+  {key:'lacivert',name:'Kurumsal',color:'#1e3a5f'},
+  {key:'kirmizi',name:'Dinamik',color:'#dc2626'},
+  {key:'siyah_beyaz',name:'Klasik B&W',color:'#000'},
+  {key:'pembe',name:'Şık',color:'#db2777'},
+  {key:'gri',name:'Gümüş',color:'#475569'},
+];
+
+function initReportSettings(){
+  // Tema grid'i çiz
+  var grid=document.getElementById('pdf-theme-grid');
+  if(!grid) return;
+  grid.innerHTML='';
+  _PDF_THEMES.forEach(function(t){
+    var div=document.createElement('div');
+    div.id='theme-btn-'+t.key;
+    div.style.cssText='cursor:pointer;border-radius:8px;padding:8px 6px;text-align:center;border:2px solid transparent;background:var(--bg3);transition:.15s';
+    div.innerHTML='<div style="width:100%;height:20px;border-radius:5px;background:'+t.color+';margin-bottom:5px"></div>'
+                 +'<div style="font-size:.68rem;color:var(--txt);font-weight:600">'+t.name+'</div>';
+    div.onclick=function(){ selectPdfTheme(t.key); };
+    grid.appendChild(div);
+  });
+  selectPdfTheme(_pdfTheme);
+
+  // Mevcut ayarları yükle
+  xhr('/api/me/report-settings',null,function(d){
+    var ni=document.getElementById('report-name-inp');
+    var ci=document.getElementById('report-contact-inp');
+    if(ni) ni.value=d.report_name||'';
+    if(ci) ci.value=d.report_contact||'';
+    if(d.report_logo){
+      _reportLogo=d.report_logo;
+      var prev=document.getElementById('report-logo-preview');
+      if(prev) prev.innerHTML='<img src="'+d.report_logo+'" style="max-width:100%;max-height:100%;object-fit:contain">';
+    }
+  });
+}
+
+function selectPdfTheme(key){
+  _pdfTheme=key;
+  _PDF_THEMES.forEach(function(t){
+    var el=document.getElementById('theme-btn-'+t.key);
+    if(!el) return;
+    el.style.borderColor=(t.key===key)?t.color:'transparent';
+    el.style.background=(t.key===key)?t.color+'18':'var(--bg3)';
+  });
+}
+
+function handleReportLogoUpload(input){
+  var file=input.files[0]; if(!file) return;
+  if(file.size>400000){ showToast('Logo en fazla 375 KB olmalı','#ef4444'); return; }
+  var reader=new FileReader();
+  reader.onload=function(e){
+    _reportLogo=e.target.result;
+    var prev=document.getElementById('report-logo-preview');
+    if(prev) prev.innerHTML='<img src="'+_reportLogo+'" style="max-width:100%;max-height:100%;object-fit:contain">';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearReportLogo(){
+  _reportLogo='';
+  var prev=document.getElementById('report-logo-preview');
+  if(prev) prev.innerHTML='<span style="font-size:.65rem;color:var(--txt2);text-align:center">Logo<br>yok</span>';
+}
+
+function saveReportSettings(){
+  var name=(document.getElementById('report-name-inp')||{}).value||'';
+  var contact=(document.getElementById('report-contact-inp')||{}).value||'';
+  xhr('/api/me/report-settings',{report_name:name,report_contact:contact,report_logo:_reportLogo},function(d){
+    if(d.ok) showToast('Rapor ayarları kaydedildi ✓','#22c55e');
+    else showToast(d.error||'Hata','#ef4444');
+  });
+}
+
+function exportPDFWithTheme(year,month){
+  var from=(document.getElementById('f-date-from')||{}).value;
+  var to=(document.getElementById('f-date-to')||{}).value;
+  var url;
+  if(from&&to){
+    url='/api/export/pdf?start='+from+'&end='+to+'&template='+_pdfTheme;
+  } else {
+    var y=year||curYear; var m=month||curMonth;
+    url='/api/export/pdf?year='+y+'&month='+m+'&template='+_pdfTheme;
+  }
+  window.open(url,'_blank');
 }
 
 function changePassword(){
@@ -5616,14 +5748,7 @@ function exportPDF(year, month){
   </div>
 </div>
 
-<!-- TRIAL BANNER -->
-<div id="trial-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:8500;background:linear-gradient(90deg,#6366f1,#a855f7);padding:8px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;box-shadow:0 2px 12px rgba(99,102,241,.4)">
-  <span id="trial-banner-text" style="font-size:.8rem;color:#fff;font-weight:600"></span>
-  <div style="display:flex;gap:8px;flex-shrink:0">
-    <a href="/premium" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:6px;padding:4px 10px;font-size:.75rem;font-weight:700;text-decoration:none">Premium Al</a>
-    <button onclick="this.parentElement.parentElement.style.display='none'" style="background:none;border:none;color:rgba(255,255,255,.7);font-size:.9rem;cursor:pointer;padding:0 4px">✕</button>
-  </div>
-</div>
+<!-- trial banner kaldırıldı — abonelik bilgisi profil dropdown'da gösterilmektedir -->
 
 <!-- PREMIUM REQUIRED MODAL -->
 <div id="premium-modal" style="display:none;position:fixed;inset:0;z-index:9200;background:rgba(0,0,0,.75);align-items:center;justify-content:center">
@@ -5646,23 +5771,31 @@ function loadSubStatus() {
   fetch('/api/me').then(r => r.json()).then(d => {
     if (!d.subscription) return;
     _kirpiSub = d.subscription;
-    if (_kirpiSub.status === 'trial' && _kirpiSub.days_left <= 7) {
-      var banner = document.getElementById('trial-banner');
-      var text   = document.getElementById('trial-banner-text');
-      if (banner && text) {
-        text.textContent = '🎁 Ücretsiz deneme süreniz: ' + _kirpiSub.days_left + ' gün kaldı';
-        banner.style.display = 'flex';
-      }
-    } else if (_kirpiSub.status === 'free') {
-      var banner = document.getElementById('trial-banner');
-      var text   = document.getElementById('trial-banner-text');
-      if (banner && text) {
-        text.textContent = '⚠️ Deneme süreniz doldu — bazı özellikler kilitli';
-        banner.style.display = 'flex';
-      }
-    }
+    _renderDropdownSubRow();
     applyPremiumLocks();
   }).catch(function(){});
+}
+
+function _renderDropdownSubRow() {
+  var el = document.getElementById('udrop-sub-row');
+  if (!el || !_kirpiSub) return;
+  var s = _kirpiSub;
+  if (s.status === 'premium') {
+    el.innerHTML = '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#22c55e12;border-radius:8px">'
+      + '<span style="font-size:.85rem">⭐</span>'
+      + '<div><div style="font-size:.78rem;font-weight:700;color:#22c55e">Premium Üye</div>'
+      + '<div style="font-size:.68rem;color:var(--txt2)">' + s.days_left + ' gün kaldı</div></div></div>';
+  } else if (s.status === 'trial') {
+    el.innerHTML = '<a href="/premium" style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#6366f112;border-radius:8px;text-decoration:none">'
+      + '<span style="font-size:.85rem">🎁</span>'
+      + '<div><div style="font-size:.78rem;font-weight:700;color:#818cf8">Deneme — ' + s.days_left + ' gün</div>'
+      + '<div style="font-size:.68rem;color:var(--txt2)">Premium\'a geç →</div></div></a>';
+  } else {
+    el.innerHTML = '<a href="/premium" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:linear-gradient(135deg,#6366f1,#a855f7);border-radius:8px;text-decoration:none">'
+      + '<span style="font-size:.9rem">🚀</span>'
+      + '<div><div style="font-size:.8rem;font-weight:800;color:#fff">Premium\'a Geç</div>'
+      + '<div style="font-size:.68rem;color:rgba(255,255,255,.75)">₺49/ay · Tüm özellikler</div></div></a>';
+  }
 }
 
 function isPremium() {

@@ -467,6 +467,9 @@ def init_db():
         ("users",        "avatar",          "TEXT NOT NULL DEFAULT ''"),
         ("accounts",     "limit_",          "DOUBLE PRECISION NOT NULL DEFAULT 0"),
         ("users",        "trial_start",     "TEXT NOT NULL DEFAULT ''"),
+        ("users",        "report_name",     "TEXT NOT NULL DEFAULT ''"),
+        ("users",        "report_contact",  "TEXT NOT NULL DEFAULT ''"),
+        ("users",        "report_logo",     "TEXT NOT NULL DEFAULT ''"),
     ]
     with pg_connect() as con:
         for stmt in stmts:
@@ -1060,6 +1063,35 @@ def api_me_delete():
         con.execute("DELETE FROM users WHERE id=%s", (uid,))
     session.clear()
     return jsonify({"ok": True})
+
+@app.route("/api/me/report-settings", methods=["GET"])
+@login_required
+def api_report_settings_get():
+    uid = session["user_id"]
+    db  = get_db()
+    row = db.execute("SELECT report_name,report_contact,report_logo FROM users WHERE id=?", (uid,)).fetchone()
+    if not row:
+        return jsonify({"report_name":"","report_contact":"","report_logo":""})
+    return jsonify({"report_name":row["report_name"],"report_contact":row["report_contact"],"report_logo":row["report_logo"]})
+
+@app.route("/api/me/report-settings", methods=["POST"])
+@login_required
+def api_report_settings_save():
+    uid  = session["user_id"]
+    data = request.get_json(force=True)
+    name    = (data.get("report_name") or "")[:120]
+    contact = (data.get("report_contact") or "")[:200]
+    logo    = data.get("report_logo") or ""
+    if logo:
+        safe_prefixes = ("data:image/png;base64,","data:image/jpeg;base64,","data:image/jpg;base64,","data:image/webp;base64,","data:image/svg+xml;base64,")
+        if not any(logo.startswith(p) for p in safe_prefixes):
+            return jsonify({"ok":False,"error":"Geçersiz logo formatı"}),400
+        if len(logo) > 500_000:
+            return jsonify({"ok":False,"error":"Logo dosyası çok büyük (max 375 KB)"}),400
+    db = get_db()
+    db.execute("UPDATE users SET report_name=%s,report_contact=%s,report_logo=%s WHERE id=%s",(name,contact,logo,uid))
+    db.commit()
+    return jsonify({"ok":True})
 
 def get_pid():
     """Return active profile_id from session (fallback: first profile of user)."""
@@ -2837,6 +2869,20 @@ def export_excel():
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
+# ── PDF TEMPLATE PALETLERİ ────────────────────────────────────────────────────
+PDF_TEMPLATES = {
+    "profesyonel":  {"name":"Profesyonel",  "accent":"#2563eb","accent2":"#1d4ed8","bg_head":"#2563eb","txt_head":"#fff","border":"#bfdbfe","row_alt":"#f0f7ff"},
+    "minimal":      {"name":"Minimal",      "accent":"#111827","accent2":"#374151","bg_head":"#111827","txt_head":"#fff","border":"#e5e7eb","row_alt":"#f9fafb"},
+    "yeşil":        {"name":"Doğa / Yeşil", "accent":"#16a34a","accent2":"#15803d","bg_head":"#16a34a","txt_head":"#fff","border":"#bbf7d0","row_alt":"#f0fdf4"},
+    "mor":          {"name":"Modern / Mor", "accent":"#7c3aed","accent2":"#6d28d9","bg_head":"#7c3aed","txt_head":"#fff","border":"#ddd6fe","row_alt":"#f5f3ff"},
+    "turuncu":      {"name":"Sıcak / Turuncu","accent":"#ea580c","accent2":"#c2410c","bg_head":"#ea580c","txt_head":"#fff","border":"#fed7aa","row_alt":"#fff7ed"},
+    "lacivert":     {"name":"Kurumsal",     "accent":"#1e3a5f","accent2":"#152e4d","bg_head":"#1e3a5f","txt_head":"#fff","border":"#c7d9f0","row_alt":"#f0f4f9"},
+    "kirmizi":      {"name":"Dinamik / Kırmızı","accent":"#dc2626","accent2":"#b91c1c","bg_head":"#dc2626","txt_head":"#fff","border":"#fecaca","row_alt":"#fff5f5"},
+    "siyah_beyaz":  {"name":"Klasik B&W",   "accent":"#000","accent2":"#333","bg_head":"#000","txt_head":"#fff","border":"#d1d5db","row_alt":"#f3f4f6"},
+    "pembe":        {"name":"Şık / Pembe",  "accent":"#db2777","accent2":"#be185d","bg_head":"#db2777","txt_head":"#fff","border":"#fbcfe8","row_alt":"#fdf2f8"},
+    "gri":          {"name":"Gümüş / Gri",  "accent":"#475569","accent2":"#334155","bg_head":"#475569","txt_head":"#fff","border":"#cbd5e1","row_alt":"#f8fafc"},
+}
+
 @app.route("/api/export/pdf")
 @premium_required
 def export_pdf():
@@ -2847,7 +2893,26 @@ def export_pdf():
     MONTHS_TR = ["","Ocak","Şubat","Mart","Nisan","Mayıs","Haziran",
                  "Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"]
 
+    # Template seçimi
+    tpl_key  = request.args.get("template", "profesyonel")
+    tpl      = PDF_TEMPLATES.get(tpl_key, PDF_TEMPLATES["profesyonel"])
+    accent   = tpl["accent"]
+    accent2  = tpl["accent2"]
+    bg_head  = tpl["bg_head"]
+    txt_head = tpl["txt_head"]
+    border   = tpl["border"]
+    row_alt  = tpl["row_alt"]
+
+    # Kullanıcı rapor ayarları (logo, firma adı, iletişim)
+    uid = session["user_id"]
+    urow = db.execute("SELECT report_name,report_contact,report_logo FROM users WHERE id=?", (uid,)).fetchone()
+    report_name    = (urow["report_name"]    if urow else "") or ""
+    report_contact = (urow["report_contact"] if urow else "") or ""
+    report_logo    = (urow["report_logo"]    if urow else "") or ""
+
     # Tarih aralığı: önce start/end, yoksa year/month, yoksa bu ay
+    year  = request.args.get("year",  today_d.year,  type=int)
+    month = request.args.get("month", today_d.month, type=int)
     raw_start = request.args.get("start", "")
     raw_end   = request.args.get("end",   "")
     if raw_start and raw_end:
@@ -2859,8 +2924,6 @@ def export_pdf():
             start, end = month_range(today_d.year, today_d.month)
             period_label = f"{MONTHS_TR[today_d.month]} {today_d.year}"
     else:
-        year  = request.args.get("year",  today_d.year,  type=int)
-        month = request.args.get("month", today_d.month, type=int)
         start, end = month_range(year, month)
         period_label = f"{MONTHS_TR[month]} {year}"
 
@@ -2919,48 +2982,65 @@ def export_pdf():
     net_color = "#1a7a46" if net >= 0 else "#c0392b"
     sign = "+" if net >= 0 else "−"
 
+    # Logo HTML
+    if report_logo:
+        logo_html = f'<img src="{report_logo}" style="max-height:52px;max-width:160px;object-fit:contain">'
+    else:
+        logo_html = f'<div style="font-size:1.6rem;font-weight:900;color:{txt_head};letter-spacing:-.02em">🦔 Kirpi</div>'
+
+    # Firma/kişi adı
+    display_name = html_escape(report_name) if report_name else "Kirpi Nakit Akışı"
+    contact_html = f'<div style="font-size:.72rem;opacity:.75;margin-top:2px">{html_escape(report_contact)}</div>' if report_contact else ""
+
+    safe_year  = str(year)
+    safe_month = f"{month:02d}"
+
     html = f"""<!DOCTYPE html>
 <html lang="tr"><head>
 <meta charset="UTF-8">
-<title>Kirpi Raporu — {period_label}</title>
+<title>Rapor — {period_label}</title>
 <style>
   *{{box-sizing:border-box;margin:0;padding:0}}
-  body{{font-family:'Helvetica Neue',Arial,sans-serif;color:#1c1c1e;background:#fff;padding:32px 40px;font-size:13px}}
-  @media print{{body{{padding:0}}@page{{margin:20mm 15mm}}.no-print{{display:none}}}}
-  .header{{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #007aff;padding-bottom:16px;margin-bottom:24px}}
-  .header-left h1{{font-size:1.5rem;font-weight:900;color:#007aff;letter-spacing:-.02em}}
-  .header-left p{{font-size:.85rem;color:#6d6d72;margin-top:3px}}
-  .header-right{{text-align:right;font-size:.8rem;color:#6d6d72;line-height:1.8}}
-  .summary{{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px}}
-  .card{{border:1px solid #e5e5ea;border-radius:12px;padding:16px;text-align:center}}
-  .card-lbl{{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6d6d72;margin-bottom:6px}}
-  .card-val{{font-size:1.35rem;font-weight:900}}
-  .section-title{{font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#6d6d72;margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid #e5e5ea}}
-  .two-col{{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px}}
-  table{{width:100%;border-collapse:collapse;font-size:.82rem}}
-  thead tr{{background:#f5f5f7}}
-  th{{text-align:left;padding:8px 10px;font-weight:700;color:#6d6d72;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em}}
-  td{{padding:7px 10px;border-bottom:1px solid #f0f0f0}}
+  body{{font-family:'Helvetica Neue',Arial,sans-serif;color:#1c1c1e;background:#fff;font-size:13px}}
+  @media print{{body{{}}@page{{margin:15mm 12mm}}.no-print{{display:none}}}}
+  .header{{background:{bg_head};color:{txt_head};padding:22px 32px;display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px}}
+  .header-right{{text-align:right;font-size:.78rem;opacity:.85;line-height:1.8}}
+  .body-wrap{{padding:0 32px 32px}}
+  .summary{{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px}}
+  .card{{border:1px solid {border};border-radius:10px;padding:14px;text-align:center}}
+  .card-lbl{{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6d6d72;margin-bottom:5px}}
+  .card-val{{font-size:1.3rem;font-weight:900}}
+  .section-title{{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:{accent};margin-bottom:12px;padding-bottom:5px;border-bottom:2px solid {border}}}
+  .two-col{{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px}}
+  table{{width:100%;border-collapse:collapse;font-size:.8rem}}
+  thead tr{{background:{bg_head};color:{txt_head}}}
+  th{{text-align:left;padding:8px 10px;font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em}}
+  td{{padding:7px 10px;border-bottom:1px solid {border}}}
+  tr:nth-child(even) td{{background:{row_alt}}}
   tr:last-child td{{border-bottom:none}}
-  .footer{{margin-top:28px;padding-top:12px;border-top:1px solid #e5e5ea;font-size:.72rem;color:#aaa;text-align:center}}
-  .print-btn{{position:fixed;bottom:24px;right:24px;background:#007aff;color:#fff;border:none;border-radius:12px;padding:12px 20px;font-size:.9rem;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(0,122,255,.4)}}
-  .print-btn:hover{{background:#0062cc}}
+  .footer{{margin-top:24px;padding-top:10px;border-top:1px solid {border};font-size:.68rem;color:#aaa;text-align:center;display:flex;justify-content:space-between;align-items:center}}
+  .print-btn{{position:fixed;bottom:20px;right:20px;background:{accent};color:#fff;border:none;border-radius:10px;padding:11px 18px;font-size:.88rem;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.25)}}
 </style>
 </head>
 <body>
 
 <div class="header">
-  <div class="header-left">
-    <h1>🦔 Kirpi</h1>
-    <p>{html_escape(prof_name)} · {period_label} Finansal Raporu</p>
+  <div style="display:flex;align-items:center;gap:16px">
+    {logo_html}
+    <div>
+      <div style="font-size:.95rem;font-weight:800;margin-bottom:1px">{display_name}</div>
+      {contact_html}
+    </div>
   </div>
   <div class="header-right">
-    <div>Rapor Tarihi: {today_d.strftime('%d.%m.%Y')}</div>
-    <div>Dönem: {start} / {end}</div>
-    <div>İşlem Sayısı: {len(txns)}</div>
+    <div style="font-weight:700;font-size:.9rem;margin-bottom:2px">{html_escape(prof_name)}</div>
+    <div>{period_label} Finansal Raporu</div>
+    <div>Tarih: {today_d.strftime('%d.%m.%Y')}</div>
+    <div>{len(txns)} işlem</div>
   </div>
 </div>
 
+<div class="body-wrap">
 <div class="summary">
   <div class="card" style="border-color:#34c75930;background:#f0fdf4">
     <div class="card-lbl">Toplam Gelir</div>
@@ -2970,7 +3050,7 @@ def export_pdf():
     <div class="card-lbl">Toplam Gider</div>
     <div class="card-val" style="color:#c0392b">₺{fmt(gider_total)}</div>
   </div>
-  <div class="card" style="border-color:#007aff30;background:#f0f6ff">
+  <div class="card" style="border-color:{border};background:{row_alt}">
     <div class="card-lbl">Net</div>
     <div class="card-val" style="color:{net_color}">{sign}₺{fmt(abs(net))}</div>
   </div>
@@ -2993,14 +3073,16 @@ def export_pdf():
   <tbody>{tx_rows if tx_rows else '<tr><td colspan="4" style="text-align:center;color:#888;padding:20px">Bu dönemde işlem yok</td></tr>'}</tbody>
 </table>
 
-<div class="footer">Kirpi Nakit Akışı · Oluşturulma: {datetime.now().strftime('%d.%m.%Y %H:%M')}</div>
+<div class="footer">
+  <span>{display_name}</span>
+  <span>Kirpi · {datetime.now().strftime('%d.%m.%Y %H:%M')}</span>
+</div>
+</div>
 
 <button class="print-btn no-print" onclick="window.print()">🖨️ Yazdır / PDF Kaydet</button>
 <script>
 window.addEventListener('load', function() {{
-  if(window.matchMedia && !window.matchMedia('print').matches) {{
-    document.title = 'Kirpi_{year}_{month:02d}';
-  }}
+  document.title = 'Rapor_{safe_year}_{safe_month}';
 }});
 </script>
 </body></html>"""
