@@ -2154,9 +2154,34 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
   <div class="page-title">Ayarlar</div>
   <div class="page-sub">Hesap bilgileri ve uygulama tercihleri</div>
 
+  <!-- ── HESAP KARTI (LinkedIn tarzı) ── -->
+  <div id="settings-account-card" style="background:linear-gradient(135deg,var(--bg2) 0%,var(--bg3) 100%);border:1px solid var(--border);border-radius:18px;padding:0;margin-bottom:16px;overflow:hidden">
+    <!-- Üst bant -->
+    <div style="height:72px;background:linear-gradient(135deg,#6366f1,#a855f7);position:relative">
+      <div id="settings-account-avatar-wrap" style="position:absolute;bottom:-28px;left:20px;width:56px;height:56px;border-radius:50%;background:var(--bg2);border:3px solid var(--bg2);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1.5rem" id="settings-account-avatar"></div>
+    </div>
+    <!-- Bilgiler -->
+    <div style="padding:36px 20px 20px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div style="min-width:0">
+          <div id="acct-display-name" style="font-size:1.1rem;font-weight:800;color:var(--txt);margin-bottom:2px">—</div>
+          <div id="acct-username" style="font-size:.78rem;color:var(--txt2);margin-bottom:6px">—</div>
+          <div id="acct-email" style="font-size:.76rem;color:var(--txt2)">—</div>
+        </div>
+        <!-- Plan badge -->
+        <div id="acct-plan-badge" style="flex-shrink:0"></div>
+      </div>
+      <!-- Plan detay + aksiyon butonu -->
+      <div id="acct-plan-detail" style="margin-top:16px;padding:12px 14px;border-radius:10px;background:var(--bg3);border:1px solid var(--border2)">
+        <div id="acct-plan-text" style="font-size:.82rem;color:var(--txt2);margin-bottom:10px">Yükleniyor...</div>
+        <a id="acct-plan-btn" href="/premium" style="display:inline-block;padding:8px 18px;border-radius:8px;font-size:.82rem;font-weight:700;text-decoration:none;background:linear-gradient(135deg,#6366f1,#a855f7);color:#fff">🚀 Premium'a Geç</a>
+      </div>
+    </div>
+  </div>
+
   <!-- Avatar + Account -->
   <div class="settings-card">
-    <div class="settings-sect-title">Profil</div>
+    <div class="settings-sect-title">Profil Bilgileri</div>
     <div class="avatar-upload-wrap">
       <div class="avatar-lg" id="settings-avatar-img">?</div>
       <div>
@@ -3215,6 +3240,7 @@ function initSettingsPage(){
     if(dn) dn.textContent=me.display||me.username||'—';
     if(un) un.textContent='@'+(me.username||'');
     setAvatarDisplay(me.avatar, me.display||me.username||'?');
+    _renderAccountCard(me);
   });
   renderSettingsProfiles();
   var el=document.getElementById('cur-label');
@@ -3222,6 +3248,47 @@ function initSettingsPage(){
   if(el) el.textContent=_curCode+' '+c.sym;
   _syncSoundToggleUI();
   initTelegramSection();
+}
+
+function _renderAccountCard(me){
+  // Avatar
+  var avatarWrap=document.getElementById('settings-account-avatar-wrap');
+  if(avatarWrap){
+    if(me.avatar){
+      avatarWrap.innerHTML='<img src="'+me.avatar+'" style="width:100%;height:100%;object-fit:cover">';
+    } else {
+      var initials=(me.display||me.username||'?').charAt(0).toUpperCase();
+      avatarWrap.innerHTML='<span style="font-size:1.3rem;font-weight:800;color:#818cf8">'+initials+'</span>';
+    }
+  }
+  // Metin
+  var el=document.getElementById('acct-display-name');
+  if(el) el.textContent=me.display||me.username||'—';
+  el=document.getElementById('acct-username');
+  if(el) el.textContent='@'+(me.username||'');
+  el=document.getElementById('acct-email');
+  if(el) el.textContent=me.email||'';
+
+  // Abonelik
+  var sub=me.subscription||{status:'free',is_premium:false,days_left:0};
+  var badge=document.getElementById('acct-plan-badge');
+  var detail=document.getElementById('acct-plan-detail');
+  var planText=document.getElementById('acct-plan-text');
+  var planBtn=document.getElementById('acct-plan-btn');
+
+  if(sub.status==='trial'){
+    if(badge) badge.innerHTML='<span style="background:#6366f120;color:#818cf8;border:1px solid #6366f140;border-radius:20px;padding:4px 12px;font-size:.72rem;font-weight:700">🎁 Deneme</span>';
+    if(planText) planText.textContent='Ücretsiz deneme süreniz: '+sub.days_left+' gün kaldı. Tüm Premium özellikler açık.';
+    if(planBtn){ planBtn.textContent='Premium\'a Geç →'; planBtn.style.display='inline-block'; }
+  } else if(sub.status==='premium'){
+    if(badge) badge.innerHTML='<span style="background:#22c55e20;color:#22c55e;border:1px solid #22c55e40;border-radius:20px;padding:4px 12px;font-size:.72rem;font-weight:700">⭐ Premium</span>';
+    if(planText) planText.textContent='Aktif Premium üyelik — '+sub.days_left+' gün kaldı.';
+    if(planBtn){ planBtn.textContent='Planı Görüntüle'; planBtn.style.background='#1e2233'; }
+  } else {
+    if(badge) badge.innerHTML='<span style="background:var(--bg3);color:var(--txt2);border:1px solid var(--border2);border-radius:20px;padding:4px 12px;font-size:.72rem;font-weight:700">Ücretsiz</span>';
+    if(planText) planText.innerHTML='<strong style="color:var(--txt)">Deneme süreniz doldu.</strong> Yatırım, export, Telegram ve AI analiz özellikleri Premium gerektiriyor.';
+    if(planBtn){ planBtn.textContent='🚀 Premium\'a Geç — ₺49/ay'; planBtn.style.display='inline-block'; }
+  }
 }
 
 // ── TELEGRAM ─────────────────────────────────────────────────────────────────
