@@ -279,24 +279,29 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
   animation:kirpi-walk-to-money 3.5s ease forwards;
 }
 @keyframes kirpi-walk-to-money{
-  0%  {opacity:0;left:5%;transform:scaleX(-1) translateY(0)}
-  8%  {opacity:1;left:5%;transform:scaleX(-1) translateY(0)}
-  /* Yürüyüş adımları */
-  15% {left:18%;transform:scaleX(-1) translateY(-4px)}
-  20% {left:24%;transform:scaleX(-1) translateY(0)}
-  25% {left:30%;transform:scaleX(-1) translateY(-4px)}
-  30% {left:36%;transform:scaleX(-1) translateY(0)}
-  35% {left:42%;transform:scaleX(-1) translateY(-4px)}
-  40% {left:48%;transform:scaleX(-1) translateY(0)}
-  45% {left:54%;transform:scaleX(-1) translateY(-4px)}
-  50% {left:58%;transform:scaleX(-1) translateY(0)}
-  /* Paraya ulaştı — sevinç */
-  55% {left:58%;transform:scaleX(1) translateY(0)}
-  62% {left:58%;transform:scaleX(1) translateY(-20px) rotate(-10deg)}
-  68% {left:58%;transform:scaleX(1) translateY(0) rotate(8deg)}
-  74% {left:58%;transform:scaleX(1) translateY(-12px) rotate(-5deg)}
-  80% {left:58%;transform:scaleX(1) translateY(0) rotate(3deg)}
-  100%{left:58%;transform:scaleX(1) translateY(0) rotate(0deg);opacity:1}
+  0%  {opacity:0;left:5%;transform:scaleX(-1) translateY(0) scale(1)}
+  8%  {opacity:1;left:5%;transform:scaleX(-1) translateY(0) scale(1)}
+  /* Yürüyüş adımları — sağa doğru */
+  14% {left:16%;transform:scaleX(-1) translateY(-5px) scale(1)}
+  18% {left:22%;transform:scaleX(-1) translateY(0)    scale(1)}
+  22% {left:28%;transform:scaleX(-1) translateY(-5px) scale(1)}
+  26% {left:34%;transform:scaleX(-1) translateY(0)    scale(1)}
+  30% {left:40%;transform:scaleX(-1) translateY(-5px) scale(1)}
+  34% {left:46%;transform:scaleX(-1) translateY(0)    scale(1)}
+  38% {left:52%;transform:scaleX(-1) translateY(-5px) scale(1)}
+  42% {left:56%;transform:scaleX(-1) translateY(0)    scale(1)}
+  /* Durdu, ekrana döndü */
+  47% {left:56%;transform:scaleX(1) translateY(0) scale(1)}
+  /* Kollarını açarak sevinç — ekrana bakıyor */
+  53% {left:56%;transform:scaleX(1) translateY(-22px) scale(1.4) rotate(-12deg)}
+  58% {left:56%;transform:scaleX(1) translateY(0)     scale(1.5) rotate(0deg)}
+  63% {left:56%;transform:scaleX(1) translateY(-16px) scale(1.4) rotate(14deg)}
+  68% {left:56%;transform:scaleX(1) translateY(0)     scale(1.5) rotate(0deg)}
+  73% {left:56%;transform:scaleX(1) translateY(-10px) scale(1.4) rotate(-8deg)}
+  78% {left:56%;transform:scaleX(1) translateY(0)     scale(1.3) rotate(0deg)}
+  /* Ekrana gülümseyerek bakıyor, büyük kaldı */
+  85% {left:56%;transform:scaleX(1) translateY(-5px)  scale(1.35) rotate(0deg)}
+  100%{left:56%;transform:scaleX(1) translateY(0)     scale(1.3)  rotate(0deg);opacity:1}
 }
 
 /* Alt yazı */
@@ -1140,8 +1145,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 
   <!-- Alt yazı -->
   <div class="splash-bottom">
-    <div class="splash-name">Kirpi <span style="color:#848e9c;font-weight:400;font-size:1.4rem">Finans</span></div>
-    <div class="splash-tag">Nakit Akışını Kontrol Et</div>
+    <div class="splash-name">Kirpi <span style="color:#f0b90b;font-weight:900">Finans</span></div>
     <div class="splash-dots">
       <span></span><span></span><span></span>
     </div>
