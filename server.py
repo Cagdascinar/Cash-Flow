@@ -2964,6 +2964,103 @@ def goals_analysis():
 def categories():
     return jsonify({"gelir":GELIR_CATS,"gider":GIDER_CATS,"all":ALL_CATS})
 
+@app.route("/api/insights")
+@login_required
+def insights():
+    pid     = get_pid(); db = get_db()
+    today_d = date.today()
+
+    # Bu ay ve geçen ay aralıkları
+    cur_start, cur_end   = month_range(today_d.year, today_d.month)
+    prev_month = today_d.month - 1 if today_d.month > 1 else 12
+    prev_year  = today_d.year if today_d.month > 1 else today_d.year - 1
+    prv_start, prv_end   = month_range(prev_year, prev_month)
+
+    def period_totals(start, end):
+        rows = db.execute(
+            "SELECT type, category, SUM(amount) as t FROM transactions "
+            "WHERE profile_id=? AND date BETWEEN ? AND ? GROUP BY type, category",
+            (pid, start, end)
+        ).fetchall()
+        gelir, gider, cats = 0.0, 0.0, {}
+        for r in rows:
+            if r["type"] == "gelir": gelir += r["t"]
+            else:
+                gider += r["t"]
+                cats[r["category"]] = r["t"]
+        return gelir, gider, cats
+
+    cur_g, cur_z, cur_cats = period_totals(cur_start, cur_end)
+    prv_g, prv_z, prv_cats = period_totals(prv_start, prv_end)
+
+    # Tasarruf oranı
+    savings_rate = round((cur_g - cur_z) / cur_g * 100) if cur_g > 0 else 0
+
+    # Skor (0-100)
+    score = max(0, min(100, savings_rate + 50))
+
+    # Motivasyon mesajı
+    if savings_rate >= 30:
+        msg = "Harika gidiyor! Bu ay gelirinin büyük kısmını biriktiriyorsun 🌟"
+        emoji = "🟢"
+    elif savings_rate >= 10:
+        msg = "İyi gidişat! Harcamalarını biraz daha kontrol altına alabilirsin 💪"
+        emoji = "🟡"
+    elif savings_rate >= 0:
+        msg = "Dikkat! Gelirinin neredeyse tamamını harcıyorsun 🔔"
+        emoji = "🟠"
+    else:
+        msg = "Uyarı! Bu ay gelirinden fazla harcama yapıyorsun ⚠️"
+        emoji = "🔴"
+
+    # Geçen aya göre kıyaslama
+    z_change = round((cur_z - prv_z) / prv_z * 100) if prv_z > 0 else 0
+    g_change = round((cur_g - prv_g) / prv_g * 100) if prv_g > 0 else 0
+
+    # Anomali tespiti — önceki aya göre >%25 artan kategoriler
+    anomalies = []
+    for cat, amt in cur_cats.items():
+        prev = prv_cats.get(cat, 0)
+        if prev > 0:
+            pct = round((amt - prev) / prev * 100)
+            if pct >= 25:
+                anomalies.append({"cat": cat, "pct": pct, "cur": round(amt), "prv": round(prev)})
+    anomalies.sort(key=lambda x: -x["pct"])
+
+    # Nakit akış tahmini — bu ayki harcama hızıyla kaç gün dayanır
+    days_passed = today_d.day
+    daily_burn  = cur_z / days_passed if days_passed > 0 else 0
+    # Toplam hesap bakiyesi
+    acc_bal = db.execute(
+        "SELECT COALESCE(SUM(initial_balance),0) + COALESCE((SELECT SUM(CASE WHEN type='gelir' THEN amount ELSE -amount END) FROM transactions WHERE profile_id=?),0) as b FROM accounts WHERE profile_id=? AND active=1",
+        (pid, pid)
+    ).fetchone()
+    total_balance = float(acc_bal["b"] or 0) if acc_bal else 0
+    days_left = round(total_balance / daily_burn) if daily_burn > 0 else 999
+
+    # Net worth
+    invest_val = db.execute(
+        "SELECT COALESCE(SUM(quantity * buy_price),0) as v FROM investments WHERE profile_id=?", (pid,)
+    ).fetchone()["v"] or 0
+    card_debt = db.execute(
+        "SELECT COALESCE(SUM(used_),0) as d FROM cards WHERE profile_id=?", (pid,)
+    ).fetchone()["d"] or 0
+    net_worth = round(total_balance + float(invest_val) - float(card_debt))
+
+    return jsonify({
+        "score": score,
+        "savings_rate": savings_rate,
+        "msg": msg,
+        "emoji": emoji,
+        "cur_gelir": round(cur_g), "cur_gider": round(cur_z),
+        "prv_gelir": round(prv_g), "prv_gider": round(prv_z),
+        "gelir_change": g_change, "gider_change": z_change,
+        "anomalies": anomalies[:3],
+        "days_left": days_left,
+        "daily_burn": round(daily_burn),
+        "net_worth": net_worth,
+    })
+
 @app.route("/api/today")
 @login_required
 def today_summary():

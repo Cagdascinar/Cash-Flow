@@ -1170,6 +1170,57 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
     <span id="s-gider-sub" style="display:none"></span>
   </div>
 
+  <!-- ── INSIGHTS ── -->
+  <div id="insights-section" style="display:none">
+
+    <!-- Skor Kartı -->
+    <div id="score-card" style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:16px 18px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt2)">Aylık Finansal Skor</div>
+        <div id="ins-emoji" style="font-size:1.1rem"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+        <div style="flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden">
+          <div id="ins-score-bar" style="height:100%;border-radius:4px;background:linear-gradient(90deg,#34c759,#007aff);transition:width .8s cubic-bezier(.4,0,.2,1);width:0%"></div>
+        </div>
+        <div id="ins-score-val" style="font-size:1.1rem;font-weight:900;color:var(--txt);min-width:40px;text-align:right">—</div>
+      </div>
+      <div id="ins-msg" style="font-size:.82rem;color:var(--txt2);line-height:1.5"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+        <div style="background:var(--bg3);border-radius:10px;padding:10px 12px">
+          <div style="font-size:.65rem;color:var(--txt2);font-weight:700;text-transform:uppercase;margin-bottom:3px">Gelir Değişimi</div>
+          <div id="ins-gelir-chg" style="font-size:.92rem;font-weight:800">—</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:10px;padding:10px 12px">
+          <div style="font-size:.65rem;color:var(--txt2);font-weight:700;text-transform:uppercase;margin-bottom:3px">Gider Değişimi</div>
+          <div id="ins-gider-chg" style="font-size:.92rem;font-weight:800">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Anomali -->
+    <div id="anomaly-card" style="display:none;background:var(--bg2);border:1.5px solid #ff950030;border-radius:16px;padding:16px 18px;margin-bottom:12px">
+      <div style="font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#ff9500;margin-bottom:10px">⚠️ Dikkat — Artan Harcamalar</div>
+      <div id="anomaly-list"></div>
+    </div>
+
+    <!-- Nakit Akış Tahmini + Net Worth -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div style="background:linear-gradient(135deg,#1e2845,#161c33);border:1px solid #6366f133;border-radius:16px;padding:14px">
+        <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.5);margin-bottom:6px">Nakit Yeterlilik</div>
+        <div id="ins-days" style="font-size:1.4rem;font-weight:900;color:#fff">—</div>
+        <div style="font-size:.72rem;color:rgba(255,255,255,.45);margin-top:3px">gün daha dayanır</div>
+        <div id="ins-burn" style="font-size:.72rem;color:rgba(255,255,255,.4);margin-top:2px"></div>
+      </div>
+      <div style="background:linear-gradient(135deg,#0d2118,#0a1a12);border:1px solid #22c55e22;border-radius:16px;padding:14px">
+        <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.5);margin-bottom:6px">Net Varlık</div>
+        <div id="ins-networth" style="font-size:1.2rem;font-weight:900;color:#4ade80">—</div>
+        <div style="font-size:.72rem;color:rgba(255,255,255,.4);margin-top:3px">hesap + yatırım − borç</div>
+      </div>
+    </div>
+
+  </div>
+
   <!-- ── GÜNÜN GELİRLERİ ── -->
   <div class="dash-section">
     <div class="s-header" onclick="toggleSection('gelir')">
@@ -2113,6 +2164,68 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 <div id="toast"></div>
 
 <script>
+// ── INSIGHTS ─────────────────────────────────────────────────────────────────
+function loadInsights(){
+  xhr('/api/insights',null,function(d){
+    if(!d) return;
+    var sec=document.getElementById('insights-section');
+    if(sec) sec.style.display='block';
+
+    // Skor
+    var bar=document.getElementById('ins-score-bar');
+    var val=document.getElementById('ins-score-val');
+    var msg=document.getElementById('ins-msg');
+    var em=document.getElementById('ins-emoji');
+    if(bar) setTimeout(function(){bar.style.width=d.score+'%'},100);
+    if(val) val.textContent=d.score+'/100';
+    if(msg) msg.textContent=d.msg;
+    if(em) em.textContent=d.emoji;
+
+    // Değişimler
+    function chgHtml(pct){
+      var sign=pct>=0?'▲':'▼';
+      var color=pct>=0?'var(--g)':'var(--r)';
+      return '<span style="color:'+color+'">'+sign+' %'+Math.abs(pct)+'</span> geçen aya göre';
+    }
+    var gc=document.getElementById('ins-gelir-chg');
+    var zc=document.getElementById('ins-gider-chg');
+    if(gc) gc.innerHTML=chgHtml(d.gelir_change);
+    if(zc) zc.innerHTML=chgHtml(-d.gider_change);
+
+    // Anomaliler
+    if(d.anomalies && d.anomalies.length>0){
+      var ac=document.getElementById('anomaly-card');
+      var al=document.getElementById('anomaly-list');
+      if(ac) ac.style.display='block';
+      if(al){
+        al.innerHTML=d.anomalies.map(function(a){
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">'
+            +'<div><div style="font-size:.84rem;font-weight:700;color:var(--txt)">'+a.cat+'</div>'
+            +'<div style="font-size:.72rem;color:var(--txt2)">₺'+a.prv+' → ₺'+a.cur+'</div></div>'
+            +'<div style="font-size:.9rem;font-weight:900;color:#ff9500">+%'+a.pct+'</div></div>';
+        }).join('');
+      }
+    }
+
+    // Nakit yeterlilik
+    var days=document.getElementById('ins-days');
+    var burn=document.getElementById('ins-burn');
+    if(days){
+      var dval=d.days_left;
+      days.textContent=dval>365?'365+':dval;
+      days.style.color=dval<30?'#ff3b30':dval<90?'#ff9500':'#fff';
+    }
+    if(burn && d.daily_burn>0) burn.textContent='Günlük ₺'+d.daily_burn+' harcıyorsun';
+
+    // Net worth
+    var nw=document.getElementById('ins-networth');
+    if(nw){
+      nw.textContent=(d.net_worth>=0?'':'−')+'₺'+Math.abs(d.net_worth).toLocaleString('tr-TR');
+      nw.style.color=d.net_worth>=0?'#4ade80':'#f87171';
+    }
+  });
+}
+
 // ── ACCOUNT DELETION ─────────────────────────────────────────────────────────
 function showDeleteAccountModal(){
   var m=document.getElementById('delete-account-modal');
@@ -2166,6 +2279,7 @@ var _todayDate=new Date().toISOString().split('T')[0];
 // ── INIT ─────────────────────────────────────────────────────────────────────
 window.onload=function(){
   _syncDarkModeUI();
+  loadInsights();
   var todayISO=new Date().toISOString().split('T')[0];
   document.getElementById('f-date').value=todayISO;
   var dpick=document.getElementById('today-date-pick');
