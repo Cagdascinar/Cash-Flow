@@ -284,102 +284,70 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 .more-sheet.open{transform:translateY(0)}
 .more-backdrop.open{display:block}
 /* ── SPLASH SCREEN ── */
-#splash-screen{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;
-  background:#0b0e11;transition:opacity .5s ease,transform .5s ease}
+#splash-screen{
+  position:fixed;inset:0;z-index:99999;
+  background:#0b0e11;
+  transition:opacity .5s ease;
+}
 #splash-screen.hide{opacity:0;pointer-events:none}
-.splash-bg{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,rgba(240,185,11,.08),transparent 70%)}
-.splash-content{display:flex;flex-direction:column;align-items:center;gap:12px;position:relative}
-/* ── Splash layout ── */
-#splash-screen{position:fixed;inset:0;z-index:99999;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:#0b0e11;transition:opacity .6s ease}
-#splash-screen.hide{opacity:0;pointer-events:none}
-.splash-bg{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 35%,rgba(240,185,11,.1),transparent 65%)}
 
-/* Para yığını — SAĞ TARAFTA sabit, kirpi buraya doğru yürüyor */
+/* Para yığını — sağ tarafta */
 .splash-money{
   position:absolute;
-  right:10%; top:50%;
-  transform:translateY(-55%);
-  display:flex;flex-direction:column;align-items:center;gap:3px;
-  pointer-events:none;
+  right:8%; top:50%;
+  transform:translateY(-60%);
+  display:flex;flex-direction:column;align-items:center;gap:4px;
 }
-.sm-coin{font-size:2.2rem;display:block;opacity:0}
-.sm-c1{animation:coin-appear .3s .3s ease forwards}
-.sm-c2{animation:coin-appear .3s .45s ease forwards;font-size:1.9rem}
-.sm-c3{animation:coin-appear .3s .6s ease forwards;font-size:1.7rem}
-.sm-c4{animation:coin-appear .3s .75s ease forwards;font-size:1.5rem}
-.sm-c5{animation:coin-appear .3s .9s ease forwards;font-size:1.3rem}
-@keyframes coin-appear{
-  from{opacity:0;transform:scale(.4) translateY(8px)}
-  to{opacity:1;transform:scale(1) translateY(0)}
-}
+.sm-coin{font-size:2.4rem;opacity:0;display:block}
+.sm-c1{animation:sc-in .3s .2s ease both}
+.sm-c2{animation:sc-in .3s .35s ease both;font-size:2rem}
+.sm-c3{animation:sc-in .3s .5s ease both;font-size:1.8rem}
+.sm-c4{animation:sc-in .3s .65s ease both;font-size:1.6rem}
+.sm-c5{animation:sc-in .3s .8s ease both;font-size:1.4rem}
+@keyframes sc-in{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
 
-/* Kirpi — soldan sağa yürüyor, paraya ulaşıyor, sevinçle zıplıyor */
+/* Kirpi — sol:4% başlar, translateX ile sağa yürür */
 .splash-kirpi{
+  position:absolute;
   font-size:4.5rem;
-  position:absolute;
-  top:50%; margin-top:-2.8rem;
-  left:4%;                        /* başlangıç: sol taraf */
+  left:4%; top:50%;
+  margin-top:-2.8rem;
   opacity:0;
-  animation:kirpi-walk 3.6s ease forwards;
-  transition:filter .4s ease;
+  will-change:transform,opacity;
+  animation:kw 3.8s ease forwards;
 }
-.splash-kirpi.glow{
-  filter:drop-shadow(0 0 24px rgba(240,185,11,.9)) drop-shadow(0 0 10px rgba(240,185,11,.5));
-}
-@keyframes kirpi-walk{
-  /* 1. Belirir */
-  0%  {left:4%;  opacity:0; transform:translateY(0) scale(.9)}
-  6%  {left:4%;  opacity:1; transform:translateY(0) scale(1)}
-  /* 2. Yürüyüş — adım adım hoplar */
-  13% {left:16%; transform:translateY(-10px) scale(1)}
-  19% {left:28%; transform:translateY(2px)   scale(1)}
-  25% {left:40%; transform:translateY(-10px) scale(1)}
-  31% {left:52%; transform:translateY(2px)   scale(1)}
-  37% {left:60%; transform:translateY(-10px) scale(1)}
-  43% {left:66%; transform:translateY(0)     scale(1)}
-  /* 3. Paraya ulaştı — sevinç zıplaması */
-  49% {left:66%; transform:translateY(-26px) scale(1.3) rotate(10deg)}
-  55% {left:66%; transform:translateY(2px)   scale(1)   rotate(0)}
-  /* 4. İkinci zıplama */
-  61% {left:66%; transform:translateY(-18px) scale(1.2) rotate(-6deg)}
-  67% {left:66%; transform:translateY(2px)   scale(1)   rotate(0)}
-  /* 5. Yerleşti — mutlu, sakin, glow ile */
-  76% {left:66%; transform:translateY(-6px)  scale(1.15)}
-  84% {left:66%; transform:translateY(0)     scale(1.12)}
-  92% {left:66%; transform:translateY(-3px)  scale(1.13)}
-  100%{left:66%; transform:translateY(0)     scale(1.12); opacity:1}
+@keyframes kw{
+  0%  {opacity:0;transform:translateX(0)    translateY(0)     scale(.9)}
+  6%  {opacity:1;transform:translateX(0)    translateY(0)     scale(1)}
+  13% {transform:translateX(12vw) translateY(-12px) scale(1)}
+  19% {transform:translateX(24vw) translateY(4px)   scale(1)}
+  25% {transform:translateX(36vw) translateY(-12px) scale(1)}
+  31% {transform:translateX(48vw) translateY(4px)   scale(1)}
+  37% {transform:translateX(56vw) translateY(-12px) scale(1)}
+  43% {transform:translateX(62vw) translateY(0)     scale(1)}
+  50% {transform:translateX(62vw) translateY(-28px) scale(1.3) rotate(12deg)}
+  56% {transform:translateX(62vw) translateY(4px)   scale(1)   rotate(0)}
+  63% {transform:translateX(62vw) translateY(-18px) scale(1.2) rotate(-8deg)}
+  69% {transform:translateX(62vw) translateY(4px)   scale(1)   rotate(0)}
+  78% {transform:translateX(62vw) translateY(-6px)  scale(1.15)}
+  86% {transform:translateX(62vw) translateY(0)     scale(1.12)}
+  100%{transform:translateX(62vw) translateY(0)     scale(1.12);opacity:1}
 }
 
-/* Zafer işareti — kirpinin üstünde, para yığınının yanında */
-#splash-smile{
-  position:absolute;
-  right:calc(10% - 1rem);
-  top:calc(50% - 7rem);
-  font-size:2rem;opacity:0;
-}
-@keyframes smile-pop{
-  from{opacity:0;transform:scale(.3) translateY(8px)}
-  to{opacity:1;transform:scale(1) translateY(0)}
-}
-
-/* Alt yazı — hızlı giriş */
+/* Alt yazı */
 .splash-bottom{
-  position:absolute;bottom:12%;
+  position:absolute;bottom:14%;width:100%;
   display:flex;flex-direction:column;align-items:center;gap:6px;
-  animation:splash-fade .5s .3s ease forwards;opacity:0;
 }
-.splash-name{font-size:2.2rem;font-weight:900;color:#f0b90b;letter-spacing:-.04em;
-  animation:splash-fade .4s .3s ease forwards;opacity:0}
-.splash-tag{font-size:.88rem;color:#848e9c;animation:splash-fade .4s .5s ease forwards;opacity:0}
-@keyframes splash-fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.splash-dots{display:flex;gap:8px;margin-top:6px;animation:splash-fade .4s .7s ease forwards;opacity:0}
-.splash-dots span{width:5px;height:5px;border-radius:50%;background:#f0b90b;
-  animation:dot-pulse .9s .8s ease-in-out infinite}
-.splash-dots span:nth-child(2){animation-delay:.95s}
-.splash-dots span:nth-child(3){animation-delay:1.1s}
-@keyframes dot-pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
+.splash-name{
+  font-size:2.2rem;font-weight:900;color:#f0b90b;letter-spacing:-.04em;
+  opacity:0;animation:sf .5s .4s ease forwards;
+}
+.splash-tag{
+  font-size:.88rem;color:#848e9c;
+  opacity:0;animation:sf .5s .6s ease forwards;
+}
+@keyframes sf{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
 /* Onboarding */
 .ob-step{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.15);
@@ -1227,11 +1195,8 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
 
   <!-- Alt yazı -->
   <div class="splash-bottom">
-    <div class="splash-name">Kirpi <span style="color:#f0b90b;font-weight:900">Finans</span></div>
+    <div class="splash-name">🦔 Kirpi</div>
     <div class="splash-tag">Nakit akışın, cebinde.</div>
-    <div class="splash-dots">
-      <span></span><span></span><span></span>
-    </div>
   </div>
 </div>
 
@@ -2776,25 +2741,17 @@ function confirmDeleteAccount(){
   var splash = document.getElementById('splash-screen');
   if(!splash) return;
 
-  // 2.1s: paraya ulaşınca glow başlar
-  setTimeout(function(){
-    var k = document.getElementById('splash-kirpi');
-    if(k) k.classList.add('glow');
-  }, 2100);
-
-  // 2.5s: alt yazı sarıya döner
+  // 2.5s: alt yazı vurgu
   setTimeout(function(){
     var tag = document.querySelector('.splash-tag');
-    if(tag){ tag.textContent='Nakit akışın, cebinde! 💛'; tag.style.color='#f0b90b'; }
-    var dots = document.querySelector('.splash-dots');
-    if(dots) dots.style.display='none';
+    if(tag){ tag.style.color='#f0b90b'; }
   }, 2500);
 
-  // 3.8s: splash kapan
+  // 4s: splash kapan
   setTimeout(function(){
     splash.classList.add('hide');
     setTimeout(function(){ splash.style.display='none'; }, 500);
-  }, 3800);
+  }, 4000);
 })();
 
 // ── NATIVE APP FEEL ──────────────────────────────────────────────────────────
