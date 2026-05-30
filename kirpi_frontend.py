@@ -2728,8 +2728,9 @@ function loadInsights(){
     var burn=document.getElementById('ins-burn');
     if(liq){
       var lval=d.net_liquidity||0;
-      liq.textContent=(lval>=0?'':'−')+'₺'+Math.abs(lval).toLocaleString('tr-TR');
-      liq.style.color=lval>=0?'#4ade80':'#f87171';
+      var lsign=lval>0?'+':lval<0?'−':'';
+      liq.textContent=lsign+'₺'+Math.abs(lval).toLocaleString('tr-TR');
+      liq.style.color=lval>0?'#4ade80':lval<0?'#f87171':'#94a3b8';
     }
     if(burn && d.daily_burn>0){
       var dval=d.days_left;
@@ -2741,8 +2742,9 @@ function loadInsights(){
     var daysEl=document.getElementById('ins-days');
     if(nw){
       var nval=d.net_worth||0;
-      nw.textContent=(nval>=0?'':'−')+'₺'+Math.abs(nval).toLocaleString('tr-TR');
-      nw.style.color=nval>=0?'#818cf8':'#f87171';
+      var nsign=nval>0?'+':nval<0?'−':'';
+      nw.textContent=nsign+'₺'+Math.abs(nval).toLocaleString('tr-TR');
+      nw.style.color=nval>0?'#818cf8':nval<0?'#f87171':'#94a3b8';
     }
     if(daysEl && d.invest_val!=null){
       daysEl.textContent='Yatırım ₺'+Math.round(d.invest_val).toLocaleString('tr-TR')+' · Kıymet ₺'+Math.round(d.asset_val||0).toLocaleString('tr-TR');
