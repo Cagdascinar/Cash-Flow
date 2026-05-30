@@ -313,44 +313,44 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
   to{opacity:1;transform:scale(1) translateY(0)}
 }
 
-/* Kirpi ana animasyon — toplam 3.0s */
+/* Kirpi ana animasyon — toplam 3.2s */
 .splash-kirpi{
-  font-size:4rem;
+  font-size:4.2rem;
   position:absolute;
-  top:50%;margin-top:-2.5rem;
+  top:50%;margin-top:-2.6rem;
   opacity:0;
-  animation:kirpi-main 3.0s cubic-bezier(.4,0,.2,1) forwards;
+  /* scaleX(1) = sağa bakıyor (yürüyüş yönü), scaleX(-1) = sola bakıyor (kullanıcıya) */
+  animation:kirpi-main 3.2s ease forwards;
+  transition:filter .5s ease;
+}
+.splash-kirpi.glow{
+  filter:drop-shadow(0 0 28px rgba(240,185,11,.9)) drop-shadow(0 0 12px rgba(240,185,11,.6));
 }
 @keyframes kirpi-main{
-  /* 1. Giriş */
-  0%   {opacity:0;left:2%; transform:scaleX(-1) scale(.8) translateY(0)}
-  4%   {opacity:1;left:4%; transform:scaleX(-1) scale(1)  translateY(0)}
+  /* 1. Soldan giriş — yüzü sağa (paraya doğru) */
+  0%  {opacity:0;left:3%; transform:scaleX(1) scale(.8) translateY(0)}
+  5%  {opacity:1;left:3%; transform:scaleX(1) scale(1)  translateY(0)}
   /* 2. Hızlı yürüyüş → para */
-  9%   {left:14%;transform:scaleX(-1) scale(1) translateY(-6px)}
-  13%  {left:24%;transform:scaleX(-1) scale(1) translateY(0)}
-  17%  {left:34%;transform:scaleX(-1) scale(1) translateY(-6px)}
-  21%  {left:44%;transform:scaleX(-1) scale(1) translateY(0)}
-  25%  {left:54%;transform:scaleX(-1) scale(1) translateY(-6px)}
-  30%  {left:62%;transform:scaleX(-1) scale(1) translateY(0)}
-  /* 3. Paraya ulaştı — sevinç zıplaması */
-  34%  {left:62%;transform:scaleX(-1) scale(1.3) translateY(-20px)}
-  38%  {left:62%;transform:scaleX(-1) scale(1)   translateY(0)}
-  /* 4. Paralar arasında rastgele oynuyor */
-  42%  {left:70%;transform:scaleX(-1) scale(1.1) translateY(-12px) rotate(10deg)}
-  46%  {left:65%;transform:scaleX(1)  scale(1)   translateY(0)     rotate(0deg)}
-  50%  {left:55%;transform:scaleX(1)  scale(1.1) translateY(-14px) rotate(-8deg)}
-  54%  {left:62%;transform:scaleX(-1) scale(1)   translateY(0)     rotate(0deg)}
-  58%  {left:68%;transform:scaleX(-1) scale(1.2) translateY(-10px) rotate(6deg)}
-  62%  {left:62%;transform:scaleX(-1) scale(1)   translateY(0)     rotate(0deg)}
-  /* 5. Durdu — kullanıcıya döndü */
-  68%  {left:50%;transform:scaleX(1)  scale(1.1) translateY(0)}
-  /* 6. Ekrana bakıyor — büyüdü, gülümsüyor */
-  74%  {left:50%;transform:scaleX(1)  scale(1.5) translateY(-8px)}
-  80%  {left:50%;transform:scaleX(1)  scale(1.4) translateY(0)}
-  86%  {left:50%;transform:scaleX(1)  scale(1.45) translateY(-4px)}
-  /* 7. Son poz — mutlu, sakin, ekrana bakıyor */
-  92%  {left:50%;transform:scaleX(1)  scale(1.4) translateY(0)}
-  100% {left:50%;transform:scaleX(1)  scale(1.35) translateY(0);opacity:1}
+  12% {left:20%;transform:scaleX(1) scale(1) translateY(-8px)}
+  18% {left:38%;transform:scaleX(1) scale(1) translateY(0)}
+  24% {left:56%;transform:scaleX(1) scale(1) translateY(-8px)}
+  30% {left:66%;transform:scaleX(1) scale(1) translateY(0)}
+  /* 3. Paraya ulaştı — sevinç zıplamaları */
+  35% {left:66%;transform:scaleX(1) scale(1.3) translateY(-22px) rotate(12deg)}
+  40% {left:66%;transform:scaleX(1) scale(1)   translateY(0)     rotate(0)}
+  45% {left:64%;transform:scaleX(1) scale(1.2) translateY(-14px) rotate(-8deg)}
+  50% {left:66%;transform:scaleX(1) scale(1)   translateY(0)     rotate(0)}
+  /* 4. DÖNDÜ — yüzünü kullanıcıya çevirdi (scaleX(-1)) + merkeze geliyor */
+  56% {left:66%;transform:scaleX(-1) scale(1.1) translateY(-4px)}
+  62% {left:50%;transform:scaleX(-1) scale(1.2) translateY(0)}
+  /* 5. Merkeze geldi — büyüdü — KULLANICIYA BAKIYOR */
+  68% {left:44%;transform:scaleX(-1) scale(1.55) translateY(-10px)}
+  75% {left:44%;transform:scaleX(-1) scale(1.5)  translateY(0)}
+  /* 6. Nefes alıyor — gülümsüyor, mutlu */
+  82% {left:44%;transform:scaleX(-1) scale(1.53) translateY(-5px)}
+  89% {left:44%;transform:scaleX(-1) scale(1.48) translateY(0)}
+  95% {left:44%;transform:scaleX(-1) scale(1.5)  translateY(-3px)}
+  100%{left:44%;transform:scaleX(-1) scale(1.48) translateY(0);opacity:1}
 }
 
 /* Gülücük emoji — JS ile swap ediliyor */
@@ -2766,23 +2766,31 @@ function confirmDeleteAccount(){
   var splash = document.getElementById('splash-screen');
   if(!splash) return;
 
-  // 2.0s: kirpi ekrana döndüğünde emoji değiş
+  // 1.9s: kirpi döndü, merkeze geliyor — glow başlar
   setTimeout(function(){
     var k = document.getElementById('splash-kirpi');
-    if(k) k.textContent = '🦔';
-  }, 2000);
+    if(k) k.classList.add('glow');
+  }, 1900);
 
-  // 2.4s: gülücük + kirpi biraz büyür (CSS ile halloldu)
+  // 2.2s: zafer/özgürlük emoji belirir
   setTimeout(function(){
     var s = document.getElementById('splash-smile');
-    if(s) s.style.opacity = '1';
-  }, 2400);
+    if(s){ s.textContent='✌️'; s.style.opacity='1'; }
+  }, 2200);
 
-  // 3.4s: splash kapan
+  // 2.5s: alt yazı değişir
+  setTimeout(function(){
+    var tag = document.querySelector('.splash-tag');
+    if(tag){ tag.textContent='Nakit akışın, cebinde! 💛'; tag.style.color='#f0b90b'; tag.style.opacity='1'; }
+    var dots = document.querySelector('.splash-dots');
+    if(dots) dots.style.display='none';
+  }, 2500);
+
+  // 3.8s: splash kapan
   setTimeout(function(){
     splash.classList.add('hide');
     setTimeout(function(){ splash.style.display='none'; }, 500);
-  }, 3400);
+  }, 3800);
 })();
 
 // ── NATIVE APP FEEL ──────────────────────────────────────────────────────────
@@ -3305,9 +3313,10 @@ function sendUrgentBrowserNotifs(){
   if(Notification.permission!=='granted') return;
   var urgent=_notifItems.filter(function(x){return x.urgency==='urgent';});
   if(!urgent.length) return;
-  // Her bildirim ID'si için localStorage'da kayıt — bir kez göster
   urgent.slice(0,3).forEach(function(item,i){
-    var key='notif_done_'+(item.id||item.title);
+    // Stabil key: rakamları çıkar (gün sayısı değişirse aynı bildirim tekrar gönderilmesin)
+    var stableTitle=(item.title||'').replace(/\d+/g,'#').slice(0,40);
+    var key='notif_v2_'+(item.category||'')+stableTitle;
     if(localStorage.getItem(key)) return;
     localStorage.setItem(key,'1');
     setTimeout(function(){
@@ -3315,7 +3324,7 @@ function sendUrgentBrowserNotifs(){
         new Notification('🦔 Kirpi — '+item.title,{
           body:item.body,
           icon:'/icon-192.png',
-          tag:'kirpi-notif-'+i,
+          tag:'kirpi-'+i,
           badge:'/icon-192.png'
         });
       }catch(e){}
