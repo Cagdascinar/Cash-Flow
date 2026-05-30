@@ -282,7 +282,21 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
 @media(max-width:900px){.grid4{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
+@media(max-width:900px){.grid4{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
 @media(max-width:500px){.grid4{grid-template-columns:1fr}.grid3{grid-template-columns:1fr}}
+
+/* ── GLOBAL MOBİL GRID DÜZELTME ── */
+@media(max-width:600px){
+  .grid2,.grid3,.grid4{grid-template-columns:1fr!important}
+  [style*="grid-template-columns:repeat(3"]{grid-template-columns:1fr!important}
+  [style*="grid-template-columns:repeat(4"]{grid-template-columns:1fr 1fr!important}
+  [style*="grid-template-columns:1fr 1fr 1fr"]{grid-template-columns:1fr!important}
+  [style*="grid-template-columns:1fr 1fr;gap"]{grid-template-columns:1fr!important}
+  .form-row{grid-template-columns:1fr!important}
+  .aging-grid{grid-template-columns:1fr 1fr!important}
+  .today-grid{grid-template-columns:1fr 1fr 1fr}
+  .asset-nums,.cdr-nums{grid-template-columns:1fr 1fr 1fr}
+}
 
 /* ── STAT CARDS ── */
 .stat{border-radius:var(--radius);padding:18px 20px;position:relative;overflow:hidden;border:1px solid transparent}
@@ -802,9 +816,15 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 
 /* ── CREDIT CARD OVERVIEW ──────────────────────────────────── */
 .cc-total-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+@media(max-width:480px){.cc-total-row{grid-template-columns:1fr;gap:6px}}
 .cc-total-cell{background:var(--bg2);border:1px solid var(--border);border-radius:11px;padding:10px 12px}
 .cc-total-cell .ccl{font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;color:var(--txt2);margin-bottom:3px;font-weight:600}
 .cc-total-cell .ccv{font-size:.88rem;font-weight:800}
+@media(max-width:480px){
+  .cc-total-cell{display:flex;align-items:center;justify-content:space-between;padding:10px 14px}
+  .cc-total-cell .ccl{margin-bottom:0;font-size:.7rem}
+  .cc-total-cell .ccv{font-size:1rem}
+}
 .cc-item{background:var(--bg2);border:1px solid var(--border);border-radius:13px;padding:13px 14px;margin-bottom:8px}
 .cc-item:last-child{margin-bottom:0}
 .cc-item-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
