@@ -3335,25 +3335,49 @@ def insights():
                 anomalies.append({"cat": cat, "pct": pct, "cur": round(amt), "prv": round(prev)})
     anomalies.sort(key=lambda x: -x["pct"])
 
-    # Nakit akış tahmini — bu ayki harcama hızıyla kaç gün dayanır
+    # ── NAKİT LİKİDİTE & NET VARLIK ──────────────────────────────────────────
     days_passed = today_d.day
-    daily_burn  = cur_z / days_passed if days_passed > 0 else 0
-    # Toplam hesap bakiyesi
+
+    # Kredi kartı toplam borcu (KMH kullanılan)
+    card_debt = float(db.execute(
+        "SELECT COALESCE(SUM(used_),0) as d FROM cards WHERE profile_id=?", (pid,)
+    ).fetchone()["d"] or 0)
+
+    # Banka hesapları toplam bakiyesi:
+    # initial_balance + geçmiş işlemler (bugüne kadar gerçekleşmiş)
+    today_iso = today_d.isoformat()
     acc_bal = db.execute(
-        "SELECT COALESCE(SUM(initial_balance),0) + COALESCE((SELECT SUM(CASE WHEN type='gelir' THEN amount ELSE -amount END) FROM transactions WHERE profile_id=?),0) as b FROM accounts WHERE profile_id=? AND active=1",
-        (pid, pid)
+        """SELECT COALESCE(SUM(a.initial_balance),0) +
+                 COALESCE((
+                   SELECT SUM(CASE WHEN t.type='gelir' THEN t.amount ELSE -t.amount END)
+                   FROM transactions t
+                   WHERE t.profile_id=%s AND t.date <= %s
+                 ),0) AS b
+           FROM accounts a
+           WHERE a.profile_id=%s AND a.active=1""",
+        (pid, today_iso, pid)
     ).fetchone()
     total_balance = float(acc_bal["b"] or 0) if acc_bal else 0
-    days_left = round(total_balance / daily_burn) if daily_burn > 0 else 999
 
-    # Net worth
-    invest_val = db.execute(
+    # Net Likidite = hesap bakiyesi - kredi kartı borcu (GERÇEK eli altındaki para)
+    net_liquidity = round(total_balance - card_debt)
+
+    # Yatırım değeri (maliyet bazlı — piyasa değeri için ayrı API)
+    invest_val = float(db.execute(
         "SELECT COALESCE(SUM(quantity * buy_price),0) as v FROM investments WHERE profile_id=?", (pid,)
-    ).fetchone()["v"] or 0
-    card_debt = db.execute(
-        "SELECT COALESCE(SUM(used_),0) as d FROM cards WHERE profile_id=?", (pid,)
-    ).fetchone()["d"] or 0
-    net_worth = round(total_balance + float(invest_val) - float(card_debt))
+    ).fetchone()["v"] or 0)
+
+    # Kıymet değeri
+    asset_val = float(db.execute(
+        "SELECT COALESCE(SUM(purchase_price),0) as v FROM assets WHERE profile_id=? AND active=1", (pid,)
+    ).fetchone()["v"] or 0)
+
+    # Toplam Net Varlık = hesaplar + yatırımlar + kıymetler - kredi kartı
+    net_worth = round(total_balance + invest_val + asset_val - card_debt)
+
+    # Nakit yeterlilik (günlük harcama hızıyla kaç gün dayanır)
+    daily_burn = cur_z / days_passed if days_passed > 0 else 0
+    days_left  = round(net_liquidity / daily_burn) if daily_burn > 0 and net_liquidity > 0 else 999
 
     return jsonify({
         "score": score,
@@ -3366,7 +3390,12 @@ def insights():
         "anomalies": anomalies[:3],
         "days_left": days_left,
         "daily_burn": round(daily_burn),
+        "net_liquidity": net_liquidity,
         "net_worth": net_worth,
+        "total_balance": round(total_balance),
+        "card_debt": round(card_debt),
+        "invest_val": round(invest_val),
+        "asset_val": round(asset_val),
     })
 
 @app.route("/api/today")

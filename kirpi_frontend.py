@@ -296,71 +296,66 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 #splash-screen.hide{opacity:0;pointer-events:none}
 .splash-bg{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 35%,rgba(240,185,11,.1),transparent 65%)}
 
-/* Para yığını — sağda */
+/* Para yığını — kirpinin etrafında çember */
 .splash-money{
   position:absolute;
-  right:16%;top:50%;transform:translateY(-60%);
-  display:flex;flex-direction:column;gap:2px;align-items:center;
+  top:50%;left:50%;
+  width:200px;height:200px;
+  margin-top:-100px;margin-left:-100px;
+  pointer-events:none;
 }
-.sm-coin{font-size:2.2rem;display:block;opacity:0}
-.sm-c1{animation:coin-appear .3s .8s ease forwards}
-.sm-c2{animation:coin-appear .3s .9s ease forwards;font-size:1.9rem}
-.sm-c3{animation:coin-appear .3s 1.0s ease forwards;font-size:1.7rem}
-.sm-c4{animation:coin-appear .3s 1.1s ease forwards;font-size:1.5rem}
-.sm-c5{animation:coin-appear .3s 1.2s ease forwards;font-size:1.3rem}
+.sm-coin{font-size:1.8rem;display:block;opacity:0;position:absolute}
+.sm-c1{top:0;left:50%;margin-left:-14px;animation:coin-appear .35s .5s ease forwards}
+.sm-c2{top:20%;right:0;animation:coin-appear .35s .65s ease forwards;font-size:1.5rem}
+.sm-c3{bottom:10%;right:10%;animation:coin-appear .35s .8s ease forwards;font-size:1.4rem}
+.sm-c4{bottom:10%;left:10%;animation:coin-appear .35s .95s ease forwards;font-size:1.4rem}
+.sm-c5{top:20%;left:0;animation:coin-appear .35s 1.1s ease forwards;font-size:1.5rem}
 @keyframes coin-appear{
-  from{opacity:0;transform:scale(.4) translateY(8px)}
+  from{opacity:0;transform:scale(.3) translateY(6px)}
   to{opacity:1;transform:scale(1) translateY(0)}
 }
 
-/* Kirpi ana animasyon — toplam 3.2s */
+/* Kirpi — merkezde, zıplıyor, kullanıcıya bakıyor */
 .splash-kirpi{
-  font-size:4.2rem;
+  font-size:5rem;
   position:absolute;
-  top:50%;margin-top:-2.6rem;
+  top:50%; left:50%;
+  margin-top:-3.1rem; margin-left:-2.5rem;
   opacity:0;
-  /* scaleX(1) = sağa bakıyor (yürüyüş yönü), scaleX(-1) = sola bakıyor (kullanıcıya) */
-  animation:kirpi-main 3.2s ease forwards;
-  transition:filter .5s ease;
+  animation:kirpi-bounce 3.0s cubic-bezier(.4,0,.2,1) forwards;
+  transition:filter .4s ease;
 }
 .splash-kirpi.glow{
-  filter:drop-shadow(0 0 28px rgba(240,185,11,.9)) drop-shadow(0 0 12px rgba(240,185,11,.6));
+  filter:drop-shadow(0 0 24px rgba(240,185,11,.9)) drop-shadow(0 0 8px rgba(240,185,11,.5));
 }
-@keyframes kirpi-main{
-  /* 1. Soldan giriş — yüzü sağa (paraya doğru) */
-  0%  {opacity:0;left:3%; transform:scaleX(1) scale(.8) translateY(0)}
-  5%  {opacity:1;left:3%; transform:scaleX(1) scale(1)  translateY(0)}
-  /* 2. Hızlı yürüyüş → para */
-  12% {left:20%;transform:scaleX(1) scale(1) translateY(-8px)}
-  18% {left:38%;transform:scaleX(1) scale(1) translateY(0)}
-  24% {left:56%;transform:scaleX(1) scale(1) translateY(-8px)}
-  30% {left:66%;transform:scaleX(1) scale(1) translateY(0)}
-  /* 3. Paraya ulaştı — sevinç zıplamaları */
-  35% {left:66%;transform:scaleX(1) scale(1.3) translateY(-22px) rotate(12deg)}
-  40% {left:66%;transform:scaleX(1) scale(1)   translateY(0)     rotate(0)}
-  45% {left:64%;transform:scaleX(1) scale(1.2) translateY(-14px) rotate(-8deg)}
-  50% {left:66%;transform:scaleX(1) scale(1)   translateY(0)     rotate(0)}
-  /* 4. DÖNDÜ — yüzünü kullanıcıya çevirdi (scaleX(-1)) + merkeze geliyor */
-  56% {left:66%;transform:scaleX(-1) scale(1.1) translateY(-4px)}
-  62% {left:50%;transform:scaleX(-1) scale(1.2) translateY(0)}
-  /* 5. Merkeze geldi — büyüdü — KULLANICIYA BAKIYOR */
-  68% {left:44%;transform:scaleX(-1) scale(1.55) translateY(-10px)}
-  75% {left:44%;transform:scaleX(-1) scale(1.5)  translateY(0)}
-  /* 6. Nefes alıyor — gülümsüyor, mutlu */
-  82% {left:44%;transform:scaleX(-1) scale(1.53) translateY(-5px)}
-  89% {left:44%;transform:scaleX(-1) scale(1.48) translateY(0)}
-  95% {left:44%;transform:scaleX(-1) scale(1.5)  translateY(-3px)}
-  100%{left:44%;transform:scaleX(-1) scale(1.48) translateY(0);opacity:1}
+@keyframes kirpi-bounce{
+  /* Aşağıdan belirir */
+  0%  {opacity:0; transform:scale(.3) translateY(40px)}
+  12% {opacity:1; transform:scale(1.25) translateY(-18px)}
+  20% {transform:scale(.95) translateY(4px)}
+  /* Sevinç zıplamaları */
+  28% {transform:scale(1.2) translateY(-20px)}
+  36% {transform:scale(.97) translateY(3px)}
+  44% {transform:scale(1.15) translateY(-14px)}
+  52% {transform:scale(1)   translateY(2px)}
+  58% {transform:scale(1.08) translateY(-8px)}
+  64% {transform:scale(1)   translateY(0)}
+  /* Sakinleşiyor — ekrana bakıyor */
+  72% {transform:scale(1.18) translateY(-5px)}
+  80% {transform:scale(1.15) translateY(0)}
+  88% {transform:scale(1.17) translateY(-3px)}
+  94% {transform:scale(1.15) translateY(0)}
+  100%{transform:scale(1.15) translateY(0);opacity:1}
 }
 
-/* Gülücük emoji — JS ile swap ediliyor */
+/* Zafer işareti — kirpinin üstünde */
 #splash-smile{
   position:absolute;top:50%;left:50%;
-  font-size:2rem;opacity:0;margin-top:-5rem;margin-left:1rem;
-  animation:smile-pop .4s 2.2s ease forwards;
+  font-size:2.2rem;opacity:0;
+  margin-top:-6.5rem;margin-left:.8rem;
 }
 @keyframes smile-pop{
-  from{opacity:0;transform:scale(.5) translateY(4px)}
+  from{opacity:0;transform:scale(.4) translateY(8px)}
   to{opacity:1;transform:scale(1) translateY(0)}
 }
 
@@ -1557,18 +1552,21 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
       <div id="anomaly-list"></div>
     </div>
 
-    <!-- Nakit Akış Tahmini + Net Worth -->
+    <!-- Finansal Pozisyon Kartları -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-      <div style="background:linear-gradient(135deg,#1e2845,#161c33);border:1px solid #6366f133;border-radius:16px;padding:14px">
-        <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.5);margin-bottom:6px">Nakit Yeterlilik</div>
-        <div id="ins-days" style="font-size:1.4rem;font-weight:900;color:#fff">—</div>
-        <div style="font-size:.72rem;color:rgba(255,255,255,.45);margin-top:3px">gün daha dayanır</div>
-        <div id="ins-burn" style="font-size:.72rem;color:rgba(255,255,255,.4);margin-top:2px"></div>
+      <!-- Net Likidite: gerçek eli altındaki para (hesap - kart borcu) -->
+      <div style="background:linear-gradient(135deg,#0d2118,#0a1a12);border:1px solid #22c55e30;border-radius:16px;padding:14px">
+        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.45);margin-bottom:5px">💧 Net Likidite</div>
+        <div id="ins-liquidity" style="font-size:1.25rem;font-weight:900;color:#4ade80">—</div>
+        <div style="font-size:.68rem;color:rgba(255,255,255,.35);margin-top:3px">Hesap − Kart Borcu</div>
+        <div id="ins-burn" style="font-size:.68rem;color:rgba(255,255,255,.35);margin-top:2px"></div>
       </div>
-      <div style="background:linear-gradient(135deg,#0d2118,#0a1a12);border:1px solid #22c55e22;border-radius:16px;padding:14px">
-        <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.5);margin-bottom:6px">Net Varlık</div>
-        <div id="ins-networth" style="font-size:1.2rem;font-weight:900;color:#4ade80">—</div>
-        <div style="font-size:.72rem;color:rgba(255,255,255,.4);margin-top:3px">hesap + yatırım − borç</div>
+      <!-- Net Varlık: hesap + yatırım + kıymet − borç -->
+      <div style="background:linear-gradient(135deg,#1e2845,#161c33);border:1px solid #6366f133;border-radius:16px;padding:14px">
+        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.45);margin-bottom:5px">📊 Net Varlık</div>
+        <div id="ins-networth" style="font-size:1.25rem;font-weight:900;color:#818cf8">—</div>
+        <div style="font-size:.68rem;color:rgba(255,255,255,.35);margin-top:3px">Hesap + Yatırım + Kıymet − Borç</div>
+        <div id="ins-days" style="font-size:.68rem;color:rgba(255,255,255,.35);margin-top:2px"></div>
       </div>
     </div>
 
@@ -2721,21 +2719,29 @@ function loadInsights(){
       }
     }
 
-    // Nakit yeterlilik
-    var days=document.getElementById('ins-days');
+    // Net Likidite (hesap bakiyesi - kart borcu)
+    var liq=document.getElementById('ins-liquidity');
     var burn=document.getElementById('ins-burn');
-    if(days){
-      var dval=d.days_left;
-      days.textContent=dval>365?'365+':dval;
-      days.style.color=dval<30?'#ff3b30':dval<90?'#ff9500':'#fff';
+    if(liq){
+      var lval=d.net_liquidity||0;
+      liq.textContent=(lval>=0?'':'−')+'₺'+Math.abs(lval).toLocaleString('tr-TR');
+      liq.style.color=lval>=0?'#4ade80':'#f87171';
     }
-    if(burn && d.daily_burn>0) burn.textContent='Günlük ₺'+d.daily_burn+' harcıyorsun';
+    if(burn && d.daily_burn>0){
+      var dval=d.days_left;
+      burn.textContent='≈ '+(dval>365?'365+':dval)+' gün dayanır · Günlük ₺'+d.daily_burn;
+    }
 
-    // Net worth
+    // Net Varlık (hesap + yatırım + kıymet − borç)
     var nw=document.getElementById('ins-networth');
+    var daysEl=document.getElementById('ins-days');
     if(nw){
-      nw.textContent=(d.net_worth>=0?'':'−')+'₺'+Math.abs(d.net_worth).toLocaleString('tr-TR');
-      nw.style.color=d.net_worth>=0?'#4ade80':'#f87171';
+      var nval=d.net_worth||0;
+      nw.textContent=(nval>=0?'':'−')+'₺'+Math.abs(nval).toLocaleString('tr-TR');
+      nw.style.color=nval>=0?'#818cf8':'#f87171';
+    }
+    if(daysEl && d.invest_val!=null){
+      daysEl.textContent='Yatırım ₺'+Math.round(d.invest_val).toLocaleString('tr-TR')+' · Kıymet ₺'+Math.round(d.asset_val||0).toLocaleString('tr-TR');
     }
   });
 }
