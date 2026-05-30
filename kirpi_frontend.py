@@ -135,15 +135,20 @@ HTML = r"""<!DOCTYPE html>
 *{box-sizing:border-box;margin:0;padding:0}
 html{overflow-x:hidden}
 body{position:relative;overflow-x:hidden}
+/* ── Binance Dark (varsayılan) ── */
 :root{
-  --bg:#f2f2f7;--bg2:#ffffff;--bg3:#e5e5ea;--bg4:#d1d1d6;
-  --g:#34c759;--r:#ff3b30;--b:#007aff;--b2:#5856d6;--y:#ff9500;--p:#af52de;--c:#32ade6;
-  --txt:#1c1c1e;--txt2:#6d6d72;--border:#d1d1d6;--border2:#c6c6c8;
+  --bg:#0b0e11;--bg2:#1e2026;--bg3:#2b2f36;--bg4:#363c45;
+  --g:#0ecb81;--r:#f6465d;--b:#f0b90b;--b2:#f0b90b;--y:#f0b90b;--p:#af52de;--c:#00b8d9;
+  --txt:#eaecef;--txt2:#848e9c;--border:#2b2f36;--border2:#363c45;
+  --radius:12px;--shadow:0 2px 16px rgba(0,0,0,.5);
+  --font:'Inter',system-ui,sans-serif;
 }
-[data-theme="dark"]{
-  --bg:#0a0c12;--bg2:#111318;--bg3:#1e2233;--bg4:#2a3050;
-  --txt:#e2e8f0;--txt2:#94a3b8;--border:#1e2233;--border2:#2a3050;
-  --shadow:0 2px 16px rgba(0,0,0,.4);
+/* Light mod isteyenler için */
+[data-theme="light"]{
+  --bg:#f0f4f8;--bg2:#ffffff;--bg3:#e8ecf0;--bg4:#d1d7de;
+  --g:#0ecb81;--r:#f6465d;--b:#f0b90b;--b2:#d4a017;--y:#f0b90b;
+  --txt:#1e2026;--txt2:#707a8a;--border:#dde1e7;--border2:#c8cdd4;
+  --shadow:0 2px 16px rgba(0,0,0,.08);
 }
 :root{
   --radius:14px;--shadow:0 2px 16px rgba(0,0,0,.08);
@@ -157,7 +162,7 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
 
 /* ── LAYOUT ── */
 .shell{display:flex;min-height:100vh}
-nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
+nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.06);
     display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;height:100vh;z-index:100}
 .main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden;min-width:0}
 @media(max-width:768px){
@@ -236,6 +241,25 @@ nav{width:220px;background:var(--bg2);border-right:1px solid var(--border);
             max-height:82vh;overflow-y:auto}
 .more-sheet.open{transform:translateY(0)}
 .more-backdrop.open{display:block}
+/* ── SPLASH SCREEN ── */
+#splash-screen{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;
+  background:#0b0e11;transition:opacity .5s ease,transform .5s ease}
+#splash-screen.hide{opacity:0;pointer-events:none}
+.splash-bg{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,rgba(240,185,11,.08),transparent 70%)}
+.splash-content{display:flex;flex-direction:column;align-items:center;gap:12px;position:relative}
+.splash-kirpi{font-size:5rem;animation:splash-bounce 1s cubic-bezier(.34,1.56,.64,1) forwards;opacity:0}
+@keyframes splash-bounce{0%{opacity:0;transform:scale(.3) translateY(30px)}60%{opacity:1;transform:scale(1.15)}100%{opacity:1;transform:scale(1) translateY(0)}}
+.splash-name{font-size:2.2rem;font-weight:900;color:#f0b90b;letter-spacing:-.04em;
+  animation:splash-fade .6s .4s ease forwards;opacity:0}
+.splash-tag{font-size:.9rem;color:#848e9c;animation:splash-fade .6s .6s ease forwards;opacity:0}
+@keyframes splash-fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.splash-dots{display:flex;gap:8px;margin-top:8px;animation:splash-fade .6s .8s ease forwards;opacity:0}
+.splash-dots span{width:6px;height:6px;border-radius:50%;background:#f0b90b;
+  animation:dot-pulse 1.2s 1s ease-in-out infinite}
+.splash-dots span:nth-child(2){animation-delay:1.15s}
+.splash-dots span:nth-child(3){animation-delay:1.3s}
+@keyframes dot-pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
+
 /* Onboarding */
 .ob-step{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.15);
   border-radius:12px;padding:12px 14px;cursor:pointer;transition:.12s}
@@ -362,13 +386,18 @@ canvas{display:block;width:100%!important}
 .filter-sel{background:var(--bg3);border:1px solid var(--border2);color:var(--txt2);
   padding:9px 12px;border-radius:9px;font-size:.82rem;outline:none;cursor:pointer}
 .filter-sel:focus{border-color:var(--b2)}
-.btn{padding:9px 18px;border-radius:9px;border:none;font-size:.82rem;font-weight:600;cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:6px}
-.btn:hover{opacity:.85;transform:translateY(-1px)}
-.btn-primary{background:var(--b);color:#fff}
-.btn-danger{background:var(--r);color:#fff}
-.btn-ghost{background:var(--bg3);border:1px solid var(--border2);color:var(--txt2)}
-.btn-ghost:hover{border-color:var(--b2);color:var(--b2)}
-.btn-green{background:var(--g);color:#fff}
+.btn{padding:9px 18px;border-radius:10px;border:none;font-size:.84rem;font-weight:700;cursor:pointer;
+  transition:transform .12s,box-shadow .12s,filter .12s;
+  display:inline-flex;align-items:center;gap:6px;letter-spacing:.01em}
+.btn:active{transform:scale(.97);filter:brightness(.9)}
+.btn-primary{background:#f0b90b;color:#1e2026;box-shadow:0 4px 0 #b8860b}
+.btn-primary:active{box-shadow:0 1px 0 #b8860b;transform:translateY(3px) scale(.98)}
+.btn-danger{background:var(--r);color:#fff;box-shadow:0 4px 0 #b82035}
+.btn-danger:active{box-shadow:0 1px 0 #b82035;transform:translateY(3px)}
+.btn-ghost{background:var(--bg3);border:1.5px solid var(--border2);color:var(--txt2);box-shadow:none}
+.btn-ghost:active{background:var(--bg4)}
+.btn-green{background:var(--g);color:#fff;box-shadow:0 4px 0 #0a9e65}
+.btn-green:active{box-shadow:0 1px 0 #0a9e65;transform:translateY(3px)}
 
 .ledger-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);
   box-shadow:0 1px 6px rgba(0,0,0,.04)}
@@ -1020,10 +1049,24 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .acc-act-btn:active{opacity:.75}
 </style>
 <script>
-(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);})();
+(function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();
 </script>
 </head>
 <body>
+
+<!-- ── SPLASH SCREEN ── -->
+<div id="splash-screen">
+  <div class="splash-bg"></div>
+  <div class="splash-content">
+    <div class="splash-kirpi" id="splash-kirpi">🦔</div>
+    <div class="splash-name">Kirpi</div>
+    <div class="splash-tag">Nakit Akışını Kontrol Et</div>
+    <div class="splash-dots">
+      <span></span><span></span><span></span>
+    </div>
+  </div>
+</div>
+
 <div class="shell">
 
 <!-- ── SIDEBAR NAV ── -->
@@ -1158,7 +1201,7 @@ button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
       <span style="display:block;width:16px;height:2px;background:var(--txt);border-radius:2px;transition:.2s"></span>
       <span style="display:block;width:20px;height:2px;background:var(--txt);border-radius:2px;transition:.2s"></span>
     </button>
-    <div class="top-header-logo tappable" onclick="goPage('dashboard',document.querySelector('[data-page=dashboard]'))" style="cursor:pointer">🦔 Kirpi</div>
+    <div class="top-header-logo tappable" onclick="openMoreSheet()" style="cursor:pointer">🦔 <span style="color:var(--b);font-weight:900">Kirpi</span></div>
   </div>
   <div class="top-header-right">
     <div class="notif-bell-wrap">
@@ -2480,6 +2523,16 @@ function confirmDeleteAccount(){
       else{errEl.textContent=d.error||'Bir hata oluştu';}
     }).catch(()=>{errEl.textContent='Bağlantı hatası';});
 }
+
+// ── SPLASH SCREEN ────────────────────────────────────────────────────────────
+(function(){
+  var splash = document.getElementById('splash-screen');
+  if(!splash) return;
+  setTimeout(function(){
+    splash.classList.add('hide');
+    setTimeout(function(){ splash.style.display='none'; }, 500);
+  }, 2200);
+})();
 
 // ── NATIVE APP FEEL ──────────────────────────────────────────────────────────
 // Pull-to-refresh engeli
