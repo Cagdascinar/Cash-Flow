@@ -735,6 +735,8 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .notif-item.soon .notif-item-days{background:#f59e0b18;color:#fbbf24}
 .notif-empty{text-align:center;padding:60px 24px;color:var(--txt2);font-size:.9rem}
 .notif-empty-ico{font-size:3rem;margin-bottom:14px}
+.notif-read{opacity:.55}
+.notif-read .notif-item-title{opacity:.7}
 .notif-section-lbl{
   font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;
   color:var(--txt2);padding:10px 4px 6px;opacity:.6;
@@ -1418,6 +1420,12 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
       <div id="notif-panel-count" class="notif-panel-count" style="margin-top:2px">Yükleniyor…</div>
     </div>
     <button class="notif-close-btn" onclick="closeNotifPanel()">✕</button>
+  </div>
+  <!-- Tümünü Okundu İşaretle -->
+  <div id="notif-mark-all" style="display:none;padding:8px 16px;border-bottom:1px solid var(--border)">
+    <button onclick="_markAllRead()" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--b2);font-size:.78rem;font-weight:600;cursor:pointer">
+      ✓ Tümünü Okundu İşaretle
+    </button>
   </div>
   <div class="notif-list" id="notif-list">
     <div class="notif-empty"><div class="notif-empty-ico">🦔</div>Yükleniyor…</div>
@@ -3315,8 +3323,20 @@ function createProfileFromSettings(){
   });
 }
 
-// ── NOTIFICATIONS ────────────────────────────────────────────────────────────
+// ── NOTIFICATIONS — Monday.com tarzı ─────────────────────────────────────────
 var _notifItems=[];
+
+function _notifKey(item){
+  // Stabil anahtar: günden bağımsız, aynı kart/fatura için aynı key
+  return 'nrd_' + (item.category||'') + '_' + (item.title||'').replace(/\d+/g,'#').slice(0,40);
+}
+function _isRead(item){ return !!localStorage.getItem(_notifKey(item)); }
+function _markRead(item){ localStorage.setItem(_notifKey(item),'1'); }
+function _markAllRead(){
+  _notifItems.forEach(function(item){ _markRead(item); });
+  renderNotifList();
+  updateNotifBadge();
+}
 
 function loadNotifications(){
   xhr('/api/notifications',null,function(d){
@@ -3328,15 +3348,19 @@ function loadNotifications(){
   });
 }
 
+function _unreadCount(){
+  return _notifItems.filter(function(x){ return !_isRead(x); }).length;
+}
+
 function updateNotifBadge(){
   var badge=document.getElementById('notif-badge');
   if(!badge) return;
-  var urgent=_notifItems.filter(function(x){return x.urgency==='urgent';}).length;
-  var total=_notifItems.length;
-  if(total===0){ badge.classList.add('hidden'); }
+  var unread=_unreadCount();
+  var urgent=_notifItems.filter(function(x){return x.urgency==='urgent'&&!_isRead(x);}).length;
+  if(unread===0){ badge.classList.add('hidden'); }
   else {
     badge.classList.remove('hidden');
-    badge.textContent=total>9?'9+':total;
+    badge.textContent=unread>9?'9+':unread;
     badge.style.background=urgent>0?'#ef4444':'#f59e0b';
   }
 }
@@ -3344,8 +3368,15 @@ function updateNotifBadge(){
 function renderNotifList(){
   var el=document.getElementById('notif-list');
   if(!el) return;
+  var unread=_unreadCount();
   var countEl=document.getElementById('notif-panel-count');
-  if(countEl) countEl.textContent=_notifItems.length===0?'Bildirim yok':_notifItems.length+' bildirim';
+  if(countEl) countEl.textContent=_notifItems.length===0?'Bildirim yok':
+    (unread>0 ? unread+' okunmamış' : 'Tümü okundu');
+
+  // "Tümünü okundu işaretle" butonu — sadece okunmamış varsa
+  var markAllBtn=document.getElementById('notif-mark-all');
+  if(markAllBtn) markAllBtn.style.display=unread>0?'block':'none';
+
   if(_notifItems.length===0){
     el.innerHTML='<div class="notif-empty"><div class="notif-empty-ico">✅</div>Harika! Yaklaşan bildirim yok.</div>';
     return;
@@ -3369,18 +3400,39 @@ function renderNotifList(){
 }
 
 function renderNotifItem(item){
+  var read=_isRead(item);
+  var key=JSON.stringify(item).replace(/"/g,'&quot;');
   var dayLabel='';
   if(item.days<=0) dayLabel='<span class="notif-item-days">Bugün</span>';
   else if(item.days===1) dayLabel='<span class="notif-item-days">Yarın</span>';
   else dayLabel='<span class="notif-item-days">'+item.days+' gün sonra</span>';
-  return '<div class="notif-item '+item.urgency+'">'
+
+  return '<div class="notif-item '+item.urgency+(read?' notif-read':'')+'" onclick="markNotifRead(this,'+key+')" style="cursor:pointer;position:relative">'
+    // Okunmamış nokta
+    +(read?'':'<div style="position:absolute;top:14px;right:14px;width:8px;height:8px;border-radius:50%;background:'+(item.urgency==='urgent'?'#ef4444':'#f59e0b')+'"></div>')
     +'<div class="notif-item-ico">'+item.icon+'</div>'
     +'<div class="notif-item-body">'
-      +'<div class="notif-item-title">'+item.title+'</div>'
-      +'<div class="notif-item-msg">'+item.body+'</div>'
+      +'<div class="notif-item-title" style="'+(read?'opacity:.5':'')+'">'+item.title+'</div>'
+      +'<div class="notif-item-msg" style="'+(read?'opacity:.4':'')+'">'+item.body+'</div>'
       +dayLabel
     +'</div>'
     +'</div>';
+}
+
+function markNotifRead(el, item){
+  _markRead(item);
+  // Animasyonla okundu hale getir
+  el.style.transition='opacity .3s';
+  el.style.opacity='.5';
+  var dot=el.querySelector('[style*="border-radius:50%"]');
+  if(dot) dot.style.display='none';
+  el.classList.add('notif-read');
+  updateNotifBadge();
+  var countEl=document.getElementById('notif-panel-count');
+  var unread=_unreadCount();
+  if(countEl) countEl.textContent=unread>0?unread+' okunmamış':'Tümü okundu';
+  var markAllBtn=document.getElementById('notif-mark-all');
+  if(markAllBtn) markAllBtn.style.display=unread>0?'block':'none';
 }
 
 function toggleNotifPanel(){
