@@ -166,6 +166,11 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
     display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;height:100vh;z-index:100}
 .main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden;min-width:0;
   padding-top:calc(54px + env(safe-area-inset-top,0px))}
+/* Tablet: 768-1200px — kaydırma açık */
+@media(min-width:769px) and (max-width:1200px){
+  .main{overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .page{touch-action:pan-y}
+}
 @media(max-width:768px){
   nav{width:100%;height:auto;flex-direction:row;border-right:none;border-top:none;border-bottom:none;
       position:fixed;bottom:0;left:0;right:0;top:auto;z-index:9999;
@@ -2835,12 +2840,15 @@ function confirmDeleteAccount(){
 })();
 
 // ── NATIVE APP FEEL ──────────────────────────────────────────────────────────
-// Pull-to-refresh engeli
+// Pull-to-refresh engeli — sadece telefonda, tablette normal kaydırma açık
 var _lastTouchY = 0;
 document.addEventListener('touchstart', function(e){ _lastTouchY = e.touches[0].clientY; }, {passive:true});
 document.addEventListener('touchmove', function(e){
+  if(window.innerWidth >= 768) return; // tablet / masaüstü → müdahale etme
   var el = e.target.closest('.s-body,.more-sheet,.mod-sheet,.ledger-wrap,[style*="overflow"]');
-  if(!el && e.touches[0].clientY > _lastTouchY && window.scrollY === 0){
+  var movingDown = e.touches[0].clientY > _lastTouchY;
+  var atTop = window.scrollY === 0 && document.documentElement.scrollTop === 0;
+  if(!el && movingDown && atTop){
     e.preventDefault();
   }
 }, {passive:false});
