@@ -382,9 +382,20 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 
 /* ── PAGE ── */
 .main{display:flex;flex-direction:column}
-.page{display:none;padding:20px 28px;max-width:1280px;will-change:opacity,transform;opacity:0;transform:translateX(18px)}
-.page.active{display:block;opacity:1;transform:translateX(0);transition:opacity .2s ease,transform .2s cubic-bezier(.25,.46,.45,.94)}
-.page.slide-back{transform:translateX(-18px)}
+.page{
+  display:none;padding:20px 28px;max-width:1280px;
+  will-change:opacity,transform;
+  opacity:0;transform:translateY(14px) scale(.99);
+}
+.page.active{
+  display:block;
+  animation:page-in .28s cubic-bezier(.25,.46,.45,.94) forwards;
+}
+@keyframes page-in{
+  from{opacity:0;transform:translateY(14px) scale(.99)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+.page.slide-back{transform:translateX(-12px);opacity:0}
 @media(max-width:600px){.page{padding:16px 16px 20px}}
 .page-title{font-size:1.75rem;font-weight:900;margin-bottom:4px;letter-spacing:-.03em}
 .page-sub{font-size:.84rem;color:var(--txt2);margin-bottom:20px}
@@ -1525,24 +1536,40 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
       <div id="anomaly-list"></div>
     </div>
 
-    <!-- Finansal Pozisyon Kartları -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-      <!-- Net Likidite: gerçek eli altındaki para (hesap - kart borcu) -->
+    <!-- Finansal Pozisyon Kartları — 3 kart -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+      <!-- Net Likidite -->
       <div onclick="showLiquidityDetail()" style="background:linear-gradient(135deg,#0d2118,#0a1a12);border:1px solid #22c55e30;border-radius:16px;padding:14px;cursor:pointer;transition:.15s" onmouseenter="this.style.borderColor='#22c55e60'" onmouseleave="this.style.borderColor='#22c55e30'">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-          <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.45)">💧 Net Likidite</div>
-          <div style="font-size:.6rem;color:rgba(255,255,255,.3)">detay ›</div>
+          <div style="font-size:.55rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.45)">💧 Net Likidite</div>
+          <div style="font-size:.55rem;color:rgba(255,255,255,.25)">›</div>
         </div>
-        <div id="ins-liquidity" style="font-size:1.25rem;font-weight:900;color:#4ade80">—</div>
-        <div style="font-size:.68rem;color:rgba(255,255,255,.35);margin-top:3px">Hesap − Kart Borcu</div>
-        <div id="ins-burn" style="font-size:.68rem;color:rgba(255,255,255,.35);margin-top:2px"></div>
+        <div id="ins-liquidity" style="font-size:1.1rem;font-weight:900;color:#4ade80">—</div>
+        <div style="font-size:.62rem;color:rgba(255,255,255,.3);margin-top:3px">Hesap − Kart</div>
+        <div id="ins-burn" style="font-size:.62rem;color:rgba(255,255,255,.3);margin-top:2px"></div>
       </div>
-      <!-- Net Varlık: hesap + yatırım + kıymet − borç -->
+      <!-- Kullanılabilir Nakit (bu ay gelir - gider - asgari ödemeler) -->
+      <div style="background:linear-gradient(135deg,#1a1300,#120e00);border:1px solid #f59e0b30;border-radius:16px;padding:14px">
+        <div style="font-size:.55rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.45);margin-bottom:5px">💵 Kullanılabilir</div>
+        <div id="ins-kullanilabilir" style="font-size:1.1rem;font-weight:900;color:#fbbf24">—</div>
+        <div style="font-size:.62rem;color:rgba(255,255,255,.3);margin-top:3px">Net − Asgari Ödemeler</div>
+        <div id="ins-asgari" style="font-size:.62rem;color:rgba(255,255,255,.3);margin-top:2px"></div>
+      </div>
+      <!-- Net Varlık -->
       <div style="background:linear-gradient(135deg,#1e2845,#161c33);border:1px solid #6366f133;border-radius:16px;padding:14px">
-        <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.45);margin-bottom:5px">📊 Net Varlık</div>
-        <div id="ins-networth" style="font-size:1.25rem;font-weight:900;color:#818cf8">—</div>
-        <div style="font-size:.68rem;color:rgba(255,255,255,.35);margin-top:3px">Hesap + Yatırım + Kıymet − Borç</div>
-        <div id="ins-days" style="font-size:.68rem;color:rgba(255,255,255,.35);margin-top:2px"></div>
+        <div style="font-size:.55rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.45);margin-bottom:5px">📊 Net Varlık</div>
+        <div id="ins-networth" style="font-size:1.1rem;font-weight:900;color:#818cf8">—</div>
+        <div style="font-size:.62rem;color:rgba(255,255,255,.3);margin-top:3px">Hesap+Yatırım−Borç</div>
+        <div id="ins-days" style="font-size:.62rem;color:rgba(255,255,255,.3);margin-top:2px"></div>
+      </div>
+    </div>
+    <!-- Kart Özeti Şeridi -->
+    <div id="ins-card-strip" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:.78rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div style="color:var(--txt2)">💳 Kart borcu: <span id="ins-kart-borcu" style="font-weight:700;color:var(--r)">—</span></div>
+        <div style="color:var(--txt2)">Asgari ödeme: <span id="ins-kart-asgari" style="font-weight:700;color:var(--y)">—</span></div>
+        <div style="color:var(--txt2)">Kullanılabilir limit: <span id="ins-kart-limit" style="font-weight:700;color:var(--g)">—</span></div>
+        <button onclick="goPage('cards',document.querySelector('[data-page=cards]'))" style="background:var(--b);color:#fff;border:none;border-radius:8px;padding:4px 12px;font-size:.72rem;cursor:pointer;font-weight:600">Ödeme Yap →</button>
       </div>
     </div>
 
@@ -2771,31 +2798,53 @@ function loadInsights(){
       }
     }
 
-    // Net Likidite (hesap bakiyesi - kart borcu)
+    // Net Likidite
     var liq=document.getElementById('ins-liquidity');
     var burn=document.getElementById('ins-burn');
     if(liq){
       var lval=d.net_liquidity||0;
-      var lsign=lval>0?'+':lval<0?'−':'';
-      liq.textContent=lsign+'₺'+Math.abs(lval).toLocaleString('tr-TR');
+      liq.textContent=(lval>0?'+':'−')+'₺'+Math.abs(lval).toLocaleString('tr-TR');
       liq.style.color=lval>0?'#4ade80':lval<0?'#f87171':'#94a3b8';
     }
     if(burn && d.daily_burn>0){
       var dval=d.days_left;
-      burn.textContent='≈ '+(dval>365?'365+':dval)+' gün dayanır · Günlük ₺'+d.daily_burn;
+      burn.textContent='≈ '+(dval>365?'365+':dval)+' gün dayanır';
     }
 
-    // Net Varlık (hesap + yatırım + kıymet − borç)
+    // Kullanılabilir Nakit (bu ay net − asgari kart ödemeler)
+    var kul=document.getElementById('ins-kullanilabilir');
+    var asg=document.getElementById('ins-asgari');
+    if(kul && d.kullanilabilir_nakit!=null){
+      var kval=d.kullanilabilir_nakit;
+      kul.textContent=(kval>0?'+':'−')+'₺'+Math.abs(kval).toLocaleString('tr-TR');
+      kul.style.color=kval>0?'#fbbf24':kval<0?'#f87171':'#94a3b8';
+    }
+    if(asg && d.asgari_odeme>0){
+      asg.textContent='Asgari: ₺'+Math.round(d.asgari_odeme).toLocaleString('tr-TR');
+    }
+
+    // Net Varlık
     var nw=document.getElementById('ins-networth');
     var daysEl=document.getElementById('ins-days');
-    if(nw){
-      var nval=d.net_worth||0;
-      var nsign=nval>0?'+':nval<0?'−':'';
-      nw.textContent=nsign+'₺'+Math.abs(nval).toLocaleString('tr-TR');
+    if(nw && d.net_worth!=null){
+      var nval=d.net_worth;
+      nw.textContent=(nval>0?'+':'−')+'₺'+Math.abs(nval).toLocaleString('tr-TR');
       nw.style.color=nval>0?'#818cf8':nval<0?'#f87171':'#94a3b8';
     }
     if(daysEl && d.invest_val!=null){
-      daysEl.textContent='Yatırım ₺'+Math.round(d.invest_val).toLocaleString('tr-TR')+' · Kıymet ₺'+Math.round(d.asset_val||0).toLocaleString('tr-TR');
+      daysEl.textContent='Yat. ₺'+Math.round(d.invest_val).toLocaleString('tr-TR');
+    }
+
+    // Kart özet şeridi
+    if(d.kart_borcu>0){
+      var strip=document.getElementById('ins-card-strip');
+      if(strip) strip.style.display='block';
+      var kb=document.getElementById('ins-kart-borcu');
+      var ka=document.getElementById('ins-kart-asgari');
+      var kl=document.getElementById('ins-kart-limit');
+      if(kb) kb.textContent='₺'+Math.round(d.kart_borcu).toLocaleString('tr-TR');
+      if(ka) ka.textContent='₺'+Math.round(d.asgari_odeme).toLocaleString('tr-TR');
+      if(kl) kl.textContent='₺'+Math.round(d.kart_kullanilabilir||0).toLocaleString('tr-TR');
     }
   });
 }
@@ -5345,12 +5394,9 @@ function loadCards(){
             '<div style="font-weight:600">'+c.statement_day+'. gün</div>'+
           '</div>'+
         '</div>'+
-        '<div style="margin-top:10px">'+
-          '<label style="font-size:.72rem">Borcu Güncelle (₺)</label>'+
-          '<div style="display:flex;gap:8px;margin-top:4px">'+
-            '<input type="text" inputmode="decimal" data-num data-raw="'+c.used_+'" id="upd-used-'+c.id+'" value="'+Number(c.used_).toLocaleString("tr-TR",{minimumFractionDigits:2,maximumFractionDigits:2})+'" class="f-input" style="flex:1" placeholder="Güncel borç">'+
-            '<button class="btn btn-ghost" style="padding:8px 14px;font-size:.78rem" onclick="updateCardUsed('+c.id+')">Kaydet</button>'+
-          '</div>'+
+        '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'+
+          '<button class="btn btn-primary" style="flex:1;min-width:120px;font-size:.82rem" onclick="openCardPayModal('+c.id+',\''+c.bank_name+(c.card_name?' '+c.card_name:'')+'\','+c.used_+','+minPay+','+c.limit_+')">💳 Ödeme Yap</button>'+
+          '<button class="btn btn-ghost" style="font-size:.78rem;padding:8px 12px" onclick="openCardUpdateModal('+c.id+','+c.used_+')">✏️ Borcu Güncelle</button>'+
         '</div>'+
       '</div>';
     }).join('');
@@ -5361,8 +5407,38 @@ function loadCards(){
   });
 }
 
-function updateCardUsed(id){
-  var val = parseFloat(document.getElementById('upd-used-'+id).value)||0;
+// ── KART ÖDEME MODALI ────────────────────────────────────────────────────────
+var _payCardId=0;
+function openCardPayModal(id, name, debt, minPay, limit){
+  _payCardId=id;
+  var m=document.getElementById('card-pay-modal'); if(!m) return;
+  document.getElementById('cpay-name').textContent=name;
+  document.getElementById('cpay-debt').textContent=fmt(debt);
+  document.getElementById('cpay-min').textContent=fmt(minPay);
+  document.getElementById('cpay-avail').textContent=fmt(limit-debt);
+  document.getElementById('cpay-amount').value='';
+  document.getElementById('cpay-asgari-val').textContent=fmt(minPay);
+  document.getElementById('cpay-tam-val').textContent=fmt(debt);
+  m.style.display='flex';
+}
+function closeCardPayModal(){ var m=document.getElementById('card-pay-modal'); if(m) m.style.display='none'; }
+function setCardPayAmount(val){ document.getElementById('cpay-amount').value=val; }
+function confirmCardPay(){
+  var amount=parseFloat((document.getElementById('cpay-amount').value||'').replace(',','.'));
+  if(!amount||amount<=0){toast('Tutar giriniz','#ef4444');return;}
+  xhr('/api/cards/'+_payCardId+'/pay',{amount:amount},function(r){
+    if(r.ok){
+      closeCardPayModal();
+      toast('✅ Ödeme kaydedildi — '+fmt(r.paid)+' ödendi, kalan borç: '+fmt(r.new_debt),'#22c55e');
+      loadCards(); loadDashboard();
+    } else { toast(r.error||'Hata','#ef4444'); }
+  });
+}
+
+function openCardUpdateModal(id, currentDebt){
+  var newVal = prompt('Güncel borç miktarını girin (₺):', currentDebt);
+  if(newVal===null) return;
+  var val = parseFloat(newVal.replace(',','.'))||0;
   xhr('/api/cards/'+id, {used_: val}, function(r){ if(r.ok){ toast('Güncellendi ✓'); loadCards(); }}, true);
 }
 function delCard(id){
@@ -6042,6 +6118,46 @@ function showLiquidityDetail(){
 }
 function closeLiquidityDetail(){ var m=document.getElementById('liquidity-detail-modal'); if(m) m.style.display='none'; }
 </script>
+
+<!-- KART ÖDEME MODALI -->
+<div id="card-pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeCardPayModal()">
+  <div style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:28px 24px 40px;border-top:1px solid var(--border)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <div style="font-size:1rem;font-weight:800;color:var(--txt)">💳 Ödeme Yap</div>
+      <button onclick="closeCardPayModal()" style="width:32px;height:32px;border-radius:50%;border:1px solid var(--border2);background:var(--bg3);color:var(--txt2);cursor:pointer">✕</button>
+    </div>
+    <div id="cpay-name" style="font-size:.85rem;color:var(--b2);font-weight:600;margin-bottom:16px"></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px">
+      <div style="background:var(--bg3);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:.65rem;color:var(--txt2);margin-bottom:3px">Mevcut Borç</div>
+        <div id="cpay-debt" style="font-size:.9rem;font-weight:800;color:var(--r)"></div>
+      </div>
+      <div style="background:var(--bg3);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:.65rem;color:var(--txt2);margin-bottom:3px">Asgari Ödeme</div>
+        <div id="cpay-min" style="font-size:.9rem;font-weight:800;color:var(--y)"></div>
+      </div>
+      <div style="background:var(--bg3);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:.65rem;color:var(--txt2);margin-bottom:3px">Kullanılabilir</div>
+        <div id="cpay-avail" style="font-size:.9rem;font-weight:800;color:var(--g)"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button onclick="setCardPayAmount(document.getElementById('cpay-asgari-val').textContent.replace(/[₺.]/g,'').replace(',','.'))" class="btn btn-ghost" style="flex:1;font-size:.78rem">
+        Asgari Öde<br><span id="cpay-asgari-val" style="font-weight:700;color:var(--y)"></span>
+      </button>
+      <button onclick="setCardPayAmount(document.getElementById('cpay-tam-val').textContent.replace(/[₺.]/g,'').replace(',','.'))" class="btn btn-ghost" style="flex:1;font-size:.78rem">
+        Tamamını Öde<br><span id="cpay-tam-val" style="font-weight:700;color:var(--r)"></span>
+      </button>
+    </div>
+
+    <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:6px">Ödeme Tutarı (₺)</label>
+    <input type="number" id="cpay-amount" class="f-input" step="0.01" placeholder="0,00" style="margin-bottom:16px">
+    <button onclick="confirmCardPay()" class="btn btn-primary" style="width:100%;padding:13px;font-size:.92rem">Ödemeyi Kaydet</button>
+    <div style="font-size:.72rem;color:var(--txt2);text-align:center;margin-top:10px">Ödeme "Kredi Kartı Ödemesi" kategorisiyle gider olarak kaydedilir ve kart borcunuzdan düşülür.</div>
+  </div>
+</div>
 
 <!-- İŞLEM DETAY MODALI -->
 <div id="tx-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;align-items:flex-end;justify-content:center;padding:0" onclick="if(event.target===this)closeTxDetail()">

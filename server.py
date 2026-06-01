@@ -1313,10 +1313,40 @@ def summary():
         bar.append({"month":m,"gelir":round(g_val,2),"gider":round(ex_val,2)})
     bal = db.execute("SELECT SUM(CASE WHEN type='gelir' THEN amount ELSE -amount END) as b FROM transactions WHERE profile_id=?",(pid,)).fetchone()
     budgets = {r["category"]:r["limit_"] for r in db.execute("SELECT * FROM budgets WHERE profile_id=?",(pid,)).fetchall()}
-    return jsonify({"gelir":round(gelir_total,2),"gider":round(gider_total,2),
-                    "net":round(gelir_total-gider_total,2),"balance":round(bal["b"] or 0,2),
-                    "gelir_cats":gelir_cats,"gider_cats":gider_cats,"bar":bar,"budgets":budgets,
-                    "period":period})
+
+    # ── Net Kullanılabilir Nakit ──────────────────────────────────────────────
+    # Bu ay gelir - bu ay gider - kart asgari ödemeler (henüz ödenmemişse)
+    cards = db.execute("SELECT used_, min_pct, limit_ FROM cards WHERE profile_id=?", (pid,)).fetchall()
+    toplam_kart_borcu   = sum(float(c["used_"] or 0) for c in cards)
+    toplam_kart_limit   = sum(float(c["limit_"] or 0) for c in cards)
+    toplam_asgari       = sum(
+        round(float(c["used_"] or 0) * float(c["min_pct"] or 25) / 100, 2)
+        for c in cards if float(c["used_"] or 0) > 0
+    )
+    # Recurring zorunlu giderler (aktif)
+    recurring_gider = db.execute(
+        "SELECT COALESCE(SUM(amount),0) as t FROM recurring WHERE profile_id=? AND type='gider' AND active=1",
+        (pid,)
+    ).fetchone()["t"] or 0
+    # Kullanılabilir nakit = bu ay net - asgari ödemeler
+    net_this_month   = round(gelir_total - gider_total, 2)
+    kullanilabilir   = round(net_this_month - toplam_asgari, 2)
+    # Kart kullanılabilir limit
+    kart_kullanilabilir = round(toplam_kart_limit - toplam_kart_borcu, 2)
+
+    return jsonify({
+        "gelir": round(gelir_total,2), "gider": round(gider_total,2),
+        "net":   round(gelir_total-gider_total,2),
+        "balance": round(bal["b"] or 0, 2),
+        "gelir_cats": gelir_cats, "gider_cats": gider_cats,
+        "bar": bar, "budgets": budgets, "period": period,
+        "kart_borcu":        round(toplam_kart_borcu, 2),
+        "kart_limit":        round(toplam_kart_limit, 2),
+        "kart_kullanilabilir": kart_kullanilabilir,
+        "asgari_odeme":      round(toplam_asgari, 2),
+        "recurring_gider":   round(recurring_gider, 2),
+        "kullanilabilir_nakit": kullanilabilir,
+    })
 
 @app.route("/api/budgets", methods=["POST"])
 @login_required
@@ -1858,7 +1888,7 @@ _TG_CAT_KW = [
     ("ikramiye","Hediye / İkramiye"),("prim","Hediye / İkramiye"),("hediye","Hediye / İkramiye"),
     ("freelance","Serbest Meslek"),("serbest","Serbest Meslek"),("danışmanlık","Serbest Meslek"),
 ]
-_GELIR_CATS = {"Maaş","Kira Geliri","Yatırım / Temettü","Hediye / İkramiye","Serbest Meslek","Diğer Gelir"}
+_GELIR_CATS = set(GELIR_CATS)  # sunucu listesiyle senkron
 
 def _parse_tg_amount(text_l):
     """Parse Turkish amount: '10 bin' → 10000, '2.5 milyon' → 2500000, '500' → 500"""
@@ -4415,6 +4445,36 @@ def del_card(cid):
     pid = get_pid()
     get_db().execute("DELETE FROM cards WHERE id=? AND profile_id=?",(cid,pid)); get_db().commit()
     return jsonify({"ok":True})
+
+@app.route("/api/cards/<int:cid>/pay", methods=["POST"])
+@login_required
+def pay_card(cid):
+    """Kredi kartı ödemesi: gider işlemi oluştur + kart borcunu düş."""
+    uid = session["user_id"]; pid = get_pid()
+    db  = get_db()
+    card = db.execute("SELECT * FROM cards WHERE id=? AND profile_id=?", (cid, pid)).fetchone()
+    if not card:
+        return jsonify({"ok": False, "error": "Kart bulunamadı"}), 404
+    d = request.get_json(force=True)
+    amount = float(d.get("amount", 0))
+    if amount <= 0:
+        return jsonify({"ok": False, "error": "Geçersiz tutar"}), 400
+    # Borçtan fazla ödeme yapılamaz
+    current_debt = float(card["used_"] or 0)
+    amount = min(amount, current_debt)
+    desc = d.get("description") or f"{card['bank_name']} {card['card_name']} ödemesi"
+    # Gider işlemi oluştur
+    db.execute(
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?,?)",
+        (uid, pid, "gider", amount, "Kredi Kartı Ödemesi", desc, date.today().isoformat(), datetime.now().isoformat())
+    )
+    # Kart borcunu düş
+    new_debt = max(0, current_debt - amount)
+    db.execute("UPDATE cards SET used_=? WHERE id=?", (new_debt, cid))
+    db.commit()
+    return jsonify({"ok": True, "paid": amount, "new_debt": new_debt,
+                    "limit": float(card["limit_"] or 0),
+                    "available": float(card["limit_"] or 0) - new_debt})
 
 # ── RATES & INVESTMENTS ───────────────────────────────────────────────────────
 
