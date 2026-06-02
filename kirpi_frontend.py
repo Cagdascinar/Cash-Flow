@@ -301,14 +301,17 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 .more-sheet.open{transform:translateY(0)}
 .more-backdrop.open{display:block}
 /* ── SPLASH SCREEN ── */
-/* ── SPLASH — Apple/Revolut tarzı modern ── */
+/* ── SPLASH — CSS ile otomatik kapanır (JS hata yapsa bile) ── */
 #splash-screen{
   position:fixed;inset:0;z-index:99999;
   background:linear-gradient(160deg,#050c1a 0%,#0d1f3c 50%,#0a0e1a 100%);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  transition:opacity .45s cubic-bezier(.4,0,.2,1);
+  /* 1.5s sonra CSS kendisi kapatır — JS olmadan da çalışır */
+  animation:_splash-auto .45s 1.5s ease forwards;
 }
-#splash-screen.hide{opacity:0;pointer-events:none}
+@keyframes _splash-auto{to{opacity:0;pointer-events:none;visibility:hidden}}
+/* JS erken kapattığında */
+#splash-screen.hide{animation:_splash-auto .35s 0s ease forwards!important}
 .splash-center{display:flex;flex-direction:column;align-items:center;gap:0}
 .splash-icon-wrap{
   width:96px;height:96px;border-radius:28px;
@@ -935,7 +938,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   color:rgba(255,255,255,.35);margin-bottom:8px;font-weight:700;position:relative;
 }
 .hero-balance{
-  font-size:3.4rem;font-weight:900;letter-spacing:-.06em;line-height:1;
+  font-size:2.6rem;font-weight:900;letter-spacing:-.05em;line-height:1;
   margin-bottom:6px;color:#fff;position:relative;
   text-shadow:0 0 40px rgba(99,160,255,.3),0 2px 12px rgba(0,0,0,.3);
   font-variant-numeric:tabular-nums;
@@ -1504,6 +1507,12 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
 <!-- DASHBOARD -->
 <div class="page active" id="page-dashboard">
 
+  <!-- Yenile butonu — veri gelmezse görünür -->
+  <div id="dash-retry-bar" style="display:none;background:#ff3b3014;border:1px solid #ff3b3030;border-radius:10px;padding:10px 14px;margin-bottom:12px;display:none;align-items:center;gap:10px;font-size:.83rem;color:var(--r)">
+    <span>⚠️ Veriler yüklenemedi.</span>
+    <button onclick="loadDashboard();this.parentElement.style.display='none'" style="margin-left:auto;padding:5px 14px;background:var(--b);color:#fff;border:none;border-radius:7px;font-size:.8rem;cursor:pointer;font-weight:700">↻ Yenile</button>
+  </div>
+
   <!-- ── HERO BALANCE ── -->
   <div class="hero-card">
     <div class="hero-top-row">
@@ -1690,10 +1699,10 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
     <div class="tnr-value" id="today-net">—</div>
   </div>
 
-  <!-- ── KARTLARIM ── -->
+  <!-- ── LİMİTLER ── -->
   <div class="dash-section">
     <div class="s-header" onclick="toggleSection('cc')">
-      <div class="sh-left"><span class="sh-dot pp"></span>Kartlarım</div>
+      <div class="sh-left"><span class="sh-dot pp"></span>Limitler</div>
       <span class="sh-chevron" id="chevron-cc">▾</span>
     </div>
     <div class="s-body" id="sec-cc">
@@ -3156,13 +3165,20 @@ function _appInit(){
   var gEl=document.getElementById('hero-greeting');
   if(gEl) gEl.textContent=gEl.textContent.replace('Merhaba',prefix);
   initHeroMonthYear();
-  setupDrop();
-  setupNumInputs();
-  requestBrowserNotifPermission();
+  try{ setupDrop(); }catch(e){}
+  try{ setupNumInputs(); }catch(e){}
+  try{ requestBrowserNotifPermission(); }catch(e){}
 
   // Dashboard + işlemleri hemen yükle
-  loadDashboard();
-  loadAllTx();
+  try{ loadDashboard(); }catch(e){ console.error('loadDashboard error:',e); }
+  try{ loadAllTx(); }catch(e){}
+  // 5 saniye içinde veri gelmediyse retry butonu göster
+  setTimeout(function(){
+    var bal=document.getElementById('s-bal');
+    if(bal&&(bal.textContent==='—'||!bal.textContent.trim())){
+      var rb=document.getElementById('dash-retry-bar'); if(rb) rb.style.display='flex';
+    }
+  }, 5000);
 
   // Arka planda profil + kategori + kart verisi
   xhr('/api/init',null,function(d){
@@ -4287,43 +4303,44 @@ function loadTodayWidgets(){
           }).join('');
         }
 
-        // GRUP 3: Kredi Kartları (cards tablosundan)
-        var krediCards=(d.cards||[]).filter(function(c){return c.card_type==='kredi'});
+        // GRUP 3: Kredi Kartları
+        var krediCards=(d.cards||[]).filter(function(c){return c.card_type==='kredi'||c.card_type==='banka'});
         if(krediCards.length){
-          html+='<div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--txt2);margin:10px 0 6px;padding:0 2px">💳 Kredi Kartları</div>';
+          html+='<div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--txt2);margin:10px 0 6px;padding:0 2px">💳 Kredi & Banka Kartları</div>';
           html+=krediCards.map(function(c){
             var pct=c.pct||0; var fc=pct<50?'var(--g)':pct<80?'var(--y)':'var(--r)';
+            var ico=c.card_type==='banka'?'🏧':'💳';
             var nm=c.bank+(c.name?' · '+c.name:'');
-            var minPay=c.min_pct>0?Math.round(c.used*c.min_pct/100):0;
-            return '<div class="cc-item" onclick="goPage(\'cards\',document.querySelector(\'[data-page=cards]\'))" style="cursor:pointer">'+
-              '<div class="cc-item-top"><div class="cc-bank">💳 '+nm+'</div><span class="cc-pct-badge '+(pct<50?'ok':pct<80?'warn':'high')+'">%'+pct+'</span></div>'+
+            var minPay=c.min_pct>0&&c.card_type==='kredi'?Math.round(c.used*c.min_pct/100):0;
+            return '<div class="cc-item" onclick="goPage(\'hesaplar\',document.querySelector(\'[data-page=hesaplar]\'))" style="cursor:pointer">'+
+              '<div class="cc-item-top"><div class="cc-bank">'+ico+' '+nm+'</div><span class="cc-pct-badge '+(pct<50?'ok':pct<80?'warn':'high')+'">%'+pct+'</span></div>'+
               '<div class="cc-prog-bg"><div class="cc-prog-fill" style="width:'+pct+'%;background:'+fc+'"></div></div>'+
               '<div class="cc-nums">'+
-                '<span>Borç: <strong style="color:var(--r)">'+fmt(c.used)+'</strong></span>'+
                 '<span>Limit: <strong style="color:var(--b2)">'+fmt(c.limit)+'</strong></span>'+
+                '<span>Kullanılan: <strong style="color:var(--r)">'+fmt(c.used)+'</strong></span>'+
                 '<span>Kalan: <strong style="color:var(--g)">'+fmt(c.avail)+'</strong></span>'+
                 (minPay>0?'<span style="color:var(--y);font-size:.72rem">Asgari: '+fmt(minPay)+'</span>':'')+
               '</div></div>';
           }).join('');
         }
 
-        // GRUP 4: Banka Kartı + Yemek + Hediye
-        var diger=(d.cards||[]).filter(function(c){return c.card_type!=='kredi'});
-        if(diger.length){
-          html+='<div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--txt2);margin:10px 0 6px;padding:0 2px">🏧 Banka / Yemek Kartları</div>';
-          html+=diger.map(function(c){
-            var ico=_cico[c.card_type]||'🏧';
+        // GRUP 4: Yemek & Hediye Kartları
+        var yemekCards=(d.cards||[]).filter(function(c){return c.card_type==='yemek'||c.card_type==='hediye'});
+        if(yemekCards.length){
+          html+='<div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--txt2);margin:10px 0 6px;padding:0 2px">🍽️ Yemek & Hediye Kartları</div>';
+          html+=yemekCards.map(function(c){
+            var ico=c.card_type==='yemek'?'🍽️':'🎁';
             var nm=c.bank+(c.name?' · '+c.name:'');
             var pct=c.limit>0?Math.round(c.used/c.limit*100):0;
             var fc=pct<50?'var(--g)':pct<80?'var(--y)':'var(--r)';
-            return '<div class="cc-item" onclick="goPage(\'cards\',document.querySelector(\'[data-page=cards]\'))" style="cursor:pointer">'+
+            return '<div class="cc-item" onclick="goPage(\'hesaplar\',document.querySelector(\'[data-page=hesaplar]\'))" style="cursor:pointer">'+
               '<div class="cc-item-top"><div class="cc-bank">'+ico+' '+nm+'</div>'+
               (c.limit>0?'<span class="cc-pct-badge '+(pct<50?'ok':pct<80?'warn':'high')+'">%'+pct+'</span>':'')+
               '</div>'+
               (c.limit>0?'<div class="cc-prog-bg"><div class="cc-prog-fill" style="width:'+pct+'%;background:'+fc+'"></div></div>':'')+
               '<div class="cc-nums">'+
-                '<span>Kullanılan: <strong style="color:var(--r)">'+fmt(c.used)+'</strong></span>'+
                 (c.limit>0?'<span>Limit: <strong style="color:var(--b2)">'+fmt(c.limit)+'</strong></span>':'')+
+                '<span>Kullanılan: <strong style="color:var(--r)">'+fmt(c.used)+'</strong></span>'+
                 (c.limit>0?'<span>Kalan: <strong style="color:var(--g)">'+fmt(c.avail)+'</strong></span>':'')+
               '</div></div>';
           }).join('');
@@ -4418,7 +4435,8 @@ function loadDashboard(){
     drawBar(d.bar);
     drawDonut(d.gider_cats);
     renderBudgetPage(d.gider_cats,d.budgets);
-    hideSplash(); // veri geldi, splash'ı kapat
+    hideSplash();
+    var rb=document.getElementById('dash-retry-bar'); if(rb) rb.style.display='none';
   });
   xhr('/api/motivation',null,renderMotivation);
   loadTodayWidgets();
@@ -6822,7 +6840,7 @@ function closeLiquidityDetail(){ var m=document.getElementById('liquidity-detail
     <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:5px">Açıklama</label>
     <input type="text" id="txe-desc" class="f-input" style="margin-bottom:12px">
     <div id="txe-card-row" style="margin-bottom:12px">
-      <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:5px">💳 Hangi Kartla Ödendi?</label>
+      <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:5px">💳 Kart Seç</label>
       <select id="txe-card" class="f-input"><option value="">— Nakit / Kart Seçme —</option></select>
     </div>
     <div style="margin-bottom:20px">
