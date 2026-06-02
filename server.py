@@ -1240,6 +1240,12 @@ def add_transaction():
     cur = db.execute(
         "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,card_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
         (uid, pid, ttype, amount, cat, desc, dt, account_id, card_id, datetime.now().isoformat()))
+    # Kart borcu otomatik güncelle
+    if card_id:
+        if ttype == "gider":
+            db.execute("UPDATE cards SET used_=used_+? WHERE id=? AND profile_id=?", (amount, card_id, pid))
+        elif ttype == "gelir":
+            db.execute("UPDATE cards SET used_=GREATEST(0,used_-?) WHERE id=? AND profile_id=?", (amount, card_id, pid))
     db.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
 
@@ -1267,8 +1273,18 @@ def update_transaction(tid):
 @app.route("/api/transactions/<int:tid>", methods=["DELETE"])
 @login_required
 def del_transaction(tid):
-    pid = get_pid()
-    get_db().execute("DELETE FROM transactions WHERE id=? AND profile_id=?", (tid, pid)); get_db().commit()
+    pid = get_pid(); db = get_db()
+    tx = db.execute("SELECT * FROM transactions WHERE id=? AND profile_id=?", (tid, pid)).fetchone()
+    if tx and tx.get("card_id"):
+        # Silmede kart borcunu geri al
+        if tx["type"] == "gider":
+            db.execute("UPDATE cards SET used_=GREATEST(0,used_-?) WHERE id=? AND profile_id=?",
+                       (tx["amount"], tx["card_id"], pid))
+        elif tx["type"] == "gelir":
+            db.execute("UPDATE cards SET used_=used_+? WHERE id=? AND profile_id=?",
+                       (tx["amount"], tx["card_id"], pid))
+    db.execute("DELETE FROM transactions WHERE id=? AND profile_id=?", (tid, pid))
+    db.commit()
     return jsonify({"ok": True})
 
 @app.route("/api/transactions/bulk-delete", methods=["POST"])
@@ -4592,16 +4608,18 @@ def pay_card(cid):
         return jsonify({"ok": False, "error": "Kart bulunamadı"}), 404
     d = request.get_json(force=True)
     amount = float(d.get("amount", 0))
+    account_id = d.get("account_id") or None  # ödeme yapılan vadesiz hesap
     if amount <= 0:
         return jsonify({"ok": False, "error": "Geçersiz tutar"}), 400
-    # Borçtan fazla ödeme yapılamaz
     current_debt = float(card["used_"] or 0)
     amount = min(amount, current_debt)
-    desc = d.get("description") or f"{card['bank_name']} {card['card_name']} ödemesi"
-    # Gider işlemi oluştur
+    card_type = card.get("card_type") or "kredi"
+    cat = "Yemek Kartı Ödemesi" if card_type == "yemek" else "Kredi Kartı Ödemesi"
+    desc = d.get("description") or f"{card['bank_name']} {card.get('card_name') or ''} ödemesi".strip()
+    # Ödeme işlemini kaydet — vadesiz hesap varsa oraya bağla
     db.execute(
-        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?,?)",
-        (uid, pid, "gider", amount, "Kredi Kartı Ödemesi", desc, date.today().isoformat(), datetime.now().isoformat())
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        (uid, pid, "gider", amount, cat, desc, date.today().isoformat(), account_id, datetime.now().isoformat())
     )
     # Kart borcunu düş
     new_debt = max(0, current_debt - amount)

@@ -166,11 +166,13 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
     display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;height:100vh;z-index:100}
 .main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden;min-width:0;
   padding-top:calc(54px + env(safe-area-inset-top,0px))}
-/* Tablet: 768-1200px — body kaydirir, .main scroll trap'i kaldır */
+/* Tablet: 768-1200px — body kaydirir, hiçbir şey scroll'u engellemez */
 @media(min-width:769px) and (max-width:1200px){
-  html,body{overflow-y:auto;-webkit-overflow-scrolling:touch}
-  .main{overflow-y:visible}
-  .page{touch-action:pan-y;-webkit-overflow-scrolling:touch}
+  html{height:auto;overflow-y:auto}
+  body{height:auto;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+  .main{overflow-y:visible;height:auto}
+  .page{touch-action:pan-y}
+  nav{touch-action:none;pointer-events:auto}
 }
 @media(max-width:768px){
   nav{width:100%;height:auto;flex-direction:row;border-right:none;border-top:none;border-bottom:none;
@@ -406,6 +408,11 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
   to{opacity:1;transform:translateY(0) scale(1)}
 }
 .page.slide-back{transform:translateX(-12px);opacity:0}
+/* Ödeme yöntemi çipleri */
+.pay-chip{padding:7px 13px;border-radius:10px;border:1.5px solid var(--border2);background:var(--bg3);
+  color:var(--txt2);font-size:.8rem;font-weight:600;cursor:pointer;transition:.14s;
+  -webkit-tap-highlight-color:transparent}
+.pay-chip.active{border-color:var(--b);background:rgba(0,122,255,.1);color:var(--b)}
 @media(max-width:600px){.page{padding:16px 16px 20px}}
 .page-title{
   font-size:1.9rem;font-weight:900;margin-bottom:4px;
@@ -1923,21 +1930,35 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
       <div><label>Tarih</label><input class="f-input" type="date" id="f-date"></div>
     </div>
     <div style="margin-bottom:12px"><label>Kategori</label><select class="f-input" id="f-cat"></select></div>
-    <div style="margin-bottom:12px"><label>Açıklama</label><input class="f-input" type="text" id="f-desc" placeholder="örn. Market alışverişi"></div>
-    <!-- Gider: hangi kartla ödendi -->
-    <div style="margin-bottom:12px" id="f-card-row">
-      <label id="f-card-label">💳 Hangi Kartla Ödendi?</label>
-      <select class="f-input" id="f-card">
-        <option value="">— Nakit / Kart Seçme —</option>
-      </select>
+    <div style="margin-bottom:14px"><label>Açıklama</label><input class="f-input" type="text" id="f-desc" placeholder="örn. Market alışverişi"></div>
+
+    <!-- ÖDEME YÖNTEMİ — sadece gider için -->
+    <div id="f-pay-section" style="margin-bottom:16px">
+      <label style="margin-bottom:8px;display:block">Ödeme Yöntemi</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="f-pay-chips">
+        <button type="button" class="pay-chip active" data-ptype="nakit" onclick="selectPayType(this)">💵 Nakit</button>
+        <button type="button" class="pay-chip" data-ptype="banka_kart" onclick="selectPayType(this)">🏧 Banka Kartı</button>
+        <button type="button" class="pay-chip" data-ptype="kredi_kart" onclick="selectPayType(this)">💳 Kredi Kartı</button>
+        <button type="button" class="pay-chip" data-ptype="yemek_kart" onclick="selectPayType(this)">🍽️ Yemek Kartı</button>
+      </div>
+      <!-- Banka kartı → vadesiz hesap seç -->
+      <div id="f-account-row" style="display:none">
+        <label style="font-size:.78rem;color:var(--txt2);margin-bottom:4px;display:block">🏦 Hangi Hesaptan?</label>
+        <select class="f-input" id="f-account"><option value="">— Hesap seçin —</option></select>
+      </div>
+      <!-- Kredi/Yemek kartı → kart seç -->
+      <div id="f-card-row" style="display:none">
+        <label style="font-size:.78rem;color:var(--txt2);margin-bottom:4px;display:block" id="f-card-label">💳 Hangi Kartla?</label>
+        <select class="f-input" id="f-card"><option value="">— Kart seçin —</option></select>
+      </div>
     </div>
-    <!-- Hesap: hangi hesaba geldi / hangi hesaptan çıktı -->
-    <div style="margin-bottom:20px" id="f-account-row">
-      <label id="f-account-label">🏦 Banka Hesabı</label>
-      <select class="f-input" id="f-account">
-        <option value="">— Hesap Belirtme —</option>
-      </select>
+
+    <!-- GELİR için hesap seçici -->
+    <div id="f-income-dest" style="display:none;margin-bottom:16px">
+      <label>🏦 Hangi Hesaba Geldi?</label>
+      <select class="f-input" id="f-income-account"><option value="">— Belirtme (Nakit) —</option></select>
     </div>
+
     <button class="btn btn-danger" id="add-btn" style="width:100%;padding:13px" onclick="addTx()">Kaydet</button>
   </div>
 </div>
@@ -4086,14 +4107,64 @@ function setTab(t){
   document.getElementById('tab-r').className='type-tab'+(t==='gider'?' tr':'');
   document.getElementById('add-btn').className='btn '+(t==='gelir'?'btn-green':'btn-danger');
   fillSel('f-cat',CATS[t]);
-  // Kart satırı: sadece giderde göster
-  var cardRow=document.getElementById('f-card-row');
-  if(cardRow) cardRow.style.display=(t==='gider'?'':'none');
-  // Hesap etiketi güncelle
-  var accLbl=document.getElementById('f-account-label');
-  if(accLbl) accLbl.textContent=(t==='gelir'?'🏦 Hangi Hesaba Geldi?':'🏦 Banka Hesabı (opsiyonel)');
+  // Gider: ödeme yöntemi çipleri göster
+  var paySection=document.getElementById('f-pay-section');
+  if(paySection) paySection.style.display=(t==='gider'?'':'none');
+  // Gelir: nereye geldi hesap seçici
+  var incDest=document.getElementById('f-income-dest');
+  if(incDest) incDest.style.display=(t==='gelir'?'':'none');
+  if(t==='gelir') _fillIncomeDest();
+  if(t==='gider') selectPayType(document.querySelector('.pay-chip.active')||document.querySelector('.pay-chip'));
+}
+
+function _fillIncomeDest(){
+  var sel=document.getElementById('f-income-account'); if(!sel) return;
+  var prev=sel.value;
+  sel.innerHTML='<option value="">— Belirtme (Nakit) —</option>';
+  _allAccounts.forEach(function(a){
+    var opt=document.createElement('option');
+    opt.value=a.id;
+    opt.textContent=(a.bank?a.bank+' · ':'')+a.name;
+    sel.appendChild(opt);
+  });
+  if(prev) sel.value=prev;
+}
+
+function selectPayType(btn){
+  if(!btn) return;
+  document.querySelectorAll('.pay-chip').forEach(function(b){b.classList.remove('active')});
+  btn.classList.add('active');
+  var pt=btn.dataset.ptype;
   var accRow=document.getElementById('f-account-row');
-  if(accRow) accRow.style.display='block'; // her zaman göster
+  var cardRow=document.getElementById('f-card-row');
+  var cardLbl=document.getElementById('f-card-label');
+  if(accRow) accRow.style.display=(pt==='banka_kart'?'':'none');
+  if(cardRow) cardRow.style.display=(pt==='kredi_kart'||pt==='yemek_kart'?'':'none');
+  if(pt==='banka_kart') loadAccountsDropdown();
+  if(pt==='kredi_kart'){
+    if(cardLbl) cardLbl.textContent='💳 Kredi Kartı Seçin';
+    _fillCardSel('kredi');
+  }
+  if(pt==='yemek_kart'){
+    if(cardLbl) cardLbl.textContent='🍽️ Yemek Kartı Seçin';
+    _fillCardSel('yemek');
+  }
+}
+
+function _fillCardSel(filterType){
+  var sel=document.getElementById('f-card'); if(!sel) return;
+  var prev=sel.value;
+  sel.innerHTML='<option value="">— Kart seçin —</option>';
+  var filtered=filterType?_allCards.filter(function(c){return c.card_type===filterType;}):_allCards;
+  filtered.forEach(function(c){
+    var opt=document.createElement('option');
+    opt.value='card:'+c.id;
+    var used=parseFloat(c.used_||0); var lim=parseFloat(c.limit_||0);
+    var avail=lim>0?' (kalan: '+fmt(lim-used)+')':'';
+    opt.textContent=c.bank_name+(c.card_name?' '+c.card_name:'')+avail;
+    sel.appendChild(opt);
+  });
+  if(prev) sel.value=prev;
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
@@ -5074,23 +5145,33 @@ function addTx(){
   var cat=document.getElementById('f-cat').value;
   var desc=document.getElementById('f-desc').value;
   var dt=document.getElementById('f-date').value;
-  var accSel=document.getElementById('f-account');
-  var cardSel=document.getElementById('f-card');
-  var accId=accSel&&accSel.value?parseInt(accSel.value):null;
-  // Kart seçici: "card:123" formatında gelir
-  var cardVal=cardSel?cardSel.value:'';
-  var cardId=null;
-  if(cardVal&&cardVal.indexOf('card:')===0) cardId=parseInt(cardVal.split(':')[1]);
   if(!amount||amount<=0){toast('Tutar giriniz');return}
-  var payload={type:curTab,amount:amount,category:cat,description:desc,date:dt,account_id:accId};
-  if(curTab==='gider'&&cardId) payload.card_id=cardId;
+  var payload={type:curTab,amount:amount,category:cat,description:desc,date:dt};
+  if(curTab==='gider'){
+    var activeChip=document.querySelector('.pay-chip.active');
+    var pt=activeChip?activeChip.dataset.ptype:'nakit';
+    if(pt==='banka_kart'){
+      var accSel=document.getElementById('f-account');
+      if(accSel&&accSel.value) payload.account_id=parseInt(accSel.value);
+    } else if(pt==='kredi_kart'||pt==='yemek_kart'){
+      var cardSel=document.getElementById('f-card');
+      var cv=cardSel?cardSel.value:'';
+      if(cv&&cv.indexOf('card:')===0) payload.card_id=parseInt(cv.split(':')[1]);
+    }
+  } else {
+    // Gelir: hangi hesaba
+    var incAcc=document.getElementById('f-income-account');
+    if(incAcc&&incAcc.value) payload.account_id=parseInt(incAcc.value);
+  }
   xhr('/api/transactions',payload,function(r){
     if(r.ok){
       toast('İşlem eklendi ✓');
       document.getElementById('f-amount').value='';
       document.getElementById('f-desc').value='';
-      if(accSel) accSel.value='';
-      if(cardSel) cardSel.value='';
+      // Seçimleri sıfırla
+      var acc=document.getElementById('f-account'); if(acc) acc.value='';
+      var crd=document.getElementById('f-card'); if(crd) crd.value='';
+      var inc=document.getElementById('f-income-account'); if(inc) inc.value='';
       loadDashboard();loadAllTx();
     }
   });
@@ -5952,6 +6033,17 @@ function openCardPayModal(id, name, debt, minPay, limit){
   document.getElementById('cpay-amount').value='';
   document.getElementById('cpay-asgari-val').textContent=fmt(minPay);
   document.getElementById('cpay-tam-val').textContent=fmt(debt);
+  // Vadesiz hesap dropdown'unu doldur
+  var accSel=document.getElementById('cpay-account');
+  if(accSel){
+    accSel.innerHTML='<option value="">— Hesap Belirtme —</option>';
+    _allAccounts.filter(function(a){return a.type==='vadesiz'||a.type==='tasarruf';}).forEach(function(a){
+      var opt=document.createElement('option');
+      opt.value=a.id;
+      opt.textContent='🏦 '+(a.bank?a.bank+' · ':'')+a.name;
+      accSel.appendChild(opt);
+    });
+  }
   m.style.display='flex';
 }
 function closeCardPayModal(){ var m=document.getElementById('card-pay-modal'); if(m) m.style.display='none'; }
@@ -5959,7 +6051,9 @@ function setCardPayAmount(val){ document.getElementById('cpay-amount').value=val
 function confirmCardPay(){
   var amount=parseFloat((document.getElementById('cpay-amount').value||'').replace(',','.'));
   if(!amount||amount<=0){toast('Tutar giriniz','#ef4444');return;}
-  xhr('/api/cards/'+_payCardId+'/pay',{amount:amount},function(r){
+  var accSel=document.getElementById('cpay-account');
+  var accId=accSel&&accSel.value?parseInt(accSel.value):null;
+  xhr('/api/cards/'+_payCardId+'/pay',{amount:amount,account_id:accId},function(r){
     if(r.ok){
       closeCardPayModal();
       toast('✅ Ödeme kaydedildi — '+fmt(r.paid)+' ödendi, kalan borç: '+fmt(r.new_debt),'#22c55e');
@@ -6686,9 +6780,13 @@ function closeLiquidityDetail(){ var m=document.getElementById('liquidity-detail
     </div>
 
     <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:6px">Ödeme Tutarı (₺)</label>
-    <input type="number" id="cpay-amount" class="f-input" step="0.01" placeholder="0,00" style="margin-bottom:16px">
+    <input type="number" id="cpay-amount" class="f-input" step="0.01" placeholder="0,00" style="margin-bottom:12px">
+    <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:6px">🏦 Hangi Hesaptan Ödeniyor? <span style="opacity:.5">(opsiyonel)</span></label>
+    <select id="cpay-account" class="f-input" style="margin-bottom:16px">
+      <option value="">— Hesap Belirtme —</option>
+    </select>
     <button onclick="confirmCardPay()" class="btn btn-primary" style="width:100%;padding:13px;font-size:.92rem">Ödemeyi Kaydet</button>
-    <div style="font-size:.72rem;color:var(--txt2);text-align:center;margin-top:10px">Ödeme "Kredi Kartı Ödemesi" kategorisiyle gider olarak kaydedilir ve kart borcunuzdan düşülür.</div>
+    <div style="font-size:.72rem;color:var(--txt2);text-align:center;margin-top:10px">Ödeme gider olarak kaydedilir, kart borcunuzdan düşülür.</div>
   </div>
 </div>
 
