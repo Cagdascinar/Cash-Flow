@@ -473,8 +473,10 @@ def init_db():
         ("users",        "report_name",     "TEXT NOT NULL DEFAULT ''"),
         ("users",        "report_contact",  "TEXT NOT NULL DEFAULT ''"),
         ("users",        "report_logo",     "TEXT NOT NULL DEFAULT ''"),
-        ("users",           "phone",    "TEXT NOT NULL DEFAULT ''"),
-        ("telegram_pending","tx_date",  "TEXT NOT NULL DEFAULT ''"),
+        ("users",           "phone",        "TEXT NOT NULL DEFAULT ''"),
+        ("telegram_pending","tx_date",      "TEXT NOT NULL DEFAULT ''"),
+        ("cards",           "card_type",    "TEXT NOT NULL DEFAULT 'kredi'"),
+        ("transactions",    "card_id",      "INTEGER DEFAULT NULL"),
     ]
     with pg_connect() as con:
         for stmt in stmts:
@@ -1231,12 +1233,13 @@ def add_transaction():
     ttype = d.get("type"); amount = float(d.get("amount", 0))
     cat = d.get("category",""); desc = d.get("description",""); dt = d.get("date", today_str())
     account_id = d.get("account_id") or None
+    card_id    = d.get("card_id") or None
     if ttype not in ("gelir","gider") or amount <= 0 or not cat:
         return jsonify({"ok": False, "error": "Geçersiz veri"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
-        (uid, pid, ttype, amount, cat, desc, dt, account_id, datetime.now().isoformat()))
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,card_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (uid, pid, ttype, amount, cat, desc, dt, account_id, card_id, datetime.now().isoformat()))
     db.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
 
@@ -1246,10 +1249,15 @@ def update_transaction(tid):
     pid = get_pid()
     d = request.get_json(force=True)
     fields, params = [], []
-    for col in ("type","amount","category","description","date"):
+    for col in ("type","amount","category","description","date","account_id","card_id"):
         if col in d:
             fields.append(f"{col}=?")
-            params.append(float(d[col]) if col == "amount" else d[col])
+            if col == "amount":
+                params.append(float(d[col]))
+            elif col in ("account_id","card_id"):
+                params.append(int(d[col]) if d[col] else None)
+            else:
+                params.append(d[col])
     if not fields: return jsonify({"ok": False}), 400
     params += [tid, pid]
     get_db().execute(f"UPDATE transactions SET {','.join(fields)} WHERE id=? AND profile_id=?", params)
@@ -2138,32 +2146,47 @@ def _tg_budget_msg(pid, db):
         lines.append(f"{warn} <b>{cat}</b>\n   {bar} %{pct}\n   {_tg_fmt_amount(spent)} / {_tg_fmt_amount(limit)}")
     return "\n".join(lines)
 
+_CTYPE_ICO = {"kredi": "💳", "banka": "🏧", "yemek": "🍽️", "hediye": "🎁"}
+
 def _tg_cards_msg(pid, db):
     cards = db.execute("SELECT * FROM cards WHERE profile_id=%s ORDER BY bank_name",(pid,)).fetchall()
     if not cards:
         return "💳 Kayıtlı kart yok."
     today = date.today()
-    lines = ["💳 <b>Kredi Kartları</b>\n"]
+    # Türe göre grupla
+    groups = {"kredi": [], "banka": [], "yemek": [], "hediye": []}
     for c in cards:
-        used = c["used_"] or 0
-        lim  = c["limit_"] or 0
-        pct  = round(used/lim*100) if lim else 0
-        # Son ödeme tarihi
-        due_day = c["due_day"] or 1
-        if today.day <= due_day:
-            due_date = today.replace(day=due_day)
-        else:
-            if today.month == 12:
-                due_date = date(today.year+1, 1, due_day)
+        groups.setdefault(c.get("card_type","kredi"), []).append(c)
+    lines = ["💳 <b>Kartlarım</b>\n"]
+    for ctype, group in groups.items():
+        if not group: continue
+        ico = _CTYPE_ICO.get(ctype, "💳")
+        type_name = {"kredi":"Kredi Kartları","banka":"Banka Kartları","yemek":"Yemek Kartları","hediye":"Hediye Kartları"}.get(ctype,"Kartlar")
+        lines.append(f"\n{ico} <b>{type_name}</b>")
+        for c in group:
+            used = c["used_"] or 0
+            lim  = c["limit_"] or 0
+            pct  = round(used/lim*100) if lim else 0
+            warn = "🔴" if pct>=90 else "🟡" if pct>=70 else "🟢"
+            card_label = f"{c['bank_name']}" + (f" {c['card_name']}" if c.get('card_name') else "")
+            if ctype in ("yemek","hediye"):
+                lines.append(f"{warn} <b>{card_label}</b>\n"
+                             f"   Kalan: {_tg_fmt_amount(lim-used)} / {_tg_fmt_amount(lim)} (%{100-pct})")
             else:
-                import calendar
-                last = calendar.monthrange(today.year, today.month+1)[1]
-                due_date = date(today.year, today.month+1, min(due_day, last))
-        days_left = (due_date - today).days
-        warn = "🔴" if pct>=90 else "🟡" if pct>=70 else "🟢"
-        lines.append(f"{warn} <b>{c['bank_name']}</b> {c.get('card_name','')}\n"
-                    f"   Borç: {_tg_fmt_amount(used)} / {_tg_fmt_amount(lim)} (%{pct})\n"
-                    f"   Son ödeme: {due_date.strftime('%d.%m')} ({days_left} gün)")
+                due_day = c["due_day"] or 1
+                if today.day <= due_day:
+                    due_date = today.replace(day=due_day)
+                else:
+                    if today.month == 12:
+                        due_date = date(today.year+1, 1, due_day)
+                    else:
+                        import calendar
+                        last = calendar.monthrange(today.year, today.month+1)[1]
+                        due_date = date(today.year, today.month+1, min(due_day, last))
+                days_left = (due_date - today).days
+                lines.append(f"{warn} <b>{card_label}</b>\n"
+                             f"   Borç: {_tg_fmt_amount(used)} / {_tg_fmt_amount(lim)} (%{pct})\n"
+                             f"   Son ödeme: {due_date.strftime('%d.%m')} ({days_left} gün)")
     return "\n".join(lines)
 
 @app.route("/api/telegram/webhook", methods=["POST"])
@@ -2368,8 +2391,26 @@ def telegram_webhook():
             return "ok"
 
         if text_l in ("/kartlar", "/kart", "kartlar", "kart", "💳 kartlar",
-                      "kart borçları", "kart borclarim", "kartlarim"):
+                      "kart borçları", "kart borclarim", "kartlarim",
+                      "yemek kart", "yemek kartı", "yemek kartim"):
             tg_send(chat_id, _tg_cards_msg(pid, db))
+            return "ok"
+
+        if text_l in ("/hesaplar", "hesaplar", "hesabım", "hesaplarim",
+                      "🏦 hesaplar", "hesap bakiye", "bakiyeler"):
+            accs = db.execute(
+                "SELECT name,bank,type,initial_balance FROM accounts WHERE profile_id=%s AND active=1 ORDER BY name", (pid,)
+            ).fetchall()
+            if not accs:
+                tg_send(chat_id, "🏦 Kayıtlı hesap yok.")
+            else:
+                _ACC_ICO_TG = {"vadesiz":"🏦","tasarruf":"💰","kredi_karti":"💳","kmh":"🔄","konut_kredisi":"🏠","arac_kredisi":"🚗","ihtiyac_kredisi":"💼","diger":"📋"}
+                lines = ["🏦 <b>Hesaplarım</b>\n"]
+                for a in accs:
+                    ico = _ACC_ICO_TG.get(a["type"],"🏦")
+                    lines.append(f"{ico} <b>{a['bank']} — {a['name']}</b>\n"
+                                 f"   Bakiye: {_tg_fmt_amount(a['initial_balance'] or 0)}")
+                tg_send(chat_id, "\n".join(lines))
             return "ok"
 
         if text_l in ("/yatirim", "/yatırım", "yatirim", "yatırım", "📈 yatırım",
@@ -3716,6 +3757,60 @@ def goals_analysis():
 def categories():
     return jsonify({"gelir":GELIR_CATS,"gider":GIDER_CATS,"all":ALL_CATS})
 
+@app.route("/api/init")
+@login_required
+def api_init():
+    """Tek çağrıyla tüm başlangıç verilerini döndür — yükleme süresini azaltır."""
+    uid = session.get("user_id"); pid = get_pid()
+    db  = get_db()
+    row = db.execute("SELECT display_name,username,email,avatar,phone FROM users WHERE id=?", (uid,)).fetchone()
+    sub = get_sub_status(uid)
+    user_info = {
+        "username":     session.get("username"),
+        "display":      session.get("display") or (row["display_name"] if row else ""),
+        "profile_id":   session.get("profile_id"),
+        "profile_name": session.get("profile_name"),
+        "profile_type": session.get("profile_type"),
+        "email":        row["email"] if row else "",
+        "phone":        (row["phone"] if row else "") or "",
+        "avatar":       row["avatar"] if row else "",
+        "subscription": sub,
+    }
+    profiles = [row_to_dict(r) for r in db.execute(
+        "SELECT * FROM profiles WHERE user_id=? ORDER BY id", (uid,)).fetchall()]
+    accounts = [row_to_dict(r) for r in db.execute(
+        "SELECT id,name,bank,type,color,initial_balance FROM accounts WHERE profile_id=? AND active=1 ORDER BY name", (pid,)).fetchall()]
+    cards_raw = db.execute(
+        "SELECT id,bank_name,card_name,card_type,used_,limit_,due_day FROM cards WHERE profile_id=? ORDER BY bank_name", (pid,)).fetchall()
+    cards = [row_to_dict(r) for r in cards_raw]
+    # Kart hatırlatıcıları
+    today_d = date.today(); year, month = today_d.year, today_d.month
+    from calendar import monthrange as _mr
+    _, last_day = _mr(year, month)
+    card_reminders = []
+    for c in cards_raw:
+        if not (c["used_"] or 0): continue
+        due_day  = c["due_day"]
+        due_date = f"{year:04d}-{month:02d}-{min(due_day, last_day):02d}"
+        days_until = (date.fromisoformat(due_date) - today_d).days
+        if 0 <= days_until <= 7:
+            card_reminders.append({
+                "name": f"{c['bank_name']} {c['card_name']}",
+                "amount": float(c["used_"] or 0),
+                "due_date": due_date,
+                "days_until": days_until,
+            })
+    tx_count = db.execute("SELECT COUNT(*) as n FROM transactions WHERE profile_id=?", (pid,)).fetchone()["n"]
+    return jsonify({
+        "user":           user_info,
+        "profiles":       profiles,
+        "categories":     {"gelir": GELIR_CATS, "gider": GIDER_CATS, "all": ALL_CATS},
+        "accounts":       accounts,
+        "cards":          cards,
+        "card_reminders": card_reminders,
+        "tx_count":       tx_count,
+    })
+
 @app.route("/api/reminders")
 @login_required
 def reminders():
@@ -4419,10 +4514,14 @@ def add_card():
     limit = float(d.get("limit_",0)); used = float(d.get("used_",0))
     due_day = int(d.get("due_day",1)); min_pct = float(d.get("min_pct",25))
     stmt_day = int(d.get("statement_day",20))
-    if not bank or limit <= 0: return jsonify({"ok":False}), 400
+    card_type = d.get("card_type","kredi")
+    if card_type not in ("kredi","banka","yemek","hediye"): card_type = "kredi"
+    if not bank: return jsonify({"ok":False}), 400
+    # Yemek kartlarının limiti olabilir (0 da geçerli)
+    if card_type not in ("yemek","hediye") and limit <= 0: return jsonify({"ok":False}), 400
     db = get_db()
-    cur = db.execute("INSERT INTO cards (user_id,profile_id,bank_name,card_name,owner,limit_,used_,due_day,min_pct,statement_day,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                     (uid,pid,bank,card,owner,limit,used,due_day,min_pct,stmt_day,datetime.now().isoformat()))
+    cur = db.execute("INSERT INTO cards (user_id,profile_id,bank_name,card_name,owner,limit_,used_,due_day,min_pct,statement_day,card_type,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                     (uid,pid,bank,card,owner,limit,used,due_day,min_pct,stmt_day,card_type,datetime.now().isoformat()))
     db.commit(); return jsonify({"ok":True,"id":cur.lastrowid})
 
 @app.route("/api/cards/<int:cid>", methods=["PUT"])
@@ -4430,7 +4529,7 @@ def add_card():
 def update_card(cid):
     pid = get_pid()
     d = request.get_json(force=True); fields=[]; params=[]
-    for col in ("bank_name","card_name","limit_","used_","due_day","min_pct","statement_day"):
+    for col in ("bank_name","card_name","owner","limit_","used_","due_day","min_pct","statement_day","card_type"):
         if col in d:
             fields.append(f"{col}=?")
             params.append(float(d[col]) if col in ("limit_","used_","min_pct") else int(d[col]) if col in ("due_day","statement_day") else d[col])
