@@ -1371,10 +1371,7 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
       <span class="ico">📈</span>Yatırım
     </div>
     <div class="nl nl-desktop" data-page="hesaplar" onclick="goPage('hesaplar',this)">
-      <span class="ico">🏦</span>Hesaplar
-    </div>
-    <div class="nl nl-desktop" data-page="cards" onclick="goPage('cards',this)">
-      <span class="ico">💳</span>Kartlarım
+      <span class="ico">💳</span>Kartlar & Hesaplar
     </div>
 
     <div class="nav-sect">Firma</div>
@@ -1687,7 +1684,7 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
         <div style="color:var(--txt2)">💳 Kart borcu: <span id="ins-kart-borcu" style="font-weight:700;color:var(--r)">—</span></div>
         <div style="color:var(--txt2)">Asgari ödeme: <span id="ins-kart-asgari" style="font-weight:700;color:var(--y)">—</span></div>
         <div style="color:var(--txt2)">Kullanılabilir limit: <span id="ins-kart-limit" style="font-weight:700;color:var(--g)">—</span></div>
-        <button onclick="goPage('cards',document.querySelector('[data-page=cards]'))" style="background:var(--b);color:#fff;border:none;border-radius:8px;padding:4px 12px;font-size:.72rem;cursor:pointer;font-weight:600">Ödeme Yap →</button>
+        <button onclick="goPage('hesaplar',document.querySelector('[data-page=hesaplar]'))" style="background:var(--b);color:#fff;border:none;border-radius:8px;padding:4px 12px;font-size:.72rem;cursor:pointer;font-weight:600">Ödeme Yap →</button>
       </div>
     </div>
 
@@ -2334,15 +2331,12 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
       </div>
     </div>
   </div>
-</div>
 
-<!-- CARDS (Kredi & Yemek Kartları) -->
-<div class="page" id="page-cards">
-  <div class="page-title">Kartlarım</div>
-  <div class="page-sub">Kredi kartı, yemek kartı (Multinet/Edenred), banka kartı — limit ve borç takibi</div>
-
+  <!-- ── KARTLARIM ── -->
+  <div style="margin-top:24px;margin-bottom:6px;font-size:1.1rem;font-weight:800;color:var(--txt);letter-spacing:-.02em">💳 Kartlarım</div>
+  <div style="font-size:.82rem;color:var(--txt2);margin-bottom:16px">Kredi kartı, yemek kartı, banka kartı — limit ve borç takibi</div>
   <div class="grid2">
-    <!-- FORM -->
+    <!-- KART FORM -->
     <div class="card">
       <div class="section-title">Kart Ekle</div>
       <div style="margin-bottom:14px">
@@ -2375,15 +2369,13 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
           <option>Diğer</option>
         </select>
       </div>
-      <div class="form-row">
-        <div>
-          <label>Kart / Ürün Adı <span style="color:var(--txt2);font-size:.7rem">(opsiyonel)</span></label>
-          <input class="f-input" type="text" id="card-name" placeholder="Bonus, Miles &amp; Smiles…">
-        </div>
-        <div>
-          <label>Kart Sahibi</label>
-          <input class="f-input" type="text" id="card-owner" placeholder="Ad Soyad">
-        </div>
+      <div style="margin-bottom:12px">
+        <label>Ad Soyad (Kart Sahibi)</label>
+        <input class="f-input" type="text" id="card-owner" placeholder="ör. Cagdas Cinar, Eşim Adı Soyadı">
+      </div>
+      <div style="margin-bottom:12px">
+        <label>Kart / Ürün Adı <span style="color:var(--txt2);font-size:.7rem">(opsiyonel)</span></label>
+        <input class="f-input" type="text" id="card-name" placeholder="Bonus, Miles &amp; Smiles, Worldcard…">
       </div>
       <div class="form-row">
         <div>
@@ -2412,9 +2404,9 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
       <button class="btn btn-primary" style="width:100%;padding:12px" onclick="addCard()">Kart Ekle</button>
     </div>
 
-    <!-- LIST -->
+    <!-- KART LİSTESİ -->
     <div class="card">
-      <div class="section-title">Kartlarım</div>
+      <div class="section-title">Kayıtlı Kartlar</div>
       <div id="card-totals" style="display:none;background:var(--bg3);border-radius:10px;padding:12px;margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:.8rem">
         <div style="text-align:center"><div style="color:var(--txt2);margin-bottom:2px">Toplam Limit</div><div style="font-weight:700" id="ct-limit">—</div></div>
         <div style="text-align:center"><div style="color:var(--txt2);margin-bottom:2px">Toplam Borç</div><div style="font-weight:700;color:var(--r)" id="ct-used">—</div></div>
@@ -3203,7 +3195,11 @@ window.onload=function(){
   setupNumInputs();
   requestBrowserNotifPermission();
 
-  // Tek çağrıda başlangıç verisi
+  // Hemen yükle — /api/init beklenmeden
+  loadDashboard();
+  loadAllTx();
+
+  // Arka planda profil + kategori + kart verisi
   xhr('/api/init',null,function(d){
     if(!d) return;
     // Kategoriler
@@ -3246,9 +3242,8 @@ window.onload=function(){
         if(match) switchProfile(preferred);
       }
     }
-    // Dashboard + işlemler + hatırlatıcılar paralel yükle
+    // Profil verisi yüklendikten sonra dashboard'ı bir kez daha yenile
     loadDashboard();
-    loadAllTx();
     loadReminders();
     loadNotifications();
     // Insights sadece dashboard açıksa
@@ -3307,8 +3302,7 @@ function goPage(id, el){
     if(id==='dashboard') loadDashboard();
     if(id==='recurring') initRecurringPage();
     if(id==='invest') initInvestPage();
-    if(id==='cards') loadCards();
-    if(id==='hesaplar') loadAccounts();
+    if(id==='hesaplar'){ loadAccounts(); loadCards(); }
     if(id==='add'){ setTab('gider'); loadAccountsDropdown(); loadCardsDropdown(); _updateAddProfileBanner(); }
     if(id==='settings') initSettingsPage();
     if(id==='budget') loadGoalsPage();
