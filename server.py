@@ -477,6 +477,7 @@ def init_db():
         ("telegram_pending","tx_date",      "TEXT NOT NULL DEFAULT ''"),
         ("cards",           "card_type",    "TEXT NOT NULL DEFAULT 'kredi'"),
         ("transactions",    "card_id",      "INTEGER DEFAULT NULL"),
+        ("accounts",        "owner",        "TEXT NOT NULL DEFAULT ''"),
     ]
     with pg_connect() as con:
         for stmt in stmts:
@@ -2656,12 +2657,13 @@ def add_account():
     initial = float(d.get("initial_balance",0))
     limit_ = float(d.get("limit_",0))
     color = d.get("color","#007aff")
+    owner = d.get("owner","").strip()
     if not name or not bank:
         return jsonify({"ok":False,"error":"Banka ve ürün adı gerekli"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO accounts (user_id,profile_id,name,bank,type,initial_balance,limit_,color,active,created_at) VALUES (?,?,?,?,?,?,?,?,1,?)",
-        (uid, pid, name, bank, atype, initial, limit_, color, datetime.now().isoformat())
+        "INSERT INTO accounts (user_id,profile_id,name,bank,type,initial_balance,limit_,color,owner,active,created_at) VALUES (?,?,?,?,?,?,?,?,?,1,?)",
+        (uid, pid, name, bank, atype, initial, limit_, color, owner, datetime.now().isoformat())
     )
     db.commit()
     return jsonify({"ok":True,"id":cur.lastrowid})
@@ -2672,7 +2674,7 @@ def update_account(aid):
     pid = get_pid()
     d = request.get_json(force=True)
     fields = []; params = []
-    for col in ("name","bank","type","color"):
+    for col in ("name","bank","type","color","owner"):
         if col in d:
             fields.append(f"{col}=?"); params.append(d[col])
     for col in ("initial_balance","limit_"):

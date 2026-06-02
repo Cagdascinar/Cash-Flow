@@ -301,71 +301,46 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 .more-sheet.open{transform:translateY(0)}
 .more-backdrop.open{display:block}
 /* ── SPLASH SCREEN ── */
+/* ── SPLASH — Apple/Revolut tarzı modern ── */
 #splash-screen{
   position:fixed;inset:0;z-index:99999;
-  background:#0b0e11;
-  transition:opacity .5s ease;
+  background:linear-gradient(160deg,#050c1a 0%,#0d1f3c 50%,#0a0e1a 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity .45s cubic-bezier(.4,0,.2,1);
 }
 #splash-screen.hide{opacity:0;pointer-events:none}
-
-/* Para yığını — sağ tarafta */
-.splash-money{
-  position:absolute;
-  right:8%; top:50%;
-  transform:translateY(-60%);
-  display:flex;flex-direction:column;align-items:center;gap:4px;
-}
-.sm-coin{font-size:2.4rem;opacity:0;display:block}
-.sm-c1{animation:sc-in .3s .2s ease both}
-.sm-c2{animation:sc-in .3s .35s ease both;font-size:2rem}
-.sm-c3{animation:sc-in .3s .5s ease both;font-size:1.8rem}
-.sm-c4{animation:sc-in .3s .65s ease both;font-size:1.6rem}
-.sm-c5{animation:sc-in .3s .8s ease both;font-size:1.4rem}
-@keyframes sc-in{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
-
-/* Kirpi — sol:4% başlar, translateX ile sağa yürür */
-.splash-kirpi{
-  position:absolute;
-  font-size:4.5rem;
-  left:4%; top:50%;
-  margin-top:-2.8rem;
+.splash-center{display:flex;flex-direction:column;align-items:center;gap:0}
+.splash-icon-wrap{
+  width:96px;height:96px;border-radius:28px;
+  background:linear-gradient(145deg,#1a3a6b,#0d2a5c);
+  border:1px solid rgba(99,160,255,.2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:3rem;margin-bottom:20px;
+  box-shadow:0 0 60px rgba(99,160,255,.15),0 20px 60px rgba(0,0,0,.5);
   opacity:0;
-  will-change:transform,opacity;
-  animation:kw 3.8s ease forwards;
+  animation:spl-icon .5s .05s cubic-bezier(.34,1.56,.64,1) forwards;
 }
-@keyframes kw{
-  /* scaleX(-1): kirpi emoji ters çevrilerek sağa bakıyor */
-  0%  {opacity:0;transform:translateX(0)    translateY(0)     scale(.9) scaleX(-1)}
-  6%  {opacity:1;transform:translateX(0)    translateY(0)     scale(1)  scaleX(-1)}
-  13% {transform:translateX(12vw) translateY(-12px) scale(1)   scaleX(-1)}
-  19% {transform:translateX(24vw) translateY(4px)   scale(1)   scaleX(-1)}
-  25% {transform:translateX(36vw) translateY(-12px) scale(1)   scaleX(-1)}
-  31% {transform:translateX(48vw) translateY(4px)   scale(1)   scaleX(-1)}
-  37% {transform:translateX(56vw) translateY(-12px) scale(1)   scaleX(-1)}
-  43% {transform:translateX(62vw) translateY(0)     scale(1)   scaleX(-1)}
-  50% {transform:translateX(62vw) translateY(-28px) scale(1.3) scaleX(-1) rotate(-12deg)}
-  56% {transform:translateX(62vw) translateY(4px)   scale(1)   scaleX(-1) rotate(0)}
-  63% {transform:translateX(62vw) translateY(-18px) scale(1.2) scaleX(-1) rotate(8deg)}
-  69% {transform:translateX(62vw) translateY(4px)   scale(1)   scaleX(-1) rotate(0)}
-  78% {transform:translateX(62vw) translateY(-6px)  scale(1.15) scaleX(-1)}
-  86% {transform:translateX(62vw) translateY(0)     scale(1.12) scaleX(-1)}
-  100%{transform:translateX(62vw) translateY(0)     scale(1.12) scaleX(-1);opacity:1}
+@keyframes spl-icon{
+  from{opacity:0;transform:scale(.7) translateY(12px)}
+  to  {opacity:1;transform:scale(1)  translateY(0)}
 }
-
-/* Alt yazı */
-.splash-bottom{
-  position:absolute;bottom:14%;width:100%;
-  display:flex;flex-direction:column;align-items:center;gap:6px;
+.splash-appname{
+  font-size:1.9rem;font-weight:900;letter-spacing:-.04em;color:#fff;
+  opacity:0;animation:spl-text .4s .3s ease forwards;
 }
-.splash-name{
-  font-size:2.2rem;font-weight:900;color:#f0b90b;letter-spacing:-.04em;
-  opacity:0;animation:sf .5s .4s ease forwards;
+.splash-apptag{
+  font-size:.82rem;color:rgba(255,255,255,.35);margin-top:6px;letter-spacing:.02em;
+  opacity:0;animation:spl-text .4s .45s ease forwards;
 }
-.splash-tag{
-  font-size:.88rem;color:#848e9c;
-  opacity:0;animation:sf .5s .6s ease forwards;
+@keyframes spl-text{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+/* İnce ilerleme çizgisi */
+.splash-bar{
+  position:absolute;bottom:0;left:0;height:2px;
+  background:linear-gradient(90deg,#6366f1,#60a5fa,#34d399);
+  animation:spl-bar 1.2s .1s ease-out forwards;
+  border-radius:0 2px 2px 0;
 }
-@keyframes sf{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes spl-bar{from{width:0}to{width:100%}}
 
 /* Onboarding */
 .ob-step{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.15);
@@ -1305,25 +1280,12 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
 
 <!-- ── SPLASH SCREEN ── -->
 <div id="splash-screen">
-  <div class="splash-bg"></div>
-
-  <!-- Para yığını — sağda -->
-  <div class="splash-money">
-    <span class="sm-coin sm-c1">💰</span>
-    <span class="sm-coin sm-c2">💵</span>
-    <span class="sm-coin sm-c3">🪙</span>
-    <span class="sm-coin sm-c4">💎</span>
-    <span class="sm-coin sm-c5">💴</span>
+  <div class="splash-center">
+    <div class="splash-icon-wrap">🦔</div>
+    <div class="splash-appname">Kirpi</div>
+    <div class="splash-apptag">Nakit akışın, cebinde.</div>
   </div>
-
-  <!-- Kirpi yürüyor -->
-  <div class="splash-kirpi" id="splash-kirpi">🦔</div>
-
-  <!-- Alt yazı -->
-  <div class="splash-bottom">
-    <div class="splash-name">🦔 Kirpi</div>
-    <div class="splash-tag">Nakit akışın, cebinde.</div>
-  </div>
+  <div class="splash-bar"></div>
 </div>
 
 <div class="shell">
@@ -2288,6 +2250,10 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
       </div>
 
       <div style="margin-bottom:12px">
+        <label>Ad Soyad (Hesap / Kart Sahibi)</label>
+        <input class="f-input" type="text" id="acc-owner" placeholder="ör. Ali Yılmaz">
+      </div>
+      <div style="margin-bottom:12px">
         <label>Ürün / Hesap Adı</label>
         <input class="f-input" type="text" id="acc-name" placeholder="ör. Bonus Card, 5465 Hesabı, Flexi Card">
       </div>
@@ -2371,7 +2337,7 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
       </div>
       <div style="margin-bottom:12px">
         <label>Ad Soyad (Kart Sahibi)</label>
-        <input class="f-input" type="text" id="card-owner" placeholder="ör. Cagdas Cinar, Eşim Adı Soyadı">
+        <input class="f-input" type="text" id="card-owner" placeholder="ör. Ali Yılmaz">
       </div>
       <div style="margin-bottom:12px">
         <label>Kart / Ürün Adı <span style="color:var(--txt2);font-size:.7rem">(opsiyonel)</span></label>
@@ -3175,8 +3141,8 @@ function _accName(id){ var a=_allAccounts.find(function(x){return x.id==id}); re
 function _cardIco(id){ var c=_allCards.find(function(x){return x.id==id}); var t=c&&c.card_type; return t==='yemek'?'🍽️':t==='banka'?'🏧':t==='hediye'?'🎁':'💳'; }
 function _cardType(id){ var c=_allCards.find(function(x){return x.id==id}); return (c&&c.card_type)||'kredi'; }
 
-// ── INIT — tek API çağrısıyla tüm başlangıç verisi ─────────────────────────
-window.onload=function(){
+// ── INIT — DOMContentLoaded: DOM hazır olunca hemen başla ───────────────────
+document.addEventListener('DOMContentLoaded', function(){
   _syncDarkModeUI();
   var todayISO=new Date().toISOString().split('T')[0];
   var fdate=document.getElementById('f-date');
@@ -3194,7 +3160,7 @@ window.onload=function(){
   setupNumInputs();
   requestBrowserNotifPermission();
 
-  // Hemen yükle — /api/init beklenmeden
+  // Dashboard + işlemleri hemen yükle
   loadDashboard();
   loadAllTx();
 
@@ -4917,6 +4883,7 @@ function resetAccForm(){
   document.getElementById('acc-edit-id').value='';
   document.getElementById('acc-form-title').textContent='Ürün Ekle';
   document.getElementById('acc-bank').value='';
+  var ao=document.getElementById('acc-owner'); if(ao) ao.value='';
   document.getElementById('acc-name').value='';
   document.getElementById('acc-balance').value='';
   document.getElementById('acc-limit').value='';
@@ -4942,7 +4909,8 @@ function saveAccount(){
   var eid=document.getElementById('acc-edit-id').value;
   if(!bank||bank===''){toast('Banka seçin');return}
   if(!name){toast('Ürün adı girin');return}
-  var body={bank:bank,name:name,type:_accType,initial_balance:bal,limit_:lim,color:_accColor};
+  var owner=(document.getElementById('acc-owner')||{}).value||'';
+  var body={bank:bank,name:name,type:_accType,initial_balance:bal,limit_:lim,color:_accColor,owner:owner};
   if(eid){
     xhr('/api/accounts/'+eid,body,function(r){
       if(r.ok){toast('Güncellendi ✓');resetAccForm();loadAccounts();loadAccountsDropdown();}
@@ -4958,6 +4926,7 @@ function editAccount(a){
   document.getElementById('acc-edit-id').value=a.id;
   document.getElementById('acc-form-title').textContent='Hesabı Güncelle';
   document.getElementById('acc-bank').value=a.bank;
+  var ao=document.getElementById('acc-owner'); if(ao) ao.value=a.owner||'';
   document.getElementById('acc-name').value=a.name;
   setNumVal(document.getElementById('acc-balance'), a.initial_balance||0);
   setNumVal(document.getElementById('acc-limit'), a.limit_||0);
