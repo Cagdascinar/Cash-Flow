@@ -3238,11 +3238,11 @@ function _appInit(){
     if(t) playClick();
   },true);
 }
-// DOM hazır mı kontrol et — her iki durumu da yakala
+// DOM hazır mı kontrol et — her iki durumda da tüm script çalıştıktan sonra başlat
 if(document.readyState==='loading'){
-  document.addEventListener('DOMContentLoaded',_appInit);
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(_appInit, 0); });
 } else {
-  _appInit();
+  setTimeout(_appInit, 0); // tüm var tanımları çalışsın, sonra başlat
 }
 
 function updateMonthLabel(){
@@ -4267,6 +4267,21 @@ function loadTodayWidgets(){
         var _aico={'vadesiz':'🏦','tasarruf':'💰','kredi_karti':'💳','kmh':'🔄','konut_kredisi':'🏠','arac_kredisi':'🚗','ihtiyac_kredisi':'💼','diger':'📋'};
         var _aname={'vadesiz':'Vadesiz','tasarruf':'Tasarruf','kredi_karti':'Kredi Kartı','kmh':'KMH','konut_kredisi':'Konut Kredisi','arac_kredisi':'Araç Kredisi','ihtiyac_kredisi':'İhtiyaç Kredisi','diger':'Diğer'};
         var html='';
+        // Toplam özet: Limit > Kullanılan > Kullanılabilir
+        html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">'+
+          '<div style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">'+
+            '<div style="font-size:.6rem;color:var(--txt2);margin-bottom:2px;text-transform:uppercase;letter-spacing:.06em">Toplam Limit</div>'+
+            '<div style="font-size:.88rem;font-weight:800;color:var(--b2)">'+fmt(d.total_limit)+'</div>'+
+          '</div>'+
+          '<div style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">'+
+            '<div style="font-size:.6rem;color:var(--txt2);margin-bottom:2px;text-transform:uppercase;letter-spacing:.06em">Kullanılan</div>'+
+            '<div style="font-size:.88rem;font-weight:800;color:var(--r)">'+fmt(d.total_used)+'</div>'+
+          '</div>'+
+          '<div style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">'+
+            '<div style="font-size:.6rem;color:var(--txt2);margin-bottom:2px;text-transform:uppercase;letter-spacing:.06em">Kullanılabilir</div>'+
+            '<div style="font-size:.88rem;font-weight:800;color:var(--g)">'+fmt(d.total_avail)+'</div>'+
+          '</div>'+
+        '</div>';
 
         // GRUP 1: Banka Hesapları (vadesiz, tasarruf vb.)
         var bankHesaplar=(d.accounts||[]).filter(function(a){return a.type!=='kredi_karti'&&a.type!=='kmh'});
@@ -5396,6 +5411,26 @@ function closeTxDetail(){
 }
 
 // ── İŞLEM DÜZENLEME MODALI ────────────────────────────────────────────────────
+function txeSelectPayType(btn){
+  document.querySelectorAll('#txe-pay-chips .pay-chip').forEach(function(b){b.classList.remove('active')});
+  btn.classList.add('active');
+  var pt=btn.dataset.eptype;
+  var accRow=document.getElementById('txe-acc-row');
+  var cardRow=document.getElementById('txe-card-row');
+  if(accRow) accRow.style.display=(pt==='banka'?'block':'none');
+  if(cardRow) cardRow.style.display=(pt==='kredi'||pt==='yemek'?'block':'none');
+  var cardSel=document.getElementById('txe-card');
+  if(cardSel&&(pt==='kredi'||pt==='yemek')){
+    var filterType=pt==='yemek'?'yemek':'kredi';
+    cardSel.innerHTML='<option value="">— Kart seçin —</option>';
+    _allCards.filter(function(c){return c.card_type===filterType;}).forEach(function(c){
+      var opt=document.createElement('option'); opt.value='card:'+c.id;
+      opt.textContent=(pt==='yemek'?'🍽️':'💳')+' '+c.bank_name+(c.card_name?' · '+c.card_name:'');
+      cardSel.appendChild(opt);
+    });
+  }
+}
+
 function openTxEdit(id){
   var tx=allTx.find(function(t){return t.id==id}); if(!tx) return;
   var m=document.getElementById('tx-edit-modal'); if(!m) return;
@@ -5406,57 +5441,82 @@ function openTxEdit(id){
   var catSel=document.getElementById('txe-category');
   catSel.innerHTML='';
   var list=tx.type==='gelir'?CATS.gelir:CATS.gider;
-  list.forEach(function(c){
-    var o=document.createElement('option');
-    o.value=o.textContent=c;
-    if(c===tx.category) o.selected=true;
-    catSel.appendChild(o);
-  });
-  // Kart seçici — sadece gider
-  var cardRow=document.getElementById('txe-card-row');
-  var txeCard=document.getElementById('txe-card');
-  var txeAccLbl=document.getElementById('txe-acc-lbl');
-  if(cardRow) cardRow.style.display=(tx.type==='gider'?'':'none');
-  if(txeAccLbl) txeAccLbl.textContent=(tx.type==='gelir'?'🏦 Hangi Hesaba Geldi?':'🏦 Hesap');
-  // Kart dropdown doldur
-  if(txeCard){
-    txeCard.innerHTML='<option value="">— Nakit / Kart Seçme —</option>';
-    _allCards.forEach(function(c){
-      var ico=_cardIco(c.id);
-      var o=document.createElement('option');
-      o.value=c.id;
-      o.textContent=ico+' '+c.bank_name+(c.card_name?' '+c.card_name:'');
-      if(tx.card_id==c.id) o.selected=true;
-      txeCard.appendChild(o);
-    });
-  }
-  // Hesap dropdown doldur
-  var txeAcc=document.getElementById('txe-account');
-  if(txeAcc){
-    txeAcc.innerHTML='<option value="">— Hesap Belirtme —</option>';
-    _allAccounts.forEach(function(a){
-      var o=document.createElement('option');
-      o.value=a.id;
-      o.textContent='🏦 '+a.bank+' · '+a.name;
-      if(tx.account_id==a.id) o.selected=true;
-      txeAcc.appendChild(o);
-    });
+  list.forEach(function(c){var o=document.createElement('option');o.value=o.textContent=c;if(c===tx.category)o.selected=true;catSel.appendChild(o);});
+
+  var isGelir=tx.type==='gelir';
+  // Ödeme türü bölümü
+  var paySection=document.getElementById('txe-pay-section');
+  var incAcc=document.getElementById('txe-income-acc');
+  if(paySection) paySection.style.display=isGelir?'none':'block';
+  if(incAcc) incAcc.style.display=isGelir?'block':'none';
+
+  if(!isGelir){
+    // Mevcut ödeme türünü belirle
+    var curType='nakit';
+    if(tx.card_id){
+      var ctype=_cardType(tx.card_id);
+      curType=ctype==='yemek'?'yemek':'kredi';
+    } else if(tx.account_id){ curType='banka'; }
+    var activeBtn=document.querySelector('#txe-pay-chips [data-eptype='+curType+']');
+    if(activeBtn) txeSelectPayType(activeBtn);
+    // Hesap dropdown doldur
+    var txeAcc=document.getElementById('txe-account');
+    if(txeAcc){
+      txeAcc.innerHTML='<option value="">— Hesap seçin —</option>';
+      (_allAccounts.length?_allAccounts:[]).forEach(function(a){
+        var o=document.createElement('option');o.value=a.id;
+        o.textContent=(a.bank?a.bank+' · ':'')+a.name;
+        if(tx.account_id==a.id)o.selected=true;
+        txeAcc.appendChild(o);
+      });
+    }
+    // Kart mevcut seçimi
+    var txeCard=document.getElementById('txe-card');
+    if(txeCard&&tx.card_id){
+      setTimeout(function(){
+        var val='card:'+tx.card_id;
+        if(txeCard.querySelector('option[value="'+val+'"]')) txeCard.value=val;
+      },50);
+    }
+  } else {
+    // Gelir hesap dropdown
+    var txeInc=document.getElementById('txe-income-account');
+    if(txeInc){
+      txeInc.innerHTML='<option value="">— Belirtme (Nakit) —</option>';
+      (_allAccounts.length?_allAccounts:[]).forEach(function(a){
+        var o=document.createElement('option');o.value=a.id;
+        o.textContent=(a.bank?a.bank+' · ':'')+a.name;
+        if(tx.account_id==a.id)o.selected=true;
+        txeInc.appendChild(o);
+      });
+    }
   }
   m.style.display='flex';
 }
 function closeTxEdit(){ var m=document.getElementById('tx-edit-modal'); if(m) m.style.display='none'; }
 function saveTxEdit(){
   var id=document.getElementById('txe-id').value;
-  var txeCard=document.getElementById('txe-card');
-  var txeAcc=document.getElementById('txe-account');
   var body={
     date:document.getElementById('txe-date').value,
     amount:document.getElementById('txe-amount').value,
     category:document.getElementById('txe-category').value,
     description:document.getElementById('txe-desc').value,
-    account_id: txeAcc&&txeAcc.value ? parseInt(txeAcc.value) : null,
-    card_id: txeCard&&txeCard.value ? parseInt(txeCard.value) : null,
+    account_id: null, card_id: null,
   };
+  var activeChip=document.querySelector('#txe-pay-chips .pay-chip.active');
+  var eptype=activeChip?activeChip.dataset.eptype:'nakit';
+  if(eptype==='banka'){
+    var txeAcc=document.getElementById('txe-account');
+    if(txeAcc&&txeAcc.value) body.account_id=parseInt(txeAcc.value);
+  } else if(eptype==='kredi'||eptype==='yemek'){
+    var txeCard=document.getElementById('txe-card');
+    var cv=txeCard?txeCard.value:'';
+    if(cv&&cv.indexOf('card:')===0) body.card_id=parseInt(cv.split(':')[1]);
+  } else {
+    // Gelir hesabı
+    var incAcc=document.getElementById('txe-income-account');
+    if(incAcc&&incAcc.value) body.account_id=parseInt(incAcc.value);
+  }
   xhr('/api/transactions/'+id,body,function(r){
     if(r.ok){closeTxEdit();toast('Kaydedildi');loadAllTx();loadDashboard();}
     else toast('Hata: '+(r.error||''),'#ef4444');
@@ -6839,13 +6899,26 @@ function closeLiquidityDetail(){ var m=document.getElementById('liquidity-detail
     <input type="number" id="txe-amount" class="f-input" step="0.01" style="margin-bottom:12px">
     <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:5px">Açıklama</label>
     <input type="text" id="txe-desc" class="f-input" style="margin-bottom:12px">
-    <div id="txe-card-row" style="margin-bottom:12px">
-      <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:5px">💳 Kart Seç</label>
-      <select id="txe-card" class="f-input"><option value="">— Nakit / Kart Seçme —</option></select>
+    <!-- Ödeme Türü — gider için -->
+    <div id="txe-pay-section" style="margin-bottom:12px">
+      <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:6px">Ödeme Türü</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px" id="txe-pay-chips">
+        <button type="button" class="pay-chip active" data-eptype="nakit" onclick="txeSelectPayType(this)">💵 Nakit</button>
+        <button type="button" class="pay-chip" data-eptype="banka" onclick="txeSelectPayType(this)">🏧 Banka</button>
+        <button type="button" class="pay-chip" data-eptype="kredi" onclick="txeSelectPayType(this)">💳 Kredi Kartı</button>
+        <button type="button" class="pay-chip" data-eptype="yemek" onclick="txeSelectPayType(this)">🍽️ Yemek Kartı</button>
+      </div>
+      <div id="txe-acc-row" style="display:none">
+        <select id="txe-account" class="f-input"><option value="">— Hesap seçin —</option></select>
+      </div>
+      <div id="txe-card-row" style="display:none">
+        <select id="txe-card" class="f-input"><option value="">— Kart seçin —</option></select>
+      </div>
     </div>
-    <div style="margin-bottom:20px">
-      <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:5px" id="txe-acc-lbl">🏦 Hesap</label>
-      <select id="txe-account" class="f-input"><option value="">— Hesap Belirtme —</option></select>
+    <!-- Gelir için hesap -->
+    <div id="txe-income-acc" style="display:none;margin-bottom:20px">
+      <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:5px">🏦 Hangi Hesaba Geldi?</label>
+      <select id="txe-income-account" class="f-input"><option value="">— Belirtme (Nakit) —</option></select>
     </div>
     <button onclick="saveTxEdit()" style="width:100%;padding:13px;background:var(--b);color:#fff;border:none;border-radius:10px;font-size:.92rem;font-weight:700;cursor:pointer">Kaydet</button>
   </div>
