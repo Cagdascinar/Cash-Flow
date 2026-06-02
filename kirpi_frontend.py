@@ -3141,8 +3141,8 @@ function _accName(id){ var a=_allAccounts.find(function(x){return x.id==id}); re
 function _cardIco(id){ var c=_allCards.find(function(x){return x.id==id}); var t=c&&c.card_type; return t==='yemek'?'🍽️':t==='banka'?'🏧':t==='hediye'?'🎁':'💳'; }
 function _cardType(id){ var c=_allCards.find(function(x){return x.id==id}); return (c&&c.card_type)||'kredi'; }
 
-// ── INIT — DOMContentLoaded: DOM hazır olunca hemen başla ───────────────────
-document.addEventListener('DOMContentLoaded', function(){
+// ── INIT ─────────────────────────────────────────────────────────────────────
+function _appInit(){
   _syncDarkModeUI();
   var todayISO=new Date().toISOString().split('T')[0];
   var fdate=document.getElementById('f-date');
@@ -3217,12 +3217,17 @@ document.addEventListener('DOMContentLoaded', function(){
   });
 
   populateYearFilter();
-  // Buton/kart tıklamalarında ses
   document.addEventListener('click',function(e){
     var t=e.target.closest('button,.btn,.tappable,.tx-day-item,.hero-chip,.aging-card,.asset-card,.todo-item,.sup-inv-item,.settings-link-row');
     if(t) playClick();
   },true);
-};
+}
+// DOM hazır mı kontrol et — her iki durumu da yakala
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',_appInit);
+} else {
+  _appInit();
+}
 
 function updateMonthLabel(){
   document.getElementById('mlabel').textContent=MONTHS[curMonth]+' '+curYear;
@@ -4079,14 +4084,18 @@ function setTab(t){
 function _fillIncomeDest(){
   var sel=document.getElementById('f-income-account'); if(!sel) return;
   var prev=sel.value;
-  sel.innerHTML='<option value="">— Belirtme (Nakit) —</option>';
-  _allAccounts.forEach(function(a){
-    var opt=document.createElement('option');
-    opt.value=a.id;
-    opt.textContent=(a.bank?a.bank+' · ':'')+a.name;
-    sel.appendChild(opt);
-  });
-  if(prev) sel.value=prev;
+  function _doFill(list){
+    sel.innerHTML='<option value="">— Belirtme (Nakit) —</option>';
+    (list||[]).forEach(function(a){
+      var opt=document.createElement('option');
+      opt.value=a.id;
+      opt.textContent=(a.bank?a.bank+' · ':'')+a.name;
+      sel.appendChild(opt);
+    });
+    if(prev) sel.value=prev;
+  }
+  if(_allAccounts.length){ _doFill(_allAccounts); }
+  else { xhr('/api/accounts',null,function(list){ _allAccounts=list||[]; _doFill(_allAccounts); }); }
 }
 
 function selectPayType(btn){
@@ -5012,26 +5021,8 @@ function loadAccounts(){
   });
 }
 
-function loadAccountsDropdown(){
-  var sel=document.getElementById('f-account');
-  if(!sel) return;
-  var prev=sel.value;
+function _buildAccDropdown(sel, list, prev){
   sel.innerHTML='<option value="">— Hesap Belirtme —</option>';
-  if(!_allAccounts.length){
-    // Henüz /api/init dönmemişse API'den çek
-    xhr('/api/accounts',null,function(list){
-      sel.innerHTML='<option value="">— Hesap Belirtme —</option>';
-      (list||[]).forEach(function(a){
-        var icon=_ACC_ICONS[a.type]||'🏦';
-        var opt=document.createElement('option');
-        opt.value=a.id;
-        opt.textContent=icon+' '+a.bank+' · '+a.name;
-        sel.appendChild(opt);
-      });
-    });
-    return;
-  }
-  // Grupla: Vadesiz → Tasarruf → KMH → Diğer
   var accGroups=[
     {types:['vadesiz'],           label:'🏦 Vadesiz Hesaplar'},
     {types:['tasarruf'],          label:'💰 Tasarruf Hesapları'},
@@ -5040,7 +5031,7 @@ function loadAccountsDropdown(){
     {types:['diger'],             label:'📋 Diğer Hesaplar'},
   ];
   accGroups.forEach(function(g){
-    var inGrp=_allAccounts.filter(function(a){return g.types.indexOf(a.type||'vadesiz')!==-1;});
+    var inGrp=(list||[]).filter(function(a){return g.types.indexOf(a.type||'vadesiz')!==-1;});
     if(!inGrp.length) return;
     var grp=document.createElement('optgroup'); grp.label=g.label;
     inGrp.forEach(function(a){
@@ -5052,6 +5043,17 @@ function loadAccountsDropdown(){
     sel.appendChild(grp);
   });
   if(prev) sel.value=prev;
+}
+
+function loadAccountsDropdown(){
+  var sel=document.getElementById('f-account');
+  if(!sel) return;
+  var prev=sel.value;
+  if(!_allAccounts.length){
+    xhr('/api/accounts',null,function(list){ _allAccounts=list||[]; _buildAccDropdown(sel,_allAccounts,prev); });
+    return;
+  }
+  _buildAccDropdown(sel, _allAccounts, prev);
 }
 
 var _CARD_TYPE_ICONS={'kredi':'💳','banka':'🏧','yemek':'🍽️','hediye':'🎁'};
@@ -6013,13 +6015,18 @@ function openCardPayModal(id, name, debt, minPay, limit){
   // Vadesiz hesap dropdown'unu doldur
   var accSel=document.getElementById('cpay-account');
   if(accSel){
-    accSel.innerHTML='<option value="">— Hesap Belirtme —</option>';
-    _allAccounts.filter(function(a){return a.type==='vadesiz'||a.type==='tasarruf';}).forEach(function(a){
-      var opt=document.createElement('option');
-      opt.value=a.id;
-      opt.textContent='🏦 '+(a.bank?a.bank+' · ':'')+a.name;
-      accSel.appendChild(opt);
-    });
+    var _LOAN_TYPES=['konut_kredisi','arac_kredisi','ihtiyac_kredisi'];
+    function _fillCpayAccounts(list){
+      accSel.innerHTML='<option value="">— Hesap Belirtme —</option>';
+      (list||[]).filter(function(a){return _LOAN_TYPES.indexOf(a.type||'')===-1;}).forEach(function(a){
+        var opt=document.createElement('option');
+        opt.value=a.id;
+        opt.textContent='🏦 '+(a.bank?a.bank+' · ':'')+a.name;
+        accSel.appendChild(opt);
+      });
+    }
+    if(_allAccounts.length){ _fillCpayAccounts(_allAccounts); }
+    else { xhr('/api/accounts',null,function(list){ _allAccounts=list||[]; _fillCpayAccounts(_allAccounts); }); }
   }
   m.style.display='flex';
 }
