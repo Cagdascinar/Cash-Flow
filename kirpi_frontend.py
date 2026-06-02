@@ -1891,7 +1891,7 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
           <th class="sortable" onclick="sortBy('type')">Tür <span class="sort-ico" id="sort-type">↕</span></th>
           <th class="sortable" onclick="sortBy('category')">Kategori <span class="sort-ico" id="sort-category">↕</span></th>
           <th class="sortable" onclick="sortBy('description')">Açıklama <span class="sort-ico" id="sort-description">↕</span></th>
-          <th style="min-width:100px">Ödeme Yöntemi</th>
+          <th style="min-width:110px">Ödeme Yöntemi</th>
           <th class="sortable" onclick="sortBy('amount')" style="text-align:right">Tutar <span class="sort-ico" id="sort-amount">↕</span></th>
           <th style="width:36px"></th>
         </tr>
@@ -3095,21 +3095,19 @@ function confirmDeleteAccount(){
 }
 
 // ── SPLASH SCREEN ────────────────────────────────────────────────────────────
+var _splashHidden = false;
+function hideSplash(){
+  if(_splashHidden) return; _splashHidden=true;
+  var splash = document.getElementById('splash-screen');
+  if(!splash) return;
+  splash.classList.add('hide');
+  setTimeout(function(){ splash.style.display='none'; }, 400);
+}
 (function(){
   var splash = document.getElementById('splash-screen');
   if(!splash) return;
-
-  // 2.5s: alt yazı vurgu
-  setTimeout(function(){
-    var tag = document.querySelector('.splash-tag');
-    if(tag){ tag.style.color='#f0b90b'; }
-  }, 2500);
-
-  // 4s: splash kapan
-  setTimeout(function(){
-    splash.classList.add('hide');
-    setTimeout(function(){ splash.style.display='none'; }, 500);
-  }, 4000);
+  // En fazla 1.5 saniye — veri geldiyse daha erken kapanır
+  setTimeout(hideSplash, 1500);
 })();
 
 // ── NATIVE APP FEEL ──────────────────────────────────────────────────────────
@@ -3172,9 +3170,10 @@ var CATS={gelir:[],gider:[],all:[]};
 var _todayDate=new Date().toISOString().split('T')[0];
 var _allCards=[], _allAccounts=[];  // /api/init'ten yüklenir
 
-function _cardName(id){ var c=_allCards.find(function(x){return x.id==id}); return c?(c.bank_name+(c.card_name?' '+c.card_name:'')):''; }
-function _accName(id){ var a=_allAccounts.find(function(x){return x.id==id}); return a?(a.bank+' '+a.name):''; }
+function _cardName(id){ var c=_allCards.find(function(x){return x.id==id}); return c?(c.bank_name+(c.card_name?' · '+c.card_name:'')):''; }
+function _accName(id){ var a=_allAccounts.find(function(x){return x.id==id}); return a?((a.bank?a.bank+' · ':'')+a.name):''; }
 function _cardIco(id){ var c=_allCards.find(function(x){return x.id==id}); var t=c&&c.card_type; return t==='yemek'?'🍽️':t==='banka'?'🏧':t==='hediye'?'🎁':'💳'; }
+function _cardType(id){ var c=_allCards.find(function(x){return x.id==id}); return (c&&c.card_type)||'kredi'; }
 
 // ── INIT — tek API çağrısıyla tüm başlangıç verisi ─────────────────────────
 window.onload=function(){
@@ -4438,12 +4437,13 @@ function loadDashboard(){
   }
   var reqId = ++_dashReqId;
   xhr(url,null,function(d){
-    if(reqId !== _dashReqId) return; // discard stale response
+    if(reqId !== _dashReqId) return;
     summaryData=d;
     renderStats(d);
     drawBar(d.bar);
     drawDonut(d.gider_cats);
     renderBudgetPage(d.gider_cats,d.budgets);
+    hideSplash(); // veri geldi, splash'ı kapat
   });
   xhr('/api/motivation',null,renderMotivation);
   loadTodayWidgets();
@@ -5292,10 +5292,24 @@ function renderLedger(){
       '<td><div class="cell"><span class="badge '+(isG?'badge-g':'badge-r')+'">'+(isG?'Gelir':'Gider')+'</span></div></td>'+
       '<td><div class="cell"><span class="badge badge-cat">'+t.category+'</span></div></td>'+
       '<td><div class="cell" style="color:var(--txt2);font-size:.82rem">'+(t.description||'<span style="opacity:.4">—</span>')+'</div></td>'+
-      '<td><div class="cell" style="font-size:.78rem">'+
-        (t.card_id ? '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:2px 7px;color:var(--txt);font-weight:600;white-space:nowrap">'+_cardIco(t.card_id)+' '+_cardName(t.card_id)+'</span>' :
-         t.account_id ? '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:2px 7px;color:var(--txt);font-weight:600;white-space:nowrap">🏦 '+_accName(t.account_id)+'</span>' :
-         '<span style="color:var(--txt2);opacity:.4">—</span>')+
+      '<td><div class="cell" style="font-size:.78rem;flex-direction:column;align-items:flex-start;gap:2px">'+
+        (function(){
+          if(t.card_id){
+            var ctype=_cardType(t.card_id);
+            var typeLabel=ctype==='yemek'?'🍽️ Yemek Kartı':ctype==='banka'?'🏧 Banka Kartı':ctype==='hediye'?'🎁 Hediye Kartı':'💳 Kredi Kartı';
+            var name=_cardName(t.card_id);
+            return '<span style="font-weight:700;color:var(--txt);font-size:.75rem">'+typeLabel+'</span>'+
+                   (name?'<span style="color:var(--txt2);font-size:.7rem">'+name+'</span>':'');
+          } else if(t.account_id){
+            var aname=_accName(t.account_id);
+            return '<span style="font-weight:700;color:var(--txt);font-size:.75rem">🏧 Banka Kartı</span>'+
+                   (aname?'<span style="color:var(--txt2);font-size:.7rem">'+aname+'</span>':'');
+          } else if(t.type==='gelir'){
+            return '<span style="color:var(--txt2);font-size:.75rem">—</span>';
+          } else {
+            return '<span style="font-weight:700;color:var(--txt);font-size:.75rem">💵 Nakit</span>';
+          }
+        })()+
       '</div></td>'+
       '<td style="text-align:right"><div class="cell" style="justify-content:flex-end;font-weight:700;color:'+(isG?'var(--g)':'var(--r)')+'">'+
         (isG?'+':'-')+fmt(t.amount)+'</div></td>'+
