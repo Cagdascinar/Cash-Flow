@@ -4053,13 +4053,48 @@ def today_summary():
         avail= lim - used
         total_limit += lim; total_used += used
         card_list.append({
-            "bank":    c["bank_name"],
-            "name":    c["card_name"],
+            "id":        c["id"],
+            "bank":      c["bank_name"],
+            "name":      c["card_name"],
+            "card_type": c.get("card_type") or "kredi",
+            "limit":     lim,
+            "used":      used,
+            "avail":     avail,
+            "due_day":   c["due_day"],
+            "min_pct":   c["min_pct"],
+            "pct":       round(used/lim*100) if lim else 0,
+        })
+
+    # Banka hesapları + güncel bakiyeler
+    accounts = db.execute(
+        "SELECT * FROM accounts WHERE profile_id=? AND active=1 ORDER BY bank,name", (pid,)
+    ).fetchall()
+    account_list = []
+    for a in accounts:
+        gelir_a = db.execute(
+            "SELECT COALESCE(SUM(amount),0) FROM transactions WHERE profile_id=? AND account_id=? AND type='gelir'", (pid, a["id"])
+        ).fetchone()[0] or 0
+        gider_a = db.execute(
+            "SELECT COALESCE(SUM(amount),0) FROM transactions WHERE profile_id=? AND account_id=? AND type='gider'", (pid, a["id"])
+        ).fetchone()[0] or 0
+        init = float(a.get("initial_balance") or 0)
+        lim  = float(a.get("limit_") or 0)
+        atype = a.get("type","vadesiz")
+        if atype in ("kredi_karti","kmh"):
+            balance = init + float(gider_a) - float(gelir_a)
+            avail   = lim - balance if lim > 0 else None
+        else:
+            balance = init + float(gelir_a) - float(gider_a)
+            avail   = None
+        account_list.append({
+            "id":    a["id"],
+            "bank":  a["bank"],
+            "name":  a["name"],
+            "type":  atype,
+            "color": a.get("color","#007aff"),
+            "balance": round(balance, 2),
             "limit":   lim,
-            "used":    used,
-            "avail":   avail,
-            "due_day": c["due_day"],
-            "pct":     round(used/lim*100) if lim else 0,
+            "available": round(avail, 2) if avail is not None else None,
         })
 
     # Check for recurring income expected today
@@ -4080,6 +4115,7 @@ def today_summary():
         "gelir_list":  gelir_list,
         "gider_list":  gider_list,
         "cards":       card_list,
+        "accounts":    account_list,
         "total_limit": round(total_limit, 2),
         "total_used":  round(total_used, 2),
         "total_avail": round(total_limit - total_used, 2),

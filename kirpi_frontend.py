@@ -1724,10 +1724,10 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
     <div class="tnr-value" id="today-net">—</div>
   </div>
 
-  <!-- ── KREDİ KARTLARI ── -->
+  <!-- ── KARTLARIM ── -->
   <div class="dash-section">
     <div class="s-header" onclick="toggleSection('cc')">
-      <div class="sh-left"><span class="sh-dot pp"></span>Kredi Kartları</div>
+      <div class="sh-left"><span class="sh-dot pp"></span>Kartlarım</div>
       <span class="sh-chevron" id="chevron-cc">▾</span>
     </div>
     <div class="s-body" id="sec-cc">
@@ -1887,6 +1887,7 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
           <th class="sortable" onclick="sortBy('type')">Tür <span class="sort-ico" id="sort-type">↕</span></th>
           <th class="sortable" onclick="sortBy('category')">Kategori <span class="sort-ico" id="sort-category">↕</span></th>
           <th class="sortable" onclick="sortBy('description')">Açıklama <span class="sort-ico" id="sort-description">↕</span></th>
+          <th style="min-width:100px">Ödeme Yöntemi</th>
           <th class="sortable" onclick="sortBy('amount')" style="text-align:right">Tutar <span class="sort-ico" id="sort-amount">↕</span></th>
           <th style="width:36px"></th>
         </tr>
@@ -3224,10 +3225,6 @@ window.onload=function(){
         if(match) switchProfile(preferred);
       }
     }
-    // Kart hatırlatıcıları (reminders)
-    if(d.card_reminders&&d.card_reminders.length){
-      renderCardReminders(d.card_reminders);
-    }
     // Dashboard + işlemler + hatırlatıcılar paralel yükle
     loadDashboard();
     loadAllTx();
@@ -4203,32 +4200,97 @@ function loadTodayWidgets(){
       }
     }
 
-    // Credit cards
+    // Kartlarım + Hesaplar — kategorize
     var co=document.getElementById('cc-overview');
     if(co){
-      if(!d.cards||!d.cards.length){
-        co.innerHTML='<div class="empty-cc">🏦 Hesap eklenmemiş<br><span style="font-size:.75rem;color:var(--txt2)">Hesaplar sayfasından ekleyebilirsiniz</span></div>';
+      var hasCards=(d.cards&&d.cards.length>0);
+      var hasAccounts=(d.accounts&&d.accounts.length>0);
+      if(!hasCards&&!hasAccounts){
+        co.innerHTML='<div class="empty-cc">💳 Kart veya hesap eklenmemiş<br><span style="font-size:.75rem;color:var(--txt2)">Kartlarım veya Hesaplar sayfasından ekleyebilirsiniz</span></div>';
       } else {
-        var totals='<div class="cc-total-row">'+
-          '<div class="cc-total-cell"><div class="ccl">Toplam Limit</div><div class="ccv" style="color:var(--b2)">'+fmt(d.total_limit)+'</div></div>'+
-          '<div class="cc-total-cell"><div class="ccl">Kullanılan</div><div class="ccv" style="color:var(--r)">'+fmt(d.total_used)+'</div></div>'+
-          '<div class="cc-total-cell"><div class="ccl">Kullanılabilir</div><div class="ccv" style="color:var(--g)">'+fmt(d.total_avail)+'</div></div>'+
-          '</div>';
-        var items=d.cards.map(function(c){
-          var pct=c.pct||0;
-          var pc=pct<50?'ok':pct<80?'warn':'high';
-          var fc=pct<50?'var(--g)':pct<80?'var(--y)':'var(--r)';
-          var nm=c.bank+(c.name?' · '+c.name:'');
-          return '<div class="cc-item" onclick="goPage(\'hesaplar\',document.querySelector(\'[data-page=hesaplar]\'))" style="cursor:pointer">'+
-            '<div class="cc-item-top"><div class="cc-bank">💳 '+nm+'</div>'+
-            '<span class="cc-pct-badge '+pc+'">%'+pct+'</span></div>'+
-            '<div class="cc-prog-bg"><div class="cc-prog-fill" style="width:'+pct+'%;background:'+fc+'"></div></div>'+
-            '<div class="cc-nums">'+
-              '<span>Kullanılan: <strong style="color:var(--r)">'+fmt(c.used)+'</strong></span>'+
-              '<span>Limit: <strong style="color:var(--b2)">'+fmt(c.limit)+'</strong></span>'+
-            '</div></div>';
-        }).join('');
-        co.innerHTML=totals+items;
+        var _cico={'kredi':'💳','banka':'🏧','yemek':'🍽️','hediye':'🎁'};
+        var _aico={'vadesiz':'🏦','tasarruf':'💰','kredi_karti':'💳','kmh':'🔄','konut_kredisi':'🏠','arac_kredisi':'🚗','ihtiyac_kredisi':'💼','diger':'📋'};
+        var _aname={'vadesiz':'Vadesiz','tasarruf':'Tasarruf','kredi_karti':'Kredi Kartı','kmh':'KMH','konut_kredisi':'Konut Kredisi','arac_kredisi':'Araç Kredisi','ihtiyac_kredisi':'İhtiyaç Kredisi','diger':'Diğer'};
+        var html='';
+
+        // GRUP 1: Banka Hesapları (vadesiz, tasarruf vb.)
+        var bankHesaplar=(d.accounts||[]).filter(function(a){return a.type!=='kredi_karti'&&a.type!=='kmh'});
+        if(bankHesaplar.length){
+          html+='<div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--txt2);margin:4px 0 6px;padding:0 2px">🏦 Banka Hesapları</div>';
+          html+=bankHesaplar.map(function(a){
+            var ico=_aico[a.type]||'🏦';
+            var balColor=a.balance>=0?'var(--g)':'var(--r)';
+            return '<div class="cc-item" onclick="goPage(\'hesaplar\',document.querySelector(\'[data-page=hesaplar]\'))" style="cursor:pointer;border-left:3px solid '+(a.color||'#007aff')+'">'+
+              '<div class="cc-item-top"><div class="cc-bank">'+ico+' '+a.bank+' · '+a.name+'</div>'+
+              '<div style="font-weight:800;font-size:.92rem;color:'+balColor+'">'+fmt(a.balance)+'</div></div>'+
+            '</div>';
+          }).join('');
+        }
+
+        // GRUP 2: KMH / Kredi hesapları
+        var kmhList=(d.accounts||[]).filter(function(a){return a.type==='kredi_karti'||a.type==='kmh'});
+        if(kmhList.length){
+          html+='<div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--txt2);margin:10px 0 6px;padding:0 2px">🔄 KMH / Kredi Hesapları</div>';
+          html+=kmhList.map(function(a){
+            var ico=_aico[a.type]||'🔄';
+            var pct=a.limit>0?Math.round(a.balance/a.limit*100):0;
+            var fc=pct<50?'var(--g)':pct<80?'var(--y)':'var(--r)';
+            return '<div class="cc-item" onclick="goPage(\'hesaplar\',document.querySelector(\'[data-page=hesaplar]\'))" style="cursor:pointer">'+
+              '<div class="cc-item-top"><div class="cc-bank">'+ico+' '+a.bank+' · '+a.name+'</div>'+
+              '<span class="cc-pct-badge '+(pct<50?'ok':pct<80?'warn':'high')+'">%'+pct+'</span></div>'+
+              (a.limit>0?'<div class="cc-prog-bg"><div class="cc-prog-fill" style="width:'+pct+'%;background:'+fc+'"></div></div>':'')+
+              '<div class="cc-nums">'+
+                '<span>Borç: <strong style="color:var(--r)">'+fmt(a.balance)+'</strong></span>'+
+                (a.limit>0?'<span>Limit: <strong style="color:var(--b2)">'+fmt(a.limit)+'</strong></span>':'')+
+                (a.available!=null?'<span>Kalan: <strong style="color:var(--g)">'+fmt(a.available)+'</strong></span>':'')+
+              '</div>'+
+            '</div>';
+          }).join('');
+        }
+
+        // GRUP 3: Kredi Kartları (cards tablosundan)
+        var krediCards=(d.cards||[]).filter(function(c){return c.card_type==='kredi'});
+        if(krediCards.length){
+          html+='<div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--txt2);margin:10px 0 6px;padding:0 2px">💳 Kredi Kartları</div>';
+          html+=krediCards.map(function(c){
+            var pct=c.pct||0; var fc=pct<50?'var(--g)':pct<80?'var(--y)':'var(--r)';
+            var nm=c.bank+(c.name?' · '+c.name:'');
+            var minPay=c.min_pct>0?Math.round(c.used*c.min_pct/100):0;
+            return '<div class="cc-item" onclick="goPage(\'cards\',document.querySelector(\'[data-page=cards]\'))" style="cursor:pointer">'+
+              '<div class="cc-item-top"><div class="cc-bank">💳 '+nm+'</div><span class="cc-pct-badge '+(pct<50?'ok':pct<80?'warn':'high')+'">%'+pct+'</span></div>'+
+              '<div class="cc-prog-bg"><div class="cc-prog-fill" style="width:'+pct+'%;background:'+fc+'"></div></div>'+
+              '<div class="cc-nums">'+
+                '<span>Borç: <strong style="color:var(--r)">'+fmt(c.used)+'</strong></span>'+
+                '<span>Limit: <strong style="color:var(--b2)">'+fmt(c.limit)+'</strong></span>'+
+                '<span>Kalan: <strong style="color:var(--g)">'+fmt(c.avail)+'</strong></span>'+
+                (minPay>0?'<span style="color:var(--y);font-size:.72rem">Asgari: '+fmt(minPay)+'</span>':'')+
+              '</div></div>';
+          }).join('');
+        }
+
+        // GRUP 4: Banka Kartı + Yemek + Hediye
+        var diger=(d.cards||[]).filter(function(c){return c.card_type!=='kredi'});
+        if(diger.length){
+          html+='<div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--txt2);margin:10px 0 6px;padding:0 2px">🏧 Banka / Yemek Kartları</div>';
+          html+=diger.map(function(c){
+            var ico=_cico[c.card_type]||'🏧';
+            var nm=c.bank+(c.name?' · '+c.name:'');
+            var pct=c.limit>0?Math.round(c.used/c.limit*100):0;
+            var fc=pct<50?'var(--g)':pct<80?'var(--y)':'var(--r)';
+            return '<div class="cc-item" onclick="goPage(\'cards\',document.querySelector(\'[data-page=cards]\'))" style="cursor:pointer">'+
+              '<div class="cc-item-top"><div class="cc-bank">'+ico+' '+nm+'</div>'+
+              (c.limit>0?'<span class="cc-pct-badge '+(pct<50?'ok':pct<80?'warn':'high')+'">%'+pct+'</span>':'')+
+              '</div>'+
+              (c.limit>0?'<div class="cc-prog-bg"><div class="cc-prog-fill" style="width:'+pct+'%;background:'+fc+'"></div></div>':'')+
+              '<div class="cc-nums">'+
+                '<span>Kullanılan: <strong style="color:var(--r)">'+fmt(c.used)+'</strong></span>'+
+                (c.limit>0?'<span>Limit: <strong style="color:var(--b2)">'+fmt(c.limit)+'</strong></span>':'')+
+                (c.limit>0?'<span>Kalan: <strong style="color:var(--g)">'+fmt(c.avail)+'</strong></span>':'')+
+              '</div></div>';
+          }).join('');
+        }
+
+        co.innerHTML=html;
       }
     }
   });
@@ -4919,18 +4981,43 @@ function loadAccounts(){
 function loadAccountsDropdown(){
   var sel=document.getElementById('f-account');
   if(!sel) return;
-  xhr('/api/accounts',null,function(list){
-    var prev=sel.value;
-    sel.innerHTML='<option value="">— Hesap Belirtme —</option>';
-    (list||[]).forEach(function(a){
-      var icon=_ACC_ICONS[a.type]||'🏦';
+  var prev=sel.value;
+  sel.innerHTML='<option value="">— Hesap Belirtme —</option>';
+  if(!_allAccounts.length){
+    // Henüz /api/init dönmemişse API'den çek
+    xhr('/api/accounts',null,function(list){
+      sel.innerHTML='<option value="">— Hesap Belirtme —</option>';
+      (list||[]).forEach(function(a){
+        var icon=_ACC_ICONS[a.type]||'🏦';
+        var opt=document.createElement('option');
+        opt.value=a.id;
+        opt.textContent=icon+' '+a.bank+' · '+a.name;
+        sel.appendChild(opt);
+      });
+    });
+    return;
+  }
+  // Grupla: Vadesiz → Tasarruf → KMH → Diğer
+  var accGroups=[
+    {types:['vadesiz'],           label:'🏦 Vadesiz Hesaplar'},
+    {types:['tasarruf'],          label:'💰 Tasarruf Hesapları'},
+    {types:['kmh','kredi_karti'], label:'🔄 KMH / Kredi Hesapları'},
+    {types:['konut_kredisi','arac_kredisi','ihtiyac_kredisi'], label:'💼 Kredi Hesapları'},
+    {types:['diger'],             label:'📋 Diğer Hesaplar'},
+  ];
+  accGroups.forEach(function(g){
+    var inGrp=_allAccounts.filter(function(a){return g.types.indexOf(a.type||'vadesiz')!==-1;});
+    if(!inGrp.length) return;
+    var grp=document.createElement('optgroup'); grp.label=g.label;
+    inGrp.forEach(function(a){
       var opt=document.createElement('option');
       opt.value=a.id;
-      opt.textContent=icon+' '+a.bank+' · '+a.name;
-      sel.appendChild(opt);
+      opt.textContent=(a.bank?a.bank+' · ':'')+a.name;
+      grp.appendChild(opt);
     });
-    if(prev) sel.value=prev;
+    sel.appendChild(grp);
   });
+  if(prev) sel.value=prev;
 }
 
 var _CARD_TYPE_ICONS={'kredi':'💳','banka':'🏧','yemek':'🍽️','hediye':'🎁'};
@@ -4938,30 +5025,42 @@ var _CARD_TYPE_ICONS={'kredi':'💳','banka':'🏧','yemek':'🍽️','hediye':'
 function loadCardsDropdown(suggestCat){
   var sel=document.getElementById('f-card');
   if(!sel) return;
-  xhr('/api/cards',null,function(list){
-    var prev=sel.value;
-    sel.innerHTML='<option value="">— Nakit / Kart Seçme —</option>';
-    // Yemek kategorisi ise yemek kartlarını öne al
-    var isYemek=(suggestCat||'').indexOf('Yemek')!==-1||(suggestCat||'').indexOf('yemek')!==-1;
-    var sorted=(list||[]).slice().sort(function(a,b){
-      if(isYemek){
-        var ay=a.card_type==='yemek'?0:1;
-        var by=b.card_type==='yemek'?0:1;
-        if(ay!==by) return ay-by;
-      }
-      return (a.bank_name||'').localeCompare(b.bank_name||'');
-    });
-    sorted.forEach(function(c){
+  var prev=sel.value;
+  sel.innerHTML='<option value="">— Nakit / Kart Seçme —</option>';
+  // Yemek kategorisi ise yemek kartlarını öne al
+  var isYemek=(suggestCat||'').indexOf('Yemek')!==-1||(suggestCat||'').indexOf('yemek')!==-1;
+  var sorted=_allCards.slice().sort(function(a,b){
+    if(isYemek){
+      var ay=a.card_type==='yemek'?0:1;
+      var by=b.card_type==='yemek'?0:1;
+      if(ay!==by) return ay-by;
+    }
+    return (a.bank_name||'').localeCompare(b.bank_name||'');
+  });
+  // Grupla: Kredi → Banka Kartı → Yemek → Hediye
+  var groups=[
+    {key:'kredi',  label:'💳 Kredi Kartları'},
+    {key:'banka',  label:'🏧 Banka Kartları'},
+    {key:'yemek',  label:'🍽️ Yemek Kartları'},
+    {key:'hediye', label:'🎁 Hediye Kartları'},
+  ];
+  groups.forEach(function(g){
+    var inGroup=sorted.filter(function(c){return (c.card_type||'kredi')===g.key;});
+    if(!inGroup.length) return;
+    var grpOpt=document.createElement('optgroup');
+    grpOpt.label=g.label;
+    inGroup.forEach(function(c){
       var ico=_CARD_TYPE_ICONS[c.card_type]||'💳';
       var opt=document.createElement('option');
-      opt.value=c.id;
+      opt.value='card:'+c.id;
       var used=parseFloat(c.used_||0); var lim=parseFloat(c.limit_||0);
-      var avail=lim>0?fmtMoney(lim-used):'';
-      opt.textContent=ico+' '+c.bank_name+(c.card_name?' '+c.card_name:'')+(avail?' — '+avail+' kaldı':'');
-      sel.appendChild(opt);
+      var avail=lim>0?' — '+fmt(lim-used)+' kaldı':'';
+      opt.textContent=c.bank_name+(c.card_name?' '+c.card_name:'')+avail;
+      grpOpt.appendChild(opt);
     });
-    if(prev) sel.value=prev;
+    sel.appendChild(grpOpt);
   });
+  if(prev) sel.value=prev;
 }
 
 function setNumVal(el, v){
@@ -4978,7 +5077,10 @@ function addTx(){
   var accSel=document.getElementById('f-account');
   var cardSel=document.getElementById('f-card');
   var accId=accSel&&accSel.value?parseInt(accSel.value):null;
-  var cardId=cardSel&&cardSel.value?parseInt(cardSel.value):null;
+  // Kart seçici: "card:123" formatında gelir
+  var cardVal=cardSel?cardSel.value:'';
+  var cardId=null;
+  if(cardVal&&cardVal.indexOf('card:')===0) cardId=parseInt(cardVal.split(':')[1]);
   if(!amount||amount<=0){toast('Tutar giriniz');return}
   var payload={type:curTab,amount:amount,category:cat,description:desc,date:dt,account_id:accId};
   if(curTab==='gider'&&cardId) payload.card_id=cardId;
@@ -5103,7 +5205,7 @@ function renderLedger(){
   });
   var tbody=document.getElementById('ledger-body');
   if(!data.length){
-    tbody.innerHTML='<tr><td colspan="7"><div class="empty-state"><div class="icon">📋</div>İşlem bulunamadı</div></td></tr>';
+    tbody.innerHTML='<tr><td colspan="8"><div class="empty-state"><div class="icon">📋</div>İşlem bulunamadı</div></td></tr>';
     document.getElementById('ledger-count').textContent='';
     return;
   }
@@ -5114,9 +5216,11 @@ function renderLedger(){
       '<td><div class="cell">'+fmtDate(t.date)+'</div></td>'+
       '<td><div class="cell"><span class="badge '+(isG?'badge-g':'badge-r')+'">'+(isG?'Gelir':'Gider')+'</span></div></td>'+
       '<td><div class="cell"><span class="badge badge-cat">'+t.category+'</span></div></td>'+
-      '<td><div class="cell" style="color:var(--txt2);font-size:.82rem">'+(t.description||'<span style="opacity:.4">—</span>')+
-        (t.card_id ? ' <span style="font-size:.7rem;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:1px 5px;color:var(--txt2)">'+_cardIco(t.card_id)+' '+_cardName(t.card_id)+'</span>' : '')+
-        (t.account_id&&!t.card_id ? ' <span style="font-size:.7rem;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:1px 5px;color:var(--txt2)">🏦 '+_accName(t.account_id)+'</span>' : '')+
+      '<td><div class="cell" style="color:var(--txt2);font-size:.82rem">'+(t.description||'<span style="opacity:.4">—</span>')+'</div></td>'+
+      '<td><div class="cell" style="font-size:.78rem">'+
+        (t.card_id ? '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:2px 7px;color:var(--txt);font-weight:600;white-space:nowrap">'+_cardIco(t.card_id)+' '+_cardName(t.card_id)+'</span>' :
+         t.account_id ? '<span style="display:inline-flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:2px 7px;color:var(--txt);font-weight:600;white-space:nowrap">🏦 '+_accName(t.account_id)+'</span>' :
+         '<span style="color:var(--txt2);opacity:.4">—</span>')+
       '</div></td>'+
       '<td style="text-align:right"><div class="cell" style="justify-content:flex-end;font-weight:700;color:'+(isG?'var(--g)':'var(--r)')+'">'+
         (isG?'+':'-')+fmt(t.amount)+'</div></td>'+
@@ -5230,16 +5334,50 @@ function openTxEdit(id){
     if(c===tx.category) o.selected=true;
     catSel.appendChild(o);
   });
+  // Kart seçici — sadece gider
+  var cardRow=document.getElementById('txe-card-row');
+  var txeCard=document.getElementById('txe-card');
+  var txeAccLbl=document.getElementById('txe-acc-lbl');
+  if(cardRow) cardRow.style.display=(tx.type==='gider'?'':'none');
+  if(txeAccLbl) txeAccLbl.textContent=(tx.type==='gelir'?'🏦 Hangi Hesaba Geldi?':'🏦 Hesap');
+  // Kart dropdown doldur
+  if(txeCard){
+    txeCard.innerHTML='<option value="">— Nakit / Kart Seçme —</option>';
+    _allCards.forEach(function(c){
+      var ico=_cardIco(c.id);
+      var o=document.createElement('option');
+      o.value=c.id;
+      o.textContent=ico+' '+c.bank_name+(c.card_name?' '+c.card_name:'');
+      if(tx.card_id==c.id) o.selected=true;
+      txeCard.appendChild(o);
+    });
+  }
+  // Hesap dropdown doldur
+  var txeAcc=document.getElementById('txe-account');
+  if(txeAcc){
+    txeAcc.innerHTML='<option value="">— Hesap Belirtme —</option>';
+    _allAccounts.forEach(function(a){
+      var o=document.createElement('option');
+      o.value=a.id;
+      o.textContent='🏦 '+a.bank+' · '+a.name;
+      if(tx.account_id==a.id) o.selected=true;
+      txeAcc.appendChild(o);
+    });
+  }
   m.style.display='flex';
 }
 function closeTxEdit(){ var m=document.getElementById('tx-edit-modal'); if(m) m.style.display='none'; }
 function saveTxEdit(){
   var id=document.getElementById('txe-id').value;
+  var txeCard=document.getElementById('txe-card');
+  var txeAcc=document.getElementById('txe-account');
   var body={
     date:document.getElementById('txe-date').value,
     amount:document.getElementById('txe-amount').value,
     category:document.getElementById('txe-category').value,
     description:document.getElementById('txe-desc').value,
+    account_id: txeAcc&&txeAcc.value ? parseInt(txeAcc.value) : null,
+    card_id: txeCard&&txeCard.value ? parseInt(txeCard.value) : null,
   };
   xhr('/api/transactions/'+id,body,function(r){
     if(r.ok){closeTxEdit();toast('Kaydedildi');loadAllTx();loadDashboard();}
@@ -6600,7 +6738,15 @@ function closeLiquidityDetail(){ var m=document.getElementById('liquidity-detail
     <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:5px">Tutar</label>
     <input type="number" id="txe-amount" class="f-input" step="0.01" style="margin-bottom:12px">
     <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:5px">Açıklama</label>
-    <input type="text" id="txe-desc" class="f-input" style="margin-bottom:20px">
+    <input type="text" id="txe-desc" class="f-input" style="margin-bottom:12px">
+    <div id="txe-card-row" style="margin-bottom:12px">
+      <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:5px">💳 Hangi Kartla Ödendi?</label>
+      <select id="txe-card" class="f-input"><option value="">— Nakit / Kart Seçme —</option></select>
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:5px" id="txe-acc-lbl">🏦 Hesap</label>
+      <select id="txe-account" class="f-input"><option value="">— Hesap Belirtme —</option></select>
+    </div>
     <button onclick="saveTxEdit()" style="width:100%;padding:13px;background:var(--b);color:#fff;border:none;border-radius:10px;font-size:.92rem;font-weight:700;cursor:pointer">Kaydet</button>
   </div>
 </div>
