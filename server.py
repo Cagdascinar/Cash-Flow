@@ -45,9 +45,13 @@ def _csrf_input():
     return f'<input type="hidden" name="csrf_token" value="{get_csrf_token()}">'
 
 def validate_csrf():
-    submitted = request.form.get("csrf_token", "")
-    expected  = session.get("csrf_token", "")
-    return bool(expected and secrets.compare_digest(submitted, expected))
+    # Form, JSON body ve header'dan sırayla dene
+    submitted = (request.form.get("csrf_token")
+                 or (request.get_json(silent=True) or {}).get("csrf_token")
+                 or request.headers.get("X-CSRF-Token")
+                 or "")
+    expected = session.get("csrf_token", "")
+    return bool(expected and secrets.compare_digest(str(submitted), str(expected)))
 
 @app.errorhandler(429)
 def too_many_requests(e):
@@ -1304,13 +1308,19 @@ def del_transaction(tid):
     pid = get_pid(); db = get_db()
     tx = db.execute("SELECT * FROM transactions WHERE id=? AND profile_id=?", (tid, pid)).fetchone()
     if tx and tx.get("card_id"):
-        # Silmede kart borcunu geri al
+        cid = tx["card_id"]
+        amt = float(tx["amount"])
+        has_account = bool(tx.get("account_id"))
         if tx["type"] == "gider":
-            db.execute("UPDATE cards SET used_=GREATEST(0,used_-?) WHERE id=? AND profile_id=?",
-                       (tx["amount"], tx["card_id"], pid))
+            if has_account:
+                # Kart ödemesi silindi → borcu geri yükle (ödeme geri alındı)
+                db.execute("UPDATE cards SET used_=used_+? WHERE id=? AND profile_id=?", (amt, cid, pid))
+            else:
+                # Kart harcaması silindi → borcu düşür (harcama geri alındı)
+                db.execute("UPDATE cards SET used_=GREATEST(0,used_-?) WHERE id=? AND profile_id=?", (amt, cid, pid))
         elif tx["type"] == "gelir":
-            db.execute("UPDATE cards SET used_=used_+? WHERE id=? AND profile_id=?",
-                       (tx["amount"], tx["card_id"], pid))
+            # İade silindi → borcu geri yükle
+            db.execute("UPDATE cards SET used_=used_+? WHERE id=? AND profile_id=?", (amt, cid, pid))
     db.execute("DELETE FROM transactions WHERE id=? AND profile_id=?", (tid, pid))
     db.commit()
     return jsonify({"ok": True})

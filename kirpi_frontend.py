@@ -1966,9 +1966,19 @@ body{top:0!important}
       </div>
 
       <!-- GELİR için hesap seçici -->
-      <div id="f-income-dest" style="display:none;margin-bottom:16px">
+      <div id="f-income-dest" style="display:none;margin-bottom:12px">
         <label>🏦 Hangi Hesaba Geldi?</label>
         <select class="f-input" id="f-income-account"><option value="">— Belirtme (Nakit) —</option></select>
+      </div>
+      <!-- GELİR: Kart iadesi -->
+      <div id="f-income-refund" style="display:none;margin-bottom:16px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:8px">
+          <input type="checkbox" id="f-refund-check" onchange="toggleRefundCard(this.checked)" style="width:16px;height:16px;accent-color:var(--b)">
+          <span style="font-size:.85rem;color:var(--txt)">💳 Kart iadesi — kart borcundan düşsün</span>
+        </label>
+        <div id="f-refund-card-row" style="display:none">
+          <select class="f-input" id="f-refund-card"><option value="">— Kart seçin —</option></select>
+        </div>
       </div>
 
       <button class="btn btn-danger" id="add-btn" style="width:100%;padding:13px" onclick="addTx()">Kaydet</button>
@@ -3309,6 +3319,18 @@ function _blErr(img){
   var svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 38 38"><rect width="38" height="38" rx="10" fill="'+bg+'"/><text x="19" y="22" font-size="'+fs+'" font-weight="900" fill="white" text-anchor="middle" dominant-baseline="middle" font-family="Arial Black,Arial,sans-serif">'+tx+'</text></svg>';
   img.src='data:image/svg+xml,'+encodeURIComponent(svg);
 }
+function goToCard(cardId){
+  var navEl=document.querySelector('[data-page=hesaplar]');
+  goPage('hesaplar', navEl);
+  setTimeout(function(){
+    var el=document.querySelector('[data-card-id="'+cardId+'"]');
+    if(!el){ loadCards(); setTimeout(function(){ var e2=document.querySelector('[data-card-id="'+cardId+'"]'); if(e2){ e2.scrollIntoView({behavior:'smooth',block:'center'}); e2.style.outline='2px solid var(--b)'; setTimeout(function(){e2.style.outline='';},2000); } },400); return; }
+    el.scrollIntoView({behavior:'smooth',block:'center'});
+    el.style.outline='2px solid var(--b)';
+    el.style.boxShadow='0 0 0 6px #0A84FF18';
+    setTimeout(function(){el.style.outline='';el.style.boxShadow='';},2000);
+  }, 300);
+}
 function _bankLogo(name){
   var colors={
     'Garanti BBVA':'#009A44','İş Bankası':'#003087','Akbank':'#E30613',
@@ -3595,19 +3617,19 @@ function loadProfiles(){
 
 function setAvatarDisplay(avatar, name){
   var initials = (name||'?').slice(0,1).toUpperCase();
-  var btn = document.getElementById('avatar-btn-inner');
-  var avaDrop = document.getElementById('udrop-ava');
-  var avaSet = document.getElementById('settings-avatar-img');
-  function setAva(el){
+  var imgHtml = avatar ? '<img src="'+avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">' : '';
+  function setAva(el, fallback){
     if(!el) return;
-    if(avatar){
-      el.innerHTML='<img src="'+avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
-    } else {
-      el.textContent = initials;
-    }
+    if(avatar) el.innerHTML=imgHtml;
+    else el.textContent=(fallback||initials);
   }
-  if(btn){ if(avatar){btn.innerHTML='<img src="'+avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';} else {btn.textContent=initials;} }
-  setAva(avaDrop); setAva(avaSet);
+  var btn=document.getElementById('avatar-btn-inner');
+  if(btn){ if(avatar) btn.innerHTML=imgHtml; else btn.textContent=initials; }
+  setAva(document.getElementById('udrop-ava'));
+  setAva(document.getElementById('settings-avatar-img'));
+  // Desktop sidebar'da da kullanıcı avatarını göster
+  var sideAvatar=document.getElementById('sidebar-profile-avatar');
+  if(sideAvatar&&avatar) sideAvatar.innerHTML='<img src="'+avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
 }
 
 function toggleUserMenu(e){
@@ -3706,6 +3728,8 @@ function switchProfileThen(pid, cb){
     sessionStorage.setItem('cur_pname', d.name||'');
     sessionStorage.setItem('cur_ptype', d.type||'');
     localStorage.setItem('preferred_pid', pid);
+    // Tüm cache'i temizle — yeni profil için taze veri
+    _allCards=[]; _allAccounts=[]; allTx=[]; filteredTx=[];
     renderDropdownProfiles(); renderSettingsProfiles();
     applyProfileType(d.type);
     allTx=[]; filteredTx=[];
@@ -4276,7 +4300,9 @@ function setTab(t){
   if(paySection) paySection.style.display=(t==='gider'?'':'none');
   var incDest=document.getElementById('f-income-dest');
   if(incDest) incDest.style.display=(t==='gelir'?'':'none');
-  if(t==='gelir') _fillIncomeDest();
+  var incRefund=document.getElementById('f-income-refund');
+  if(incRefund) incRefund.style.display=(t==='gelir'?'':'none');
+  if(t==='gelir'){ _fillIncomeDest(); _fillRefundCards(); }
   if(t==='gider') selectPayType(document.querySelector('.pay-chip.active')||document.querySelector('.pay-chip'));
 }
 
@@ -4322,6 +4348,27 @@ function doTransfer(){
   });
 }
 
+function _fillRefundCards(){
+  var sel=document.getElementById('f-refund-card'); if(!sel) return;
+  if(sel.options.length>1) return;
+  function _fill(list){
+    (list||[]).forEach(function(c){
+      var o=document.createElement('option');
+      o.value='card:'+c.id;
+      var ico=c.card_type==='yemek'?'🍽️':c.card_type==='banka'?'🏧':'💳';
+      var used=parseFloat(c.used_||0);var lim=parseFloat(c.limit_||0);
+      var avail=lim>0?' — '+fmt(lim-used)+' kullanılabilir':'  borç: '+fmt(used);
+      o.textContent=ico+' '+c.bank_name+(c.card_name?' '+c.card_name:'')+avail;
+      sel.appendChild(o);
+    });
+  }
+  if(_allCards.length) _fill(_allCards);
+  else xhr('/api/cards',null,function(list){_allCards=list||[];_fill(_allCards);});
+}
+function toggleRefundCard(checked){
+  var row=document.getElementById('f-refund-card-row');
+  if(row) row.style.display=checked?'':'none';
+}
 function _fillIncomeDest(){
   var sel=document.getElementById('f-income-account'); if(!sel) return;
   var prev=sel.value;
@@ -4568,7 +4615,7 @@ function loadTodayWidgets(){
             var nm=c.bank+(c.name?' · '+c.name:'');
             var isCredi=c.card_type==='kredi';
             var minPay=isCredi&&c.min_pct>0?Math.round(c.used*c.min_pct/100):0;
-            return '<div class="cc-item" onclick="goPage(\'hesaplar\',document.querySelector(\'[data-page=hesaplar]\'))" style="cursor:pointer">'+
+            return '<div class="cc-item" onclick="goToCard('+c.id+')" style="cursor:pointer">'+
               '<div class="cc-item-logo" style="margin-bottom:9px">'+
                 _bankLogo(c.bank)+
                 '<div class="cc-item-logo-info">'+
@@ -4596,7 +4643,7 @@ function loadTodayWidgets(){
             var nm=c.bank+(c.name?' · '+c.name:'');
             var pct=c.limit>0?Math.round(c.used/c.limit*100):0;
             var fc=pct<50?'var(--g)':pct<80?'var(--y)':'var(--r)';
-            return '<div class="cc-item" onclick="goPage(\'hesaplar\',document.querySelector(\'[data-page=hesaplar]\'))" style="cursor:pointer">'+
+            return '<div class="cc-item" onclick="goToCard('+c.id+')" style="cursor:pointer">'+
               '<div class="cc-item-logo"'+(c.limit>0?' style="margin-bottom:9px"':'')+'>'+
                 _bankLogo(c.bank)+
                 '<div class="cc-item-logo-info">'+
@@ -5403,6 +5450,13 @@ function addTx(){
     // Gelir: hangi hesaba
     var incAcc=document.getElementById('f-income-account');
     if(incAcc&&incAcc.value) payload.account_id=parseInt(incAcc.value);
+    // Gelir: kart iadesi
+    var refundChk=document.getElementById('f-refund-check');
+    if(refundChk&&refundChk.checked){
+      var refundSel=document.getElementById('f-refund-card');
+      var rv=refundSel?refundSel.value:'';
+      if(rv&&rv.indexOf('card:')===0) payload.card_id=parseInt(rv.split(':')[1]);
+    }
   }
   xhr('/api/transactions',payload,function(r){
     if(r.ok){
@@ -6342,8 +6396,8 @@ function selectCardType(btn){
   // Kredi alanlarını göster/gizle
   var creditFields=document.getElementById('card-credit-fields');
   var minPctRow=document.getElementById('card-minpct-row');
-  var isCredit=(t==='kredi'||t==='banka');
-  if(creditFields) creditFields.style.display=isCredit?'':'none';
+  // Son ödeme + ekstre sadece kredi kartında; asgari ödeme de sadece kredi
+  if(creditFields) creditFields.style.display=t==='kredi'?'':'none';
   if(minPctRow) minPctRow.style.display=t==='kredi'?'':'none';
   // Etiketleri güncelle
   var limitLbl=document.getElementById('card-limit-lbl');
