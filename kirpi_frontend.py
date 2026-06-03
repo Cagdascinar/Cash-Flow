@@ -1561,6 +1561,44 @@ body{top:0!important}
     <span id="s-gider-sub" style="display:none"></span>
   </div>
 
+  <!-- ── GÜNÜN GELİRLERİ & GİDERLERİ — hero'nun hemen altında ── -->
+  <!-- ── GÜNÜN GELİRLERİ ── -->
+  <div class="dash-section">
+    <div class="s-header" onclick="toggleSection('gelir')">
+      <div class="sh-left"><span class="sh-dot gn"></span><span id="gelir-section-lbl">Günün Gelirleri</span></div>
+      <input type="date" id="today-date-pick" onclick="event.stopPropagation()" onchange="changeTodayDate(this.value)"
+        style="background:var(--bg3);border:1px solid var(--border2);color:var(--txt2);padding:3px 8px;border-radius:7px;font-size:.72rem;outline:none;cursor:pointer">
+      <span class="sh-badge" id="gelir-badge" style="display:none">0</span>
+      <span class="sh-chevron" id="chevron-gelir">▾</span>
+    </div>
+    <div class="s-body" id="sec-gelir">
+      <div id="today-gelir-list"><div class="empty-pay"><div class="ep-ico">📅</div><div class="ep-txt">Yükleniyor…</div></div></div>
+      <div class="today-subtotal today-subtotal-gn" id="today-gelir-total" style="display:none">
+        <span>Toplam Gelir</span><span id="today-gelir">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── GÜNÜN GİDERLERİ ── -->
+  <div class="dash-section">
+    <div class="s-header" onclick="toggleSection('gider')">
+      <div class="sh-left"><span class="sh-dot rd"></span><span id="gider-section-lbl">Günün Giderleri</span></div>
+      <span class="sh-badge" id="gider-badge" style="display:none">0</span>
+      <span class="sh-chevron" id="chevron-gider">▾</span>
+    </div>
+    <div class="s-body" id="sec-gider">
+      <div id="today-gider-list"><div class="empty-pay"><div class="ep-ico">📅</div><div class="ep-txt">Yükleniyor…</div></div></div>
+      <div class="today-subtotal today-subtotal-rd" id="today-gider-total" style="display:none">
+        <span>Toplam Gider</span><span id="today-gider">—</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="today-net-row" id="today-net-row" style="display:none">
+    <div class="tnr-label">Günün Bakiyesi</div>
+    <div class="tnr-value" id="today-net">—</div>
+  </div>
+
   <!-- ── ONBOARDING ── -->
   <div id="onboarding-card" style="display:none;background:linear-gradient(135deg,#6366f1,#a855f7);border-radius:20px;padding:24px;margin-bottom:16px;color:#fff">
     <div style="font-size:2rem;margin-bottom:10px">🦔</div>
@@ -1675,44 +1713,6 @@ body{top:0!important}
       </div>
     </div>
 
-  </div>
-
-  <!-- ── GÜNÜN GELİRLERİ ── -->
-  <div class="dash-section">
-    <div class="s-header" onclick="toggleSection('gelir')">
-      <div class="sh-left"><span class="sh-dot gn"></span><span id="gelir-section-lbl">Günün Gelirleri</span></div>
-      <input type="date" id="today-date-pick" onclick="event.stopPropagation()" onchange="changeTodayDate(this.value)"
-        style="background:var(--bg3);border:1px solid var(--border2);color:var(--txt2);padding:3px 8px;border-radius:7px;font-size:.72rem;outline:none;cursor:pointer">
-      <span class="sh-badge" id="gelir-badge" style="display:none">0</span>
-      <span class="sh-chevron" id="chevron-gelir">▾</span>
-    </div>
-    <div class="s-body" id="sec-gelir">
-      <div id="today-gelir-list"><div class="empty-pay"><div class="ep-ico">📅</div><div class="ep-txt">Yükleniyor…</div></div></div>
-      <div class="today-subtotal today-subtotal-gn" id="today-gelir-total" style="display:none">
-        <span>Toplam Gelir</span><span id="today-gelir">—</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── GÜNÜN GİDERLERİ ── -->
-  <div class="dash-section">
-    <div class="s-header" onclick="toggleSection('gider')">
-      <div class="sh-left"><span class="sh-dot rd"></span><span id="gider-section-lbl">Günün Giderleri</span></div>
-      <span class="sh-badge" id="gider-badge" style="display:none">0</span>
-      <span class="sh-chevron" id="chevron-gider">▾</span>
-    </div>
-    <div class="s-body" id="sec-gider">
-      <div id="today-gider-list"><div class="empty-pay"><div class="ep-ico">📅</div><div class="ep-txt">Yükleniyor…</div></div></div>
-      <div class="today-subtotal today-subtotal-rd" id="today-gider-total" style="display:none">
-        <span>Toplam Gider</span><span id="today-gider">—</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── GÜNÜN BAKİYESİ ── -->
-  <div class="today-net-row" id="today-net-row" style="display:none">
-    <div class="tnr-label">Günün Bakiyesi</div>
-    <div class="tnr-value" id="today-net">—</div>
   </div>
 
   <!-- ── LİMİTLER ── -->
