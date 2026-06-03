@@ -2679,37 +2679,41 @@ body{top:0!important}
   <div class="settings-card">
     <!-- DİL SEÇİCİ -->
     <div class="settings-sect-title">🌍 Dil / Language</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px" id="lang-grid">
-      <button class="lang-btn active" onclick="setLang('tr')" data-lang="tr">🇹🇷 Türkçe</button>
-      <button class="lang-btn" onclick="setLang('en')" data-lang="en">🇬🇧 English</button>
-      <button class="lang-btn" onclick="setLang('de')" data-lang="de">🇩🇪 Deutsch</button>
-      <button class="lang-btn" onclick="setLang('fr')" data-lang="fr">🇫🇷 Français</button>
-      <button class="lang-btn" onclick="setLang('es')" data-lang="es">🇪🇸 Español</button>
-      <button class="lang-btn" onclick="setLang('it')" data-lang="it">🇮🇹 Italiano</button>
-      <button class="lang-btn" onclick="setLang('ru')" data-lang="ru">🇷🇺 Русский</button>
-      <button class="lang-btn" onclick="setLang('ar')" data-lang="ar">🇸🇦 العربية</button>
-      <button class="lang-btn" onclick="setLang('zh-CN')" data-lang="zh-CN">🇨🇳 中文</button>
-      <button class="lang-btn" onclick="setLang('ja')" data-lang="ja">🇯🇵 日本語</button>
-      <button class="lang-btn" onclick="setLang('ko')" data-lang="ko">🇰🇷 한국어</button>
-      <button class="lang-btn" onclick="setLang('pt')" data-lang="pt">🇵🇹 Português</button>
-      <button class="lang-btn" onclick="setLang('nl')" data-lang="nl">🇳🇱 Nederlands</button>
-      <button class="lang-btn" onclick="setLang('pl')" data-lang="pl">🇵🇱 Polski</button>
-      <button class="lang-btn" onclick="setLang('uk')" data-lang="uk">🇺🇦 Українська</button>
-      <button class="lang-btn" onclick="setLang('sv')" data-lang="sv">🇸🇪 Svenska</button>
-      <button class="lang-btn" onclick="setLang('no')" data-lang="no">🇳🇴 Norsk</button>
-      <button class="lang-btn" onclick="setLang('da')" data-lang="da">🇩🇰 Dansk</button>
-      <button class="lang-btn" onclick="setLang('fi')" data-lang="fi">🇫🇮 Suomi</button>
-      <button class="lang-btn" onclick="setLang('hi')" data-lang="hi">🇮🇳 हिन्दी</button>
-      <button class="lang-btn" onclick="setLang('fa')" data-lang="fa">🇮🇷 فارسی</button>
-      <button class="lang-btn" onclick="setLang('id')" data-lang="id">🇮🇩 Indonesia</button>
-      <button class="lang-btn" onclick="setLang('ms')" data-lang="ms">🇲🇾 Melayu</button>
-      <button class="lang-btn" onclick="setLang('th')" data-lang="th">🇹🇭 ไทย</button>
-      <button class="lang-btn" onclick="setLang('vi')" data-lang="vi">🇻🇳 Tiếng Việt</button>
-      <button class="lang-btn" onclick="setLang('ro')" data-lang="ro">🇷🇴 Română</button>
-      <button class="lang-btn" onclick="setLang('el')" data-lang="el">🇬🇷 Ελληνικά</button>
-      <button class="lang-btn" onclick="setLang('hu')" data-lang="hu">🇭🇺 Magyar</button>
-      <button class="lang-btn" onclick="setLang('cs')" data-lang="cs">🇨🇿 Čeština</button>
-      <button class="lang-btn" onclick="setLang('he')" data-lang="he">🇮🇱 עברית</button>
+    <div style="margin-bottom:16px">
+      <select class="f-input" id="lang-select" onchange="setLang(this.value)" style="font-size:.9rem">
+        <option value="tr">🇹🇷 Türkçe</option>
+        <option value="en">🇬🇧 English</option>
+        <option value="de">🇩🇪 Deutsch</option>
+        <option value="fr">🇫🇷 Français</option>
+        <option value="es">🇪🇸 Español</option>
+        <option value="it">🇮🇹 Italiano</option>
+        <option value="pt">🇵🇹 Português</option>
+        <option value="nl">🇳🇱 Nederlands</option>
+        <option value="pl">🇵🇱 Polski</option>
+        <option value="ru">🇷🇺 Русский</option>
+        <option value="uk">🇺🇦 Українська</option>
+        <option value="ro">🇷🇴 Română</option>
+        <option value="cs">🇨🇿 Čeština</option>
+        <option value="hu">🇭🇺 Magyar</option>
+        <option value="el">🇬🇷 Ελληνικά</option>
+        <option value="sv">🇸🇪 Svenska</option>
+        <option value="no">🇳🇴 Norsk</option>
+        <option value="da">🇩🇰 Dansk</option>
+        <option value="fi">🇫🇮 Suomi</option>
+        <option value="ar">🇸🇦 العربية</option>
+        <option value="he">🇮🇱 עברית</option>
+        <option value="fa">🇮🇷 فارسی</option>
+        <option value="hi">🇮🇳 हिन्दी</option>
+        <option value="zh-CN">🇨🇳 中文 (简体)</option>
+        <option value="zh-TW">🇹🇼 中文 (繁體)</option>
+        <option value="ja">🇯🇵 日本語</option>
+        <option value="ko">🇰🇷 한국어</option>
+        <option value="th">🇹🇭 ไทย</option>
+        <option value="vi">🇻🇳 Tiếng Việt</option>
+        <option value="id">🇮🇩 Indonesia</option>
+        <option value="ms">🇲🇾 Melayu</option>
+      </select>
+      <div style="font-size:.72rem;color:var(--txt2);margin-top:6px">Google Translate ile otomatik çeviri yapılır.</div>
     </div>
 
     <div class="settings-sect-title">Uygulama</div>
@@ -3205,9 +3209,8 @@ function setLang(lang){
 
 function _syncLangBtns(){
   var cur=localStorage.getItem('kirpi_lang')||'tr';
-  document.querySelectorAll('.lang-btn').forEach(function(b){
-    b.classList.toggle('active',b.dataset.lang===cur);
-  });
+  var sel=document.getElementById('lang-select');
+  if(sel) sel.value=cur;
 }
 
 function _syncDarkModeUI(){
@@ -4408,7 +4411,7 @@ function loadTodayWidgets(){
               '<div class="cc-nums">'+
                 (a.limit>0?'<span>Limit: <strong style="color:var(--b2)">'+fmt(a.limit)+'</strong></span>':'')+
                 '<span>Kullanılan: <strong style="color:var(--r)">'+fmt(a.balance)+'</strong></span>'+
-                (a.available!=null?'<span>Kalan: <strong style="color:var(--g)">'+fmt(a.available)+'</strong></span>':'')+
+                (a.available!=null?'<span>Kullanılabilir: <strong style="color:'+(a.available<0?'var(--r)':'var(--g)')+'">'+fmt(a.available)+'</strong></span>':'')+
               '</div>'+
             '</div>';
           }).join('');
