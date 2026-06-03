@@ -2223,11 +2223,11 @@ body{top:0!important}
   <div class="grid2">
     <!-- ADD FORM -->
     <div class="card">
-      <div class="section-title" id="acc-form-title">Ürün Ekle</div>
+      <div class="section-title" id="acc-form-title">Hesap Ekle</div>
       <input type="hidden" id="acc-edit-id" value="">
 
       <div style="margin-bottom:14px">
-        <label>Ürün Türü</label>
+        <label>Tür</label>
         <div class="acc-type-chips">
           <button type="button" class="acc-type-chip active" data-type="vadesiz" onclick="selectAccType(this)">🏦 Vadesiz</button>
           <button type="button" class="acc-type-chip" data-type="tasarruf" onclick="selectAccType(this)">💰 Tasarruf</button>
@@ -2236,6 +2236,9 @@ body{top:0!important}
           <button type="button" class="acc-type-chip" data-type="arac_kredisi" onclick="selectAccType(this)">🚗 Araç Kredisi</button>
           <button type="button" class="acc-type-chip" data-type="ihtiyac_kredisi" onclick="selectAccType(this)">💼 İhtiyaç Kredisi</button>
           <button type="button" class="acc-type-chip" data-type="diger" onclick="selectAccType(this)">📋 Diğer</button>
+        </div>
+        <div id="acc-kmh-hint" style="display:none;margin-top:8px;padding:7px 10px;background:rgba(99,102,241,.08);border-radius:8px;font-size:.72rem;color:var(--txt2)">
+          🔄 KMH: Vadesiz hesabınıza bağlı eksi bakiye (overdraft) limitidir. Limit alanına maksimum eksi bakiye tutarını girin.
         </div>
       </div>
 
@@ -2354,7 +2357,7 @@ body{top:0!important}
             <option>Sodexo</option><option>Pluxee</option><option>Paye</option>
           </optgroup>
           <optgroup label="Dijital / Neo">
-            <option>Papara</option><option>Param</option><option>Tosla</option><option>Ininal</option>
+            <option>Enpara</option><option>Papara</option><option>Param</option><option>Tosla</option><option>Ininal</option>
           </optgroup>
           <option>Diğer</option>
         </select>
@@ -4980,11 +4983,14 @@ function selectAccType(btn){
   document.querySelectorAll('.acc-type-chip').forEach(function(b){b.classList.remove('active')});
   btn.classList.add('active');
   _accType=btn.getAttribute('data-type');
-  var isCard=(_accType==='kredi_karti'||_accType==='kmh');
+  var isDebt=(_accType==='kmh'||_accType==='konut_kredisi'||_accType==='arac_kredisi'||_accType==='ihtiyac_kredisi');
+  var isKmh=(_accType==='kmh');
   var lbl=document.getElementById('acc-bal-lbl');
   var limitCol=document.getElementById('acc-limit-col');
-  if(lbl) lbl.textContent=isCard?'Mevcut Borç (₺)':'Mevcut Bakiye (₺)';
-  if(limitCol) limitCol.style.display=isCard?'':'none';
+  var kmhHint=document.getElementById('acc-kmh-hint');
+  if(lbl) lbl.textContent=isDebt?'Mevcut Borç / Kalan Anapara (₺)':'Mevcut Bakiye (₺)';
+  if(limitCol) limitCol.style.display=isDebt?'':'none';
+  if(kmhHint) kmhHint.style.display=isKmh?'block':'none';
 }
 
 function selectAccColor(btn){
@@ -4995,7 +5001,7 @@ function selectAccColor(btn){
 
 function resetAccForm(){
   document.getElementById('acc-edit-id').value='';
-  document.getElementById('acc-form-title').textContent='Ürün Ekle';
+  document.getElementById('acc-form-title').textContent='Hesap Ekle';
   document.getElementById('acc-bank').value='';
   var ao=document.getElementById('acc-owner'); if(ao) ao.value='';
   document.getElementById('acc-name').value='';
