@@ -6137,7 +6137,25 @@ function loadCards(){
     var totalLimit=0, totalUsed=0;
     var today = new Date().getDate();
     var _ctypeIco={'kredi':'💳','banka':'🏧','yemek':'🍽️','hediye':'🎁'};
-    el.innerHTML = list.map(function(c){
+    var _ctypeGroups=[
+      {key:'kredi', label:'💳 Kredi Kartları'},
+      {key:'banka', label:'🏧 Banka Kartları'},
+      {key:'yemek', label:'🍽️ Yemek Kartları'},
+      {key:'hediye',label:'🎁 Hediye Kartları'},
+    ];
+    var grouped={};
+    list.forEach(function(c){
+      var t=c.card_type||'kredi';
+      if(!grouped[t]) grouped[t]=[];
+      grouped[t].push(c);
+      totalLimit+=(c.limit_||0); totalUsed+=(c.used_||0);
+    });
+    var html='';
+    _ctypeGroups.forEach(function(g){
+      var grpList=grouped[g.key]||[];
+      if(!grpList.length) return;
+      html+='<div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--txt2);margin:8px 0 6px;padding:0 2px">'+g.label+'</div>';
+      html+=grpList.map(function(c){
       var ctype   = c.card_type||'kredi';
       var ico     = _ctypeIco[ctype]||'💳';
       var avail   = (c.limit_||0) - (c.used_||0);
@@ -6185,7 +6203,9 @@ function loadCards(){
           '<button class="btn btn-ghost" style="font-size:.78rem;padding:8px 12px" onclick="openCardEdit({id:'+c.id+',bank_name:\''+c.bank_name+'\',card_name:\''+(c.card_name||'')+'\',owner:\''+(c.owner||'')+'\',limit_:'+(c.limit_||0)+',used_:'+(c.used_||0)+',due_day:'+(c.due_day||15)+',statement_day:'+(c.statement_day||20)+',min_pct:'+(c.min_pct||25)+',card_type:\''+(ctype||'kredi')+'\'})">✏️ Düzenle</button>'+
         '</div>'+
       '</div>';
-    }).join('');
+      }).join('');
+    });
+    el.innerHTML=html;
     document.getElementById('card-totals').style.display='block';
     document.getElementById('ct-limit').textContent = fmt(totalLimit);
     document.getElementById('ct-used').textContent  = fmt(totalUsed);
