@@ -1253,8 +1253,12 @@ def add_transaction():
 @app.route("/api/transactions/<int:tid>", methods=["PUT"])
 @login_required
 def update_transaction(tid):
-    pid = get_pid()
+    pid = get_pid(); db = get_db()
     d = request.get_json(force=True)
+    # Eski işlemi oku — kart borcu senkronizasyonu için
+    old = db.execute("SELECT * FROM transactions WHERE id=? AND profile_id=?", (tid, pid)).fetchone()
+    if not old: return jsonify({"ok": False, "error": "İşlem bulunamadı"}), 404
+
     fields, params = [], []
     for col in ("type","amount","category","description","date","account_id","card_id"):
         if col in d:
@@ -1267,8 +1271,31 @@ def update_transaction(tid):
                 params.append(d[col])
     if not fields: return jsonify({"ok": False}), 400
     params += [tid, pid]
-    get_db().execute(f"UPDATE transactions SET {','.join(fields)} WHERE id=? AND profile_id=?", params)
-    get_db().commit()
+    db.execute(f"UPDATE transactions SET {','.join(fields)} WHERE id=? AND profile_id=?", params)
+
+    # Kart borcu senkronizasyonu: eski etkiyi geri al, yeni etkiyi uygula
+    old_card_id = old["card_id"]
+    new_card_id = int(d["card_id"]) if "card_id" in d and d["card_id"] else old_card_id
+    old_amount  = float(old["amount"])
+    new_amount  = float(d["amount"]) if "amount" in d else old_amount
+    old_type    = old["type"]
+    new_type    = d.get("type", old_type)
+
+    def _card_delta(card_id, amount, ttype, reverse=False):
+        if not card_id: return
+        sign = -1 if reverse else 1
+        if ttype == "gider":
+            db.execute("UPDATE cards SET used_=GREATEST(0,used_+?) WHERE id=? AND profile_id=?",
+                       (sign * amount, card_id, pid))
+        elif ttype == "gelir":
+            db.execute("UPDATE cards SET used_=GREATEST(0,used_+?) WHERE id=? AND profile_id=?",
+                       (-sign * amount, card_id, pid))
+
+    if old_card_id or new_card_id:
+        _card_delta(old_card_id, old_amount, old_type, reverse=True)   # eski etkiyi sil
+        _card_delta(new_card_id, new_amount, new_type, reverse=False)  # yeni etkiyi uygula
+
+    db.commit()
     return jsonify({"ok": True})
 
 @app.route("/api/transactions/<int:tid>", methods=["DELETE"])
@@ -2790,31 +2817,36 @@ def setup_telegram_webhook():
 @login_required
 def list_accounts():
     pid = get_pid(); db = get_db()
+    # Tek sorguda hesap + işlem toplamları (N+1 sorunu giderildi)
     rows = db.execute(
-        "SELECT * FROM accounts WHERE profile_id=? AND active=1 ORDER BY bank,name", (pid,)
+        """SELECT a.*,
+             COALESCE(SUM(CASE WHEN t.type='gelir' THEN t.amount ELSE 0 END),0) AS tagged_gelir,
+             COALESCE(SUM(CASE WHEN t.type='gider' THEN t.amount ELSE 0 END),0) AS tagged_gider
+           FROM accounts a
+           LEFT JOIN transactions t ON t.account_id=a.id AND t.profile_id=a.profile_id
+           WHERE a.profile_id=? AND a.active=1
+           GROUP BY a.id
+           ORDER BY a.bank, a.name""",
+        (pid,)
     ).fetchall()
     result = []
     for r in rows:
         acc = row_to_dict(r)
-        gelir = db.execute(
-            "SELECT COALESCE(SUM(amount),0) FROM transactions WHERE profile_id=? AND account_id=? AND type='gelir'",
-            (pid, r["id"])
-        ).fetchone()[0] or 0
-        gider = db.execute(
-            "SELECT COALESCE(SUM(amount),0) FROM transactions WHERE profile_id=? AND account_id=? AND type='gider'",
-            (pid, r["id"])
-        ).fetchone()[0] or 0
-        acc["tagged_gelir"] = float(gelir)
-        acc["tagged_gider"] = float(gider)
-        init = float(acc.get("initial_balance") or 0)
+        gelir  = float(acc.pop("tagged_gelir", 0) or 0)
+        gider  = float(acc.pop("tagged_gider", 0) or 0)
+        acc["tagged_gelir"] = gelir
+        acc["tagged_gider"] = gider
+        init   = float(acc.get("initial_balance") or 0)
         limit_ = float(acc.get("limit_") or 0)
-        atype = acc.get("type","hesap")
-        if atype in ("kredi_karti","kmh"):
-            # For credit products: debt grows with gider, shrinks with gelir
-            acc["computed_balance"] = init + float(gider) - float(gelir)
-            acc["available"] = limit_ - acc["computed_balance"] if limit_ > 0 else None
+        atype  = acc.get("type", "vadesiz")
+        if atype in ("kredi_karti", "kmh"):
+            # Kredi ürünlerinde borç = gider − gelir (ters)
+            debt = init + gider - gelir
+            acc["computed_balance"] = round(debt, 2)
+            acc["available"] = round(limit_ - debt, 2) if limit_ > 0 else None
         else:
-            acc["computed_balance"] = init + float(gelir) - float(gider)
+            bal = init + gelir - gider
+            acc["computed_balance"] = round(bal, 2)
             acc["available"] = None
         result.append(acc)
     return jsonify(result)
@@ -4180,23 +4212,42 @@ def insights():
     ).fetchone()["d"] or 0)
 
     # Banka hesapları toplam bakiyesi:
-    # initial_balance + geçmiş işlemler (bugüne kadar gerçekleşmiş)
+    # Dahil: nakit işlemler + hesaba bağlı işlemler (account_id set) + kart ödemeleri (her ikisi de set)
+    # Hariç: saf kart harcamaları (card_id set, account_id NULL) — bunlar zaten card_debt'e dahil
     today_iso = today_d.isoformat()
     acc_bal = db.execute(
-        """SELECT COALESCE(SUM(a.initial_balance),0) +
-                 COALESCE((
-                   SELECT SUM(CASE WHEN t.type='gelir' THEN t.amount ELSE -t.amount END)
-                   FROM transactions t
-                   WHERE t.profile_id=%s AND t.date <= %s
-                 ),0) AS b
+        """SELECT
+             COALESCE(SUM(a.initial_balance),0) +
+             COALESCE((
+               SELECT SUM(CASE WHEN t.type='gelir' THEN t.amount ELSE -t.amount END)
+               FROM transactions t
+               WHERE t.profile_id=%s AND t.date <= %s
+                 AND NOT (t.card_id IS NOT NULL AND t.account_id IS NULL)
+             ),0) AS b
            FROM accounts a
-           WHERE a.profile_id=%s AND a.active=1""",
+           WHERE a.profile_id=%s AND a.active=1
+             AND a.type NOT IN ('kredi_karti','kmh')""",
         (pid, today_iso, pid)
     ).fetchone()
     total_balance = float(acc_bal["b"] or 0) if acc_bal else 0
 
-    # Net Likidite = hesap bakiyesi - kredi kartı borcu (GERÇEK eli altındaki para)
-    net_liquidity = round(total_balance - card_debt)
+    # KMH borcu (accounts tablosundaki KMH kullanımı)
+    kmh_debt = float(db.execute(
+        """SELECT COALESCE(SUM(t.amount),0)
+           FROM transactions t JOIN accounts a ON t.account_id=a.id
+           WHERE a.profile_id=%s AND a.type='kmh' AND t.type='gider'""",
+        (pid,)
+    ).fetchone()[0] or 0)
+    kmh_paid = float(db.execute(
+        """SELECT COALESCE(SUM(t.amount),0)
+           FROM transactions t JOIN accounts a ON t.account_id=a.id
+           WHERE a.profile_id=%s AND a.type='kmh' AND t.type='gelir'""",
+        (pid,)
+    ).fetchone()[0] or 0)
+    kmh_balance = max(0, kmh_debt - kmh_paid)
+
+    # Net Likidite = hesap bakiyesi - kredi kartı borcu - KMH borcu
+    net_liquidity = round(total_balance - card_debt - kmh_balance)
 
     # Yatırım değeri (maliyet bazlı — piyasa değeri için ayrı API)
     invest_val = float(db.execute(
@@ -4208,8 +4259,8 @@ def insights():
         "SELECT COALESCE(SUM(purchase_price),0) as v FROM assets WHERE profile_id=? AND active=1", (pid,)
     ).fetchone()["v"] or 0)
 
-    # Toplam Net Varlık = hesaplar + yatırımlar + kıymetler - kredi kartı
-    net_worth = round(total_balance + invest_val + asset_val - card_debt)
+    # Net Varlık = likit varlıklar + yatırımlar + kıymetler
+    net_worth = round(total_balance + invest_val + asset_val - card_debt - kmh_balance)
 
     # Nakit yeterlilik (günlük harcama hızıyla kaç gün dayanır)
     daily_burn = cur_z / days_passed if days_passed > 0 else 0
@@ -4832,12 +4883,12 @@ def pay_card(cid):
     card_type = card.get("card_type") or "kredi"
     cat = "Yemek Kartı Ödemesi" if card_type == "yemek" else "Kredi Kartı Ödemesi"
     desc = d.get("description") or f"{card['bank_name']} {card.get('card_name') or ''} ödemesi".strip()
-    # Ödeme işlemini kaydet — vadesiz hesap varsa oraya bağla
+    # Ödeme işlemini kaydet — vadesiz hesap ve kartla ilişkilendir
     db.execute(
-        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
-        (uid, pid, "gider", amount, cat, desc, date.today().isoformat(), account_id, datetime.now().isoformat())
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,card_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (uid, pid, "gider", amount, cat, desc, date.today().isoformat(), account_id, cid, datetime.now().isoformat())
     )
-    # Kart borcunu düş
+    # Kart borcunu düş (transaction insert'teki card_id zaten etkisini yapıyor — burada manuel düzeltiriz)
     new_debt = max(0, current_debt - amount)
     db.execute("UPDATE cards SET used_=? WHERE id=?", (new_debt, cid))
     db.commit()
