@@ -5390,9 +5390,9 @@ ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
 </svg>"""
 
 MANIFEST = json.dumps({
-    "name": "Kirpi — Nakit Akışı",
+    "name": "Kirpi — Nakit Akış Yönetimi",
     "short_name": "Kirpi",
-    "description": "Gelir, gider, yatırım ve kartlarını tek ekranda yönet. Şahıs ve şirket profillerini ayrı tut.",
+    "description": "Gelir, gider, kart borçları ve bütçenizi tek yerden yönetin. Şahıs ve şirket profillerini ayrı tutun.",
     "start_url": "/",
     "scope": "/",
     "display": "standalone",

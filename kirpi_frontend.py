@@ -6,7 +6,9 @@ AUTH_HTML = r"""<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#f2f2f7">
-<title>Kirpi — __MODE_TITLE__</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/icon-192.png" sizes="192x192" type="image/png">
+<title>Kirpi — Nakit Akış Yönetimi</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#f2f2f7;color:#1c1c1e;font-family:'Inter',system-ui,sans-serif;
@@ -124,13 +126,20 @@ HTML = r"""<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0a0c12">
-<meta name="description" content="Kirpi — Kişisel nakit akışı takip uygulaması">
+<meta name="description" content="Kirpi — Kişisel nakit akış yönetim uygulaması. Gelir, gider, kart borçları ve bütçenizi tek yerden takip edin.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Kirpi">
 <link rel="manifest" href="/manifest.json">
-<title>Kirpi — Finansal Kontrol</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta property="og:title" content="Kirpi — Nakit Akış Yönetimi">
+<meta property="og:description" content="Gelir, gider, kart borçları ve bütçenizi tek yerden yönetin.">
+<meta property="og:image" content="/icon-512.png">
+<meta property="og:type" content="website">
+<title>Kirpi — Nakit Akış Yönetimi</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{overflow-x:hidden}
