@@ -2686,19 +2686,27 @@ def telegram_webhook():
                 "SELECT id,bank_name,card_name,card_type,used_,limit_ FROM cards WHERE profile_id=%s ORDER BY bank_name",
                 (pid,)
             ).fetchall()
-            is_yemek = "yemek" in parsed["category"].lower()
-            relevant = [c for c in all_cards if c["card_type"] in ("yemek","kredi") if is_yemek or c["card_type"]=="kredi"]
+            cat_l = parsed["category"].lower()
+            is_yemek = "yemek" in cat_l or "restoran" in cat_l
+            # Yemek kategorisiyse yemek kartlarını öne al, sonra kredi; diğerlerinde kredi önce
+            if is_yemek:
+                relevant = ([c for c in all_cards if c["card_type"] == "yemek"] +
+                            [c for c in all_cards if c["card_type"] == "kredi"])
+            else:
+                relevant = ([c for c in all_cards if c["card_type"] == "kredi"] +
+                            [c for c in all_cards if c["card_type"] == "yemek"])
+            # Hiç kredi/yemek yoksa banka kartını da ekle
             if not relevant:
-                relevant = [c for c in all_cards if c["card_type"] in ("kredi","yemek","banka")]
+                relevant = [c for c in all_cards if c["card_type"] == "banka"]
             row = []
-            for c in relevant[:6]:
-                ico = "🍽️" if c["card_type"]=="yemek" else "💳"
+            for c in relevant[:8]:
+                ico = "🍽️" if c["card_type"] == "yemek" else ("🏧" if c["card_type"] == "banka" else "💳")
                 lbl = f"{ico} {c['bank_name']}"
                 if c.get("card_name"): lbl += f" {c['card_name']}"
                 if c["limit_"]:
-                    avail = round(float(c["limit_"])-float(c["used_"] or 0),2)
+                    avail = round(float(c["limit_"]) - float(c["used_"] or 0), 2)
                     lbl += f" ·{_tg_fmt_amount(avail)}"
-                if len(lbl) > 28: lbl = lbl[:27]+"…"
+                if len(lbl) > 30: lbl = lbl[:29] + "…"
                 row.append({"text": lbl, "callback_data": f"confirm:{pending_id}:c:{c['id']}"})
                 if len(row) == 2:
                     keyboard_rows.append(row); row = []
