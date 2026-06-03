@@ -1302,6 +1302,7 @@ def bulk_delete():
 @app.route("/api/summary")
 @login_required
 def summary():
+  try:
     pid   = get_pid()
     db    = get_db()
     today_d = date.today()
@@ -1333,8 +1334,8 @@ def summary():
     for m in range(1,13):
         s,e2 = month_range(today_d.year, m)
         totals = db.execute("SELECT type,SUM(amount) as t FROM transactions WHERE profile_id=? AND date BETWEEN ? AND ? GROUP BY type",(pid,s,e2)).fetchall()
-        g_val  = next((r["t"] for r in totals if r["type"]=="gelir"),0)
-        ex_val = next((r["t"] for r in totals if r["type"]=="gider"),0)
+        g_val  = float(next((r["t"] for r in totals if r["type"]=="gelir"),0) or 0)
+        ex_val = float(next((r["t"] for r in totals if r["type"]=="gider"),0) or 0)
         bar.append({"month":m,"gelir":round(g_val,2),"gider":round(ex_val,2)})
     bal = db.execute("SELECT SUM(CASE WHEN type='gelir' THEN amount ELSE -amount END) as b FROM transactions WHERE profile_id=?",(pid,)).fetchone()
     budgets = {r["category"]:r["limit_"] for r in db.execute("SELECT * FROM budgets WHERE profile_id=?",(pid,)).fetchall()}
@@ -1372,6 +1373,12 @@ def summary():
         "recurring_gider":   round(recurring_gider, 2),
         "kullanilabilir_nakit": kullanilabilir,
     })
+  except Exception as _e:
+    log.error("summary error: %s", _e, exc_info=True)
+    return jsonify({"error": str(_e), "gelir":0,"gider":0,"net":0,"balance":0,
+                    "gelir_cats":{},"gider_cats":{},"bar":[],"budgets":{},"period":"month",
+                    "kart_borcu":0,"kart_limit":0,"kart_kullanilabilir":0,
+                    "asgari_odeme":0,"recurring_gider":0,"kullanilabilir_nakit":0})
 
 @app.route("/api/budgets", methods=["POST"])
 @login_required
