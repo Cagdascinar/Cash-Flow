@@ -1933,43 +1933,67 @@ body{top:0!important}
     <div class="type-tabs">
       <button class="type-tab tr" id="tab-r" onclick="setTab('gider')">📉  Gider</button>
       <button class="type-tab" id="tab-g" onclick="setTab('gelir')">📈  Gelir</button>
-    </div>
-    <div class="form-row">
-      <div><label>Tutar (₺)</label><input class="f-input" type="text" inputmode="decimal" data-num id="f-amount" placeholder="0,00"></div>
-      <div><label>Tarih</label><input class="f-input" type="date" id="f-date"></div>
-    </div>
-    <div style="margin-bottom:12px"><label>Kategori</label><select class="f-input" id="f-cat"></select></div>
-    <div style="margin-bottom:14px"><label>Açıklama</label><input class="f-input" type="text" id="f-desc" placeholder="örn. Market alışverişi"></div>
-
-    <!-- ÖDEME YÖNTEMİ — sadece gider için -->
-    <div id="f-pay-section" style="margin-bottom:16px">
-      <label style="margin-bottom:8px;display:block">Ödeme Yöntemi</label>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="f-pay-chips">
-        <button type="button" class="pay-chip active" data-ptype="nakit" onclick="selectPayType(this)">💵 Nakit</button>
-        <button type="button" class="pay-chip" data-ptype="banka_kart" onclick="selectPayType(this)">🏧 Banka Kartı</button>
-        <button type="button" class="pay-chip" data-ptype="kredi_kart" onclick="selectPayType(this)">💳 Kredi Kartı</button>
-        <button type="button" class="pay-chip" data-ptype="yemek_kart" onclick="selectPayType(this)">🍽️ Yemek Kartı</button>
-        <button type="button" class="pay-chip" data-ptype="kmh" onclick="selectPayType(this)">🔄 KMH</button>
-      </div>
-      <!-- Banka kartı → vadesiz hesap seç -->
-      <div id="f-account-row" style="display:none">
-        <label style="font-size:.78rem;color:var(--txt2);margin-bottom:4px;display:block">🏦 Hangi Hesaptan?</label>
-        <select class="f-input" id="f-account"><option value="">— Hesap seçin —</option></select>
-      </div>
-      <!-- Kredi/Yemek kartı → kart seç -->
-      <div id="f-card-row" style="display:none">
-        <label style="font-size:.78rem;color:var(--txt2);margin-bottom:4px;display:block" id="f-card-label">💳 Hangi Kartla?</label>
-        <select class="f-input" id="f-card"><option value="">— Kart seçin —</option></select>
-      </div>
+      <button class="type-tab" id="tab-t" onclick="setTab('transfer')">↔️  Transfer</button>
     </div>
 
-    <!-- GELİR için hesap seçici -->
-    <div id="f-income-dest" style="display:none;margin-bottom:16px">
-      <label>🏦 Hangi Hesaba Geldi?</label>
-      <select class="f-input" id="f-income-account"><option value="">— Belirtme (Nakit) —</option></select>
+    <!-- GIDER / GELİR formu -->
+    <div id="f-normal-form">
+      <div class="form-row">
+        <div><label>Tutar (₺)</label><input class="f-input" type="text" inputmode="decimal" data-num id="f-amount" placeholder="0,00"></div>
+        <div><label>Tarih</label><input class="f-input" type="date" id="f-date"></div>
+      </div>
+      <div style="margin-bottom:12px"><label>Kategori</label><select class="f-input" id="f-cat"></select></div>
+      <div style="margin-bottom:14px"><label>Açıklama</label><input class="f-input" type="text" id="f-desc" placeholder="örn. Market alışverişi"></div>
+
+      <!-- ÖDEME YÖNTEMİ — sadece gider için -->
+      <div id="f-pay-section" style="margin-bottom:16px">
+        <label style="margin-bottom:8px;display:block">Ödeme Yöntemi</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="f-pay-chips">
+          <button type="button" class="pay-chip active" data-ptype="nakit" onclick="selectPayType(this)">💵 Nakit</button>
+          <button type="button" class="pay-chip" data-ptype="banka_kart" onclick="selectPayType(this)">🏧 Banka Kartı</button>
+          <button type="button" class="pay-chip" data-ptype="kredi_kart" onclick="selectPayType(this)">💳 Kredi Kartı</button>
+          <button type="button" class="pay-chip" data-ptype="yemek_kart" onclick="selectPayType(this)">🍽️ Yemek Kartı</button>
+          <button type="button" class="pay-chip" data-ptype="kmh" onclick="selectPayType(this)">🔄 KMH</button>
+        </div>
+        <div id="f-account-row" style="display:none">
+          <label style="font-size:.78rem;color:var(--txt2);margin-bottom:4px;display:block">🏦 Hangi Hesaptan?</label>
+          <select class="f-input" id="f-account"><option value="">— Hesap seçin —</option></select>
+        </div>
+        <div id="f-card-row" style="display:none">
+          <label style="font-size:.78rem;color:var(--txt2);margin-bottom:4px;display:block" id="f-card-label">💳 Hangi Kartla?</label>
+          <select class="f-input" id="f-card"><option value="">— Kart seçin —</option></select>
+        </div>
+      </div>
+
+      <!-- GELİR için hesap seçici -->
+      <div id="f-income-dest" style="display:none;margin-bottom:16px">
+        <label>🏦 Hangi Hesaba Geldi?</label>
+        <select class="f-input" id="f-income-account"><option value="">— Belirtme (Nakit) —</option></select>
+      </div>
+
+      <button class="btn btn-danger" id="add-btn" style="width:100%;padding:13px" onclick="addTx()">Kaydet</button>
     </div>
 
-    <button class="btn btn-danger" id="add-btn" style="width:100%;padding:13px" onclick="addTx()">Kaydet</button>
+    <!-- TRANSFER formu -->
+    <div id="f-transfer-form" style="display:none">
+      <div style="font-size:.8rem;color:var(--txt2);margin-bottom:14px">Hesaplar arası para transferi — iki tarafta da işlem oluşturulur.</div>
+      <div style="margin-bottom:12px">
+        <label>Kaynaktan (gider) 🔴</label>
+        <select class="f-input" id="tr-from"><option value="">— Hesap seçin —</option></select>
+      </div>
+      <div style="margin-bottom:12px">
+        <label>Hedefe (gelir) 🟢</label>
+        <select class="f-input" id="tr-to"><option value="">— Hesap seçin —</option></select>
+      </div>
+      <div class="form-row">
+        <div><label>Tutar (₺)</label><input class="f-input" type="text" inputmode="decimal" data-num id="tr-amount" placeholder="0,00"></div>
+        <div><label>Tarih</label><input class="f-input" type="date" id="tr-date"></div>
+      </div>
+      <div style="margin-bottom:14px"><label>Açıklama <span style="color:var(--txt2);font-size:.7rem">(opsiyonel)</span></label>
+        <input class="f-input" type="text" id="tr-desc" placeholder="ör. Maaş Akbank'a transfer">
+      </div>
+      <button class="btn btn-primary" style="width:100%;padding:13px" onclick="doTransfer()">↔️ Transfer Yap</button>
+    </div>
   </div>
 </div>
 
@@ -4238,16 +4262,64 @@ function setTab(t){
   curTab=t;
   document.getElementById('tab-g').className='type-tab'+(t==='gelir'?' tg':'');
   document.getElementById('tab-r').className='type-tab'+(t==='gider'?' tr':'');
-  document.getElementById('add-btn').className='btn '+(t==='gelir'?'btn-green':'btn-danger');
+  var tabT=document.getElementById('tab-t');
+  if(tabT) tabT.className='type-tab'+(t==='transfer'?' active':'');
+  var normalForm=document.getElementById('f-normal-form');
+  var transferForm=document.getElementById('f-transfer-form');
+  if(transferForm) transferForm.style.display=(t==='transfer'?'':'none');
+  if(normalForm) normalForm.style.display=(t==='transfer'?'none':'');
+  if(t==='transfer'){ _fillTransferDropdowns(); return; }
+  var addBtn=document.getElementById('add-btn');
+  if(addBtn) addBtn.className='btn '+(t==='gelir'?'btn-green':'btn-danger');
   fillSel('f-cat',CATS[t]);
-  // Gider: ödeme yöntemi çipleri göster
   var paySection=document.getElementById('f-pay-section');
   if(paySection) paySection.style.display=(t==='gider'?'':'none');
-  // Gelir: nereye geldi hesap seçici
   var incDest=document.getElementById('f-income-dest');
   if(incDest) incDest.style.display=(t==='gelir'?'':'none');
   if(t==='gelir') _fillIncomeDest();
   if(t==='gider') selectPayType(document.querySelector('.pay-chip.active')||document.querySelector('.pay-chip'));
+}
+
+function _fillTransferDropdowns(){
+  var trDate=document.getElementById('tr-date');
+  if(trDate&&!trDate.value) trDate.value=new Date().toISOString().split('T')[0];
+  function _fill(list){
+    ['tr-from','tr-to'].forEach(function(id){
+      var sel=document.getElementById(id); if(!sel) return;
+      var prev=sel.value;
+      sel.innerHTML='<option value="">— Hesap seçin —</option>';
+      (list||[]).forEach(function(a){
+        var o=document.createElement('option');
+        o.value=a.id;
+        var bal=a.computed_balance||a.initial_balance||0;
+        o.textContent=(a.bank?a.bank+' · ':'')+a.name+' ('+fmt(bal)+')';
+        sel.appendChild(o);
+      });
+      if(prev) sel.value=prev;
+    });
+  }
+  if(_allAccounts.length) _fill(_allAccounts);
+  else xhr('/api/accounts',null,function(list){_allAccounts=list||[];_fill(_allAccounts);});
+}
+
+function doTransfer(){
+  var fromId=document.getElementById('tr-from').value;
+  var toId=document.getElementById('tr-to').value;
+  var amount=getNumVal(document.getElementById('tr-amount'));
+  var dt=document.getElementById('tr-date').value;
+  var desc=document.getElementById('tr-desc').value.trim();
+  if(!fromId||!toId){toast('Kaynak ve hedef hesap seçin','#ef4444');return;}
+  if(fromId===toId){toast('Kaynak ve hedef aynı olamaz','#ef4444');return;}
+  if(!amount||amount<=0){toast('Tutar giriniz','#ef4444');return;}
+  xhr('/api/transfers',{from_account_id:parseInt(fromId),to_account_id:parseInt(toId),amount:amount,date:dt,description:desc},function(r){
+    if(r.ok){
+      toast('Transfer kaydedildi ✓');
+      document.getElementById('tr-amount').value='';
+      document.getElementById('tr-desc').value='';
+      xhr('/api/accounts',null,function(list){_allAccounts=list||[];_fillTransferDropdowns();});
+      loadDashboard(); loadAllTx();
+    }
+  });
 }
 
 function _fillIncomeDest(){
@@ -5953,7 +6025,10 @@ function loadInvestments(){
             '<div style="font-weight:600;font-size:.88rem">'+inv.name+'</div>'+
             '<div style="font-size:.72rem;color:var(--txt2)">'+inv.symbol+' · '+inv.buy_date+'</div>'+
           '</div>'+
-          '<button class="del-row" onclick="delInv('+inv.id+')">✕</button>'+
+          '<div style="display:flex;gap:6px">'+
+            '<button class="btn btn-green" style="font-size:.72rem;padding:4px 10px" onclick="openSellModal('+inv.id+',\''+inv.name.replace(/'/g,'\\\'')+'\',' +inv.quantity+','+inv.buy_price+')">Sat</button>'+
+            '<button class="del-row" onclick="delInv('+inv.id+')">✕</button>'+
+          '</div>'+
         '</div>'+
         '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:.78rem">'+
           '<div><div style="color:var(--txt2)">Maliyet</div><div style="font-weight:600">'+fmt(inv.buy_try)+'</div></div>'+
@@ -5986,6 +6061,57 @@ function updateInvPrice(id, price){
 
 function delInv(id){
   xhr('/api/investments/'+id, null, function(){ loadInvestments(); toast('Silindi'); }, false, true);
+}
+
+var _sellInvId=null;
+function openSellModal(id,name,qty,buyPrice){
+  _sellInvId=id;
+  var m=document.getElementById('sell-inv-modal');
+  if(!m){ // modal yoksa oluştur
+    m=document.createElement('div');
+    m.id='sell-inv-modal';
+    m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    m.innerHTML='<div style="background:var(--bg2);border-radius:16px;padding:24px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.3)">'
+      +'<div style="font-size:1rem;font-weight:800;margin-bottom:16px">💰 Yatırım Sat</div>'
+      +'<div id="sell-inv-info" style="font-size:.82rem;color:var(--txt2);margin-bottom:14px"></div>'
+      +'<div style="margin-bottom:12px"><label style="font-size:.8rem;color:var(--txt2)">Satış Fiyatı (birim, TRY)</label>'
+      +'<input class="f-input" type="text" inputmode="decimal" data-num id="sell-inv-price" placeholder="0,00"></div>'
+      +'<div style="margin-bottom:12px"><label style="font-size:.8rem;color:var(--txt2)">Satış Tarihi</label>'
+      +'<input class="f-input" type="date" id="sell-inv-date"></div>'
+      +'<div style="margin-bottom:16px"><label style="font-size:.8rem;color:var(--txt2)">Gelir hangi hesaba? <span style="opacity:.6">(opsiyonel)</span></label>'
+      +'<select class="f-input" id="sell-inv-account"><option value="">— Hesap seçme —</option></select></div>'
+      +'<div style="display:flex;gap:8px">'
+      +'<button class="btn btn-ghost" style="flex:1" onclick="document.getElementById(\'sell-inv-modal\').style.display=\'none\'">İptal</button>'
+      +'<button class="btn btn-green" style="flex:1" onclick="confirmSell()">Sat & Kaydet</button>'
+      +'</div></div>';
+    document.body.appendChild(m);
+  }
+  document.getElementById('sell-inv-info').textContent=name+' — '+qty+' adet, alış: '+fmt(qty*buyPrice);
+  var dp=document.getElementById('sell-inv-date'); if(dp) dp.value=new Date().toISOString().split('T')[0];
+  var sp=document.getElementById('sell-inv-price'); if(sp){sp.value='';setTimeout(function(){sp.focus();},100);}
+  // hesap doldur
+  var accSel=document.getElementById('sell-inv-account');
+  if(accSel&&accSel.options.length<=1){
+    function _f(list){(list||[]).filter(function(a){return a.type==='vadesiz'||a.type==='vadeli'||a.type==='tasarruf';}).forEach(function(a){var o=document.createElement('option');o.value=a.id;o.textContent=(a.bank?a.bank+' · ':'')+a.name;accSel.appendChild(o);});}
+    if(_allAccounts.length) _f(_allAccounts);
+    else xhr('/api/accounts',null,function(l){_allAccounts=l||[];_f(_allAccounts);});
+  }
+  m.style.display='flex';
+}
+function confirmSell(){
+  var price=getNumVal(document.getElementById('sell-inv-price'));
+  var dt=document.getElementById('sell-inv-date').value;
+  var accEl=document.getElementById('sell-inv-account');
+  if(!price||price<=0){toast('Satış fiyatı giriniz','#ef4444');return;}
+  xhr('/api/investments/'+_sellInvId+'/sell',
+    {sell_price:price,sell_date:dt,account_id:accEl&&accEl.value?parseInt(accEl.value):null},
+    function(r){
+      if(r.ok){
+        document.getElementById('sell-inv-modal').style.display='none';
+        toast('Satış kaydedildi — ₺'+fmt(r.proceeds)+' gelir eklendi'+(r.profit!==0?' (K/Z: ₺'+(r.profit>=0?'+':'')+fmt(r.profit)+')':'')+'  ✓');
+        loadInvestments(); loadDashboard(); loadAllTx();
+      }
+    });
 }
 
 function bookIncome(invId, amount, name){

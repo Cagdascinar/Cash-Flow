@@ -158,11 +158,14 @@ APP_URL         = os.environ.get("APP_URL", "https://kirpifinans.com")
 TELEGRAM_TOKEN  = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME", "KirpiNakitBot")
 
-GELIR_CATS = ["Maaş", "Serbest Meslek", "Kira Geliri", "Yatırım / Temettü", "Hediye / İkramiye", "Diğer Gelir"]
-GIDER_CATS = ["Kira / Mortgage", "Konut Kredisi Taksiti", "Araç Kredisi Taksiti", "İhtiyaç Kredisi",
-               "Market / Gıda", "Faturalar", "Ulaşım", "Yemek / Restoran",
+GELIR_CATS = ["Maaş", "Serbest Meslek", "Kira Geliri", "Yatırım Geliri / Satış",
+               "Yatırım / Temettü", "Hediye / İkramiye", "Hesaplar Arası Transfer", "Diğer Gelir"]
+GIDER_CATS = ["Kira / Mortgage", "Market / Gıda", "Faturalar", "Ulaşım", "Yemek / Restoran",
                "Eğlence", "Sağlık", "Giyim", "Eğitim", "Abonelikler", "Elektronik",
-               "Sigorta", "Vergi / Harç", "Diğer Gider"]
+               "Sigorta", "Vergi / Harç",
+               "Kredi Kartı Ödemesi", "Yemek Kartı Ödemesi",
+               "Döviz Alımı", "Altın Alımı", "Yatırım Fonu", "Hisse Senedi",
+               "Hesaplar Arası Transfer", "Diğer Gider"]
 ALL_CATS   = GELIR_CATS + GIDER_CATS
 
 # ── DB ────────────────────────────────────────────────────────────────────────
@@ -4842,6 +4845,37 @@ def pay_card(cid):
                     "limit": float(card["limit_"] or 0),
                     "available": float(card["limit_"] or 0) - new_debt})
 
+# ── TRANSFER ─────────────────────────────────────────────────────────────────
+
+@app.route("/api/transfers", methods=["POST"])
+@login_required
+def create_transfer():
+    uid = session["user_id"]; pid = get_pid()
+    d = request.get_json(force=True)
+    from_id = d.get("from_account_id")
+    to_id   = d.get("to_account_id")
+    amount  = float(d.get("amount", 0))
+    dt      = d.get("date", today_str())
+    desc    = d.get("description") or "Hesaplar Arası Transfer"
+    if not from_id or not to_id or amount <= 0:
+        return jsonify({"ok": False, "error": "Geçersiz veri"}), 400
+    if int(from_id) == int(to_id):
+        return jsonify({"ok": False, "error": "Kaynak ve hedef hesap aynı olamaz"}), 400
+    db = get_db()
+    ok1 = db.execute("SELECT id FROM accounts WHERE id=? AND profile_id=?", (from_id, pid)).fetchone()
+    ok2 = db.execute("SELECT id FROM accounts WHERE id=? AND profile_id=?", (to_id, pid)).fetchone()
+    if not ok1 or not ok2:
+        return jsonify({"ok": False, "error": "Hesap bulunamadı"}), 404
+    now = datetime.now().isoformat()
+    db.execute(
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        (uid, pid, "gider", amount, "Hesaplar Arası Transfer", desc, dt, from_id, now))
+    db.execute(
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        (uid, pid, "gelir", amount, "Hesaplar Arası Transfer", desc, dt, to_id, now))
+    db.commit()
+    return jsonify({"ok": True})
+
 # ── RATES & INVESTMENTS ───────────────────────────────────────────────────────
 
 _rates_cache = {"data": None, "ts": 0}
@@ -4932,6 +4966,32 @@ def del_investment(iid):
     pid = get_pid()
     get_db().execute("DELETE FROM investments WHERE id=? AND profile_id=?", (iid,pid)); get_db().commit()
     return jsonify({"ok": True})
+
+@app.route("/api/investments/<int:iid>/sell", methods=["POST"])
+@premium_required
+def sell_investment(iid):
+    uid = session["user_id"]; pid = get_pid()
+    d = request.get_json(force=True)
+    sell_price = float(d.get("sell_price", 0))
+    sell_date  = d.get("sell_date", today_str())
+    account_id = d.get("account_id") or None
+    if sell_price <= 0:
+        return jsonify({"ok": False, "error": "Satış fiyatı geçersiz"}), 400
+    db = get_db()
+    inv = db.execute("SELECT * FROM investments WHERE id=? AND profile_id=?", (iid, pid)).fetchone()
+    if not inv:
+        return jsonify({"ok": False, "error": "Yatırım bulunamadı"}), 404
+    proceeds = round(inv["quantity"] * sell_price, 2)
+    cost     = round(inv["quantity"] * float(inv["buy_price"]), 2)
+    profit   = round(proceeds - cost, 2)
+    _icat = {"doviz":"Döviz Alımı","altin":"Altın Alımı","fon":"Yatırım Fonu","hisse":"Hisse Senedi"}
+    desc = f"{inv['name']} satışı" + (f" (K/Z: ₺{profit:+,.2f})" if profit else "")
+    db.execute(
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        (uid, pid, "gelir", proceeds, "Yatırım Geliri / Satış", desc, sell_date, account_id, datetime.now().isoformat()))
+    db.execute("DELETE FROM investments WHERE id=? AND profile_id=?", (iid, pid))
+    db.commit()
+    return jsonify({"ok": True, "proceeds": proceeds, "profit": profit})
 
 @app.route("/api/investments/value", methods=["GET"])
 @premium_required
