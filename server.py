@@ -2250,11 +2250,10 @@ def _tg_cards_msg(pid, db):
 @app.route("/api/telegram/webhook", methods=["POST"])
 def telegram_webhook():
     if not TELEGRAM_TOKEN: return "ok"
-    if not TELEGRAM_WEBHOOK_SECRET:
-        return "Forbidden", 403
-    incoming = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
-    if not secrets.compare_digest(incoming, TELEGRAM_WEBHOOK_SECRET):
-        return "Forbidden", 403
+    if TELEGRAM_WEBHOOK_SECRET:
+        incoming = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+        if not secrets.compare_digest(incoming, TELEGRAM_WEBHOOK_SECRET):
+            return "Forbidden", 403
     data = request.get_json(force=True, silent=True) or {}
 
     # ── Callback query (Evet/Hayır butonları) ──
@@ -2718,9 +2717,12 @@ def telegram_unlink():
 def setup_telegram_webhook():
     if not TELEGRAM_TOKEN:
         return jsonify({"ok": False, "error": "TELEGRAM_BOT_TOKEN ayarlanmamış"}), 400
+    payload = {"url": f"{APP_URL}/api/telegram/webhook"}
+    if TELEGRAM_WEBHOOK_SECRET:
+        payload["secret_token"] = TELEGRAM_WEBHOOK_SECRET
     r = requests.post(
         f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook",
-        json={"url": f"{APP_URL}/api/telegram/webhook"}, timeout=10
+        json=payload, timeout=10
     )
     return jsonify(r.json())
 
@@ -6002,9 +6004,12 @@ def _register_tg_webhook():
     try:
         import time as _time
         _time.sleep(3)  # gunicorn'un tam ayağa kalkmasını bekle
+        wh_payload = {"url": f"{APP_URL}/api/telegram/webhook"}
+        if TELEGRAM_WEBHOOK_SECRET:
+            wh_payload["secret_token"] = TELEGRAM_WEBHOOK_SECRET
         r = requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook",
-            json={"url": f"{APP_URL}/api/telegram/webhook"},
+            json=wh_payload,
             timeout=10
         )
         log.info("Telegram webhook: %s", r.json())

@@ -3274,11 +3274,42 @@ function _cardName(id){ var c=_allCards.find(function(x){return x.id==id}); retu
 function _accName(id){ var a=_allAccounts.find(function(x){return x.id==id}); return a?((a.bank?a.bank+' · ':'')+a.name):''; }
 function _cardIco(id){ var c=_allCards.find(function(x){return x.id==id}); var t=c&&c.card_type; return t==='yemek'?'🍽️':t==='banka'?'🏧':t==='hediye'?'🎁':'💳'; }
 function _cardType(id){ var c=_allCards.find(function(x){return x.id==id}); return (c&&c.card_type)||'kredi'; }
+function _blFallback(img,bg,txt){var p=img.parentElement;p.style.background=bg;p.style.display='flex';p.style.alignItems='center';p.style.justifyContent='center';p.innerHTML='<span style="color:#fff;font-weight:800;font-size:.78rem">'+txt+'</span>';}
 function _bankLogo(name){
-  var b={'Garanti BBVA':{c:'#009A44',t:'G'},'İş Bankası':{c:'#003087',t:'İ'},'Akbank':{c:'#E30613',t:'A'},'Yapı Kredi':{c:'#003087',t:'YK'},'Ziraat Bankası':{c:'#C8102E',t:'Z'},'Halkbank':{c:'#0072CE',t:'H'},'Vakıfbank':{c:'#F5A623',t:'V'},'QNB Finansbank':{c:'#6F2D8E',t:'Q'},'Denizbank':{c:'#00A3E0',t:'D'},'ING':{c:'#FF6200',t:'ING'},'TEB':{c:'#003087',t:'TEB'},'HSBC':{c:'#DB0011',t:'H'},'Multinet':{c:'#F7941D',t:'M'},'Edenred':{c:'#E30613',t:'E'},'Ticket Restaurant':{c:'#E30613',t:'TR'},'Sodexo':{c:'#012169',t:'S'},'Pluxee':{c:'#7B2D8B',t:'PL'},'Paye':{c:'#1DA462',t:'P'},'Enpara':{c:'#00A859',t:'EN'},'Papara':{c:'#6F2D8E',t:'PP'},'Param':{c:'#00B050',t:'PR'},'Tosla':{c:'#FF5C35',t:'T'},'Ininal':{c:'#0081FF',t:'IN'}};
-  var d=b[name]||{c:'#8E8E93',t:(name||'?').replace(/[^A-ZİÇŞĞÜÖa-zıçşğüö]/g,'').substring(0,2).toUpperCase()||'?'};
-  var fs=d.t.length<=2?'.78rem':d.t.length===3?'.65rem':'.55rem';
-  return '<div class="bank-logo-badge" style="background:'+d.c+'"><span style="color:#fff;font-size:'+fs+'">'+d.t+'</span></div>';
+  var info={
+    'Garanti BBVA':  {c:'#009A44',t:'G',  d:'garantibbva.com.tr'},
+    'İş Bankası':    {c:'#003087',t:'İŞ', d:'isbank.com.tr'},
+    'Akbank':        {c:'#E30613',t:'A',  d:'akbank.com'},
+    'Yapı Kredi':    {c:'#003087',t:'YK', d:'yapikredi.com.tr'},
+    'Ziraat Bankası':{c:'#C8102E',t:'Z',  d:'ziraatbank.com.tr'},
+    'Halkbank':      {c:'#0072CE',t:'H',  d:'halkbank.com.tr'},
+    'Vakıfbank':     {c:'#F5A623',t:'V',  d:'vakifbank.com.tr'},
+    'QNB Finansbank':{c:'#6F2D8E',t:'Q',  d:'qnbfinansbank.com'},
+    'Denizbank':     {c:'#00A3E0',t:'D',  d:'denizbank.com'},
+    'ING':           {c:'#FF6200',t:'ING',d:'ingbank.com.tr'},
+    'TEB':           {c:'#003087',t:'TEB',d:'teb.com.tr'},
+    'HSBC':          {c:'#DB0011',t:'H',  d:'hsbc.com.tr'},
+    'Multinet':      {c:'#F7941D',t:'M',  d:'multinetup.com'},
+    'Edenred':       {c:'#E30613',t:'E',  d:'edenred.com.tr'},
+    'Ticket Restaurant':{c:'#E30613',t:'TR',d:'ticket.com.tr'},
+    'Sodexo':        {c:'#012169',t:'S',  d:'sodexo.com.tr'},
+    'Pluxee':        {c:'#7B2D8B',t:'PL', d:'pluxee.com'},
+    'Paye':          {c:'#1DA462',t:'P',  d:'paye.com.tr'},
+    'Enpara':        {c:'#00A859',t:'EN', d:'enpara.com'},
+    'Papara':        {c:'#6F2D8E',t:'PP', d:'papara.com'},
+    'Param':         {c:'#00B050',t:'PR', d:'param.com.tr'},
+    'Tosla':         {c:'#FF5C35',t:'T',  d:'tosla.com'},
+    'Ininal':        {c:'#0081FF',t:'IN', d:'ininal.com'}
+  };
+  var b=info[name];
+  if(!b){var ab=(name||'?').trim().split(/\s+/);var t=ab.length>=2?ab[0][0]+ab[1][0]:name.substring(0,2);b={c:'#8E8E93',t:t.toUpperCase()};}
+  if(b.d){
+    return '<div class="bank-logo-badge" style="background:#f0f0f0;overflow:hidden;padding:3px">'+
+      '<img src="https://www.google.com/s2/favicons?domain='+b.d+'&sz=64" width="32" height="32" style="object-fit:contain;border-radius:6px" '+
+      'onerror="_blFallback(this,\''+b.c+'\',\''+b.t+'\')" /></div>';
+  }
+  var fs=b.t.length<=2?'.78rem':b.t.length===3?'.65rem':'.55rem';
+  return '<div class="bank-logo-badge" style="background:'+b.c+'"><span style="color:#fff;font-size:'+fs+'">'+b.t+'</span></div>';
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
