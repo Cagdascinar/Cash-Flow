@@ -2127,6 +2127,10 @@ body{top:0!important}
         <div><label>Alış Tarihi</label><input class="f-input" type="date" id="inv-date"></div>
         <div><label>Not (opsiyonel)</label><input class="f-input" type="text" id="inv-note" placeholder="ör. Acil fon"></div>
       </div>
+      <div style="margin-bottom:12px">
+        <label>Hangi Hesaptan? <span style="color:var(--txt2);font-size:.7rem">(opsiyonel — nakit çıkışı takibi için)</span></label>
+        <select class="f-input" id="inv-account"><option value="">— Hesap seçme —</option></select>
+      </div>
       <!-- Fon lookup -->
       <div id="fon-lookup" style="display:none;margin-bottom:12px">
         <div style="display:flex;gap:8px">
@@ -5819,6 +5823,18 @@ function initInvestPage(){
   loadInvestments();
   updateInvForm();
   setInterval(loadRates, 60000);
+  // Hesap dropdown'unu doldur
+  var accSel=document.getElementById('inv-account');
+  if(accSel&&accSel.options.length<=1){
+    var src=_allAccounts.length?_allAccounts:null;
+    function _fill(list){
+      (list||[]).filter(function(a){return a.type==='vadesiz'||a.type==='vadeli'||a.type==='tasarruf';}).forEach(function(a){
+        var o=document.createElement('option');o.value=a.id;o.textContent=(a.bank?a.bank+' · ':'')+a.name;accSel.appendChild(o);
+      });
+    }
+    if(src) _fill(src);
+    else xhr('/api/accounts',null,function(list){_allAccounts=list||[];_fill(_allAccounts);});
+  }
 }
 
 function loadRates(){
@@ -5891,21 +5907,27 @@ function lookupFon(){
 }
 
 function addInvestment(){
+  var accEl=document.getElementById('inv-account');
   var body = {
-    name:      document.getElementById('inv-name').value.trim(),
-    itype:     document.getElementById('inv-type').value,
-    symbol:    document.getElementById('inv-sym').value.trim().toUpperCase(),
-    quantity:  getNumVal(document.getElementById('inv-qty')),
-    buy_price: getNumVal(document.getElementById('inv-price')),
-    buy_date:  document.getElementById('inv-date').value,
-    note:      document.getElementById('inv-note').value,
+    name:       document.getElementById('inv-name').value.trim(),
+    itype:      document.getElementById('inv-type').value,
+    symbol:     document.getElementById('inv-sym').value.trim().toUpperCase(),
+    quantity:   getNumVal(document.getElementById('inv-qty')),
+    buy_price:  getNumVal(document.getElementById('inv-price')),
+    buy_date:   document.getElementById('inv-date').value,
+    note:       document.getElementById('inv-note').value,
+    account_id: accEl&&accEl.value ? parseInt(accEl.value) : null,
   };
   if(!body.name || !body.quantity || !body.buy_price){ toast('İsim, miktar ve fiyat zorunlu'); return; }
   xhr('/api/investments', body, function(r){
-    if(r.ok){ toast('Portföye eklendi ✓'); loadInvestments();
+    if(r.ok){
+      var cost=body.quantity*body.buy_price;
+      toast('Portföye eklendi — ₺'+fmt(cost)+' gider kaydedildi ✓');
+      loadInvestments(); loadDashboard(); loadAllTx();
       document.getElementById('inv-name').value='';
       document.getElementById('inv-qty').value='';
       document.getElementById('inv-price').value='';
+      if(accEl) accEl.value='';
     }
   });
 }

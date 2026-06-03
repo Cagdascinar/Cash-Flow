@@ -4901,19 +4901,28 @@ def list_investments():
 def add_investment():
     uid = session["user_id"]; pid = get_pid()
     d = request.get_json(force=True)
-    name     = d.get("name","").strip()
-    itype    = d.get("itype","")
-    symbol   = d.get("symbol","").strip().upper()
-    quantity = float(d.get("quantity", 0))
-    buy_price= float(d.get("buy_price", 0))
-    buy_date = d.get("buy_date", today_str())
-    note     = d.get("note","")
+    name       = d.get("name","").strip()
+    itype      = d.get("itype","")
+    symbol     = d.get("symbol","").strip().upper()
+    quantity   = float(d.get("quantity", 0))
+    buy_price  = float(d.get("buy_price", 0))
+    buy_date   = d.get("buy_date", today_str())
+    note       = d.get("note","")
+    account_id = d.get("account_id") or None
     if not name or itype not in ("doviz","altin","fon","hisse") or quantity <= 0 or buy_price <= 0:
         return jsonify({"ok": False, "error": "Geçersiz veri"}), 400
     db = get_db()
     cur = db.execute(
         "INSERT INTO investments (user_id,profile_id,name,itype,symbol,quantity,buy_price,buy_date,note,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
         (uid, pid, name, itype, symbol, quantity, buy_price, buy_date, note, datetime.now().isoformat()))
+    # Nakit çıkışını transaction olarak da kaydet (rapor için)
+    _icat = {"doviz":"Döviz Alımı","altin":"Altın Alımı","fon":"Yatırım Fonu","hisse":"Hisse Senedi"}
+    cat  = _icat.get(itype, "Yatırım")
+    desc = name + (f" ({symbol})" if symbol else "") + (f" — {note}" if note else "")
+    total_cost = round(quantity * buy_price, 2)
+    db.execute(
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        (uid, pid, "gider", total_cost, cat, desc, buy_date, account_id, datetime.now().isoformat()))
     db.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
 
