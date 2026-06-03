@@ -1092,11 +1092,15 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   .cc-total-cell .ccl{margin-bottom:0;font-size:.7rem}
   .cc-total-cell .ccv{font-size:1rem}
 }
-.cc-item{background:var(--bg2);border:1px solid var(--border);border-radius:13px;padding:13px 14px;margin-bottom:8px}
+.cc-item{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:13px 14px;margin-bottom:8px;transition:box-shadow .15s}
 .cc-item:last-child{margin-bottom:0}
+.cc-item:active{box-shadow:0 0 0 2px var(--b2)22}
 .cc-item-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
-.cc-bank{font-size:.83rem;font-weight:700;color:var(--txt)}
-.cc-pct-badge{font-size:.66rem;font-weight:700;padding:3px 9px;border-radius:8px}
+.cc-item-logo{display:flex;align-items:center;gap:10px}
+.cc-item-logo-info{min-width:0;flex:1}
+.bank-logo-badge{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;letter-spacing:-.01em;font-family:system-ui,sans-serif}
+.cc-bank{font-size:.85rem;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc-pct-badge{font-size:.66rem;font-weight:700;padding:3px 9px;border-radius:8px;flex-shrink:0}
 .cc-pct-badge.ok{background:#34c75914;color:var(--g);border:1px solid #34c75928}
 .cc-pct-badge.warn{background:#ff950014;color:var(--y);border:1px solid #ff950028}
 .cc-pct-badge.high{background:#ff3b3014;color:var(--r);border:1px solid #ff3b3028}
@@ -1105,6 +1109,9 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .cc-nums{display:flex;justify-content:space-between;font-size:.72rem;color:var(--txt2)}
 .cc-nums strong{color:var(--txt);font-weight:600}
 .empty-cc{text-align:center;padding:22px 16px;color:var(--txt2);font-size:.82rem;line-height:1.7}
+.qd-btn{padding:5px 11px;border:1px solid var(--border2);border-radius:8px;font-size:.72rem;font-weight:600;color:var(--txt2);background:var(--bg3);cursor:pointer;transition:.15s;white-space:nowrap;font-family:inherit}
+.qd-btn:hover{border-color:var(--b);color:var(--b)}
+.qd-btn.qd-active{background:var(--b);color:#fff;border-color:var(--b)}
 
 /* ── MOBILE NAV ENHANCEMENTS ────────────────────────────────── */
 .nl-desktop{}
@@ -1856,17 +1863,27 @@ body{top:0!important}
       </div>
     </div>
 
-    <!-- Tarih aralığı (toggle ile) -->
-    <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <button onclick="toggleDateRange()" id="date-range-toggle"
-        style="font-size:.75rem;color:var(--txt2);background:none;border:none;cursor:pointer;padding:0;display:flex;align-items:center;gap:4px">
-        📅 Tarih Aralığı <span id="date-range-arrow">▸</span>
-      </button>
-      <div id="date-range-row" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
-        <input type="date" id="f-date-from" onchange="filterLedger()"
+    <!-- Hızlı tarih filtreleri -->
+    <div style="margin-top:10px">
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:7px">
+        <button class="qd-btn" id="qd-dun" onclick="setQuickDate('dun')">Dün</button>
+        <button class="qd-btn" id="qd-bugun" onclick="setQuickDate('bugun')">Bugün</button>
+        <button class="qd-btn" id="qd-yarin" onclick="setQuickDate('yarin')">Yarın</button>
+        <div style="width:1px;background:var(--border);margin:0 2px;align-self:stretch"></div>
+        <button class="qd-btn" id="qd-gecen_ay" onclick="setQuickDate('gecen_ay')">Geçen Ay</button>
+        <button class="qd-btn" id="qd-bu_ay" onclick="setQuickDate('bu_ay')">Bu Ay</button>
+        <button class="qd-btn" id="qd-gelecek_ay" onclick="setQuickDate('gelecek_ay')">Gelecek Ay</button>
+        <div style="width:1px;background:var(--border);margin:0 2px;align-self:stretch"></div>
+        <button class="qd-btn" id="qd-gecen_yil" onclick="setQuickDate('gecen_yil')">Geçen Yıl</button>
+        <button class="qd-btn" id="qd-bu_yil" onclick="setQuickDate('bu_yil')">Bu Yıl</button>
+        <button class="qd-btn" id="qd-gelecek_yil" onclick="setQuickDate('gelecek_yil')">Gelecek Yıl</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span style="font-size:.72rem;color:var(--txt2)">📅</span>
+        <input type="date" id="f-date-from" onchange="onManualDateChange();filterLedger()"
           style="background:var(--bg3);border:1px solid var(--border2);color:var(--txt);padding:5px 8px;border-radius:8px;font-size:.78rem;outline:none">
         <span style="color:var(--txt2);font-size:.78rem">—</span>
-        <input type="date" id="f-date-to" onchange="filterLedger()"
+        <input type="date" id="f-date-to" onchange="onManualDateChange();filterLedger()"
           style="background:var(--bg3);border:1px solid var(--border2);color:var(--txt);padding:5px 8px;border-radius:8px;font-size:.78rem;outline:none">
         <button onclick="clearDateRange()" style="font-size:.72rem;color:var(--r);background:none;border:none;cursor:pointer;padding:2px 6px">✕ Temizle</button>
       </div>
@@ -3257,6 +3274,12 @@ function _cardName(id){ var c=_allCards.find(function(x){return x.id==id}); retu
 function _accName(id){ var a=_allAccounts.find(function(x){return x.id==id}); return a?((a.bank?a.bank+' · ':'')+a.name):''; }
 function _cardIco(id){ var c=_allCards.find(function(x){return x.id==id}); var t=c&&c.card_type; return t==='yemek'?'🍽️':t==='banka'?'🏧':t==='hediye'?'🎁':'💳'; }
 function _cardType(id){ var c=_allCards.find(function(x){return x.id==id}); return (c&&c.card_type)||'kredi'; }
+function _bankLogo(name){
+  var b={'Garanti BBVA':{c:'#009A44',t:'G'},'İş Bankası':{c:'#003087',t:'İ'},'Akbank':{c:'#E30613',t:'A'},'Yapı Kredi':{c:'#003087',t:'YK'},'Ziraat Bankası':{c:'#C8102E',t:'Z'},'Halkbank':{c:'#0072CE',t:'H'},'Vakıfbank':{c:'#F5A623',t:'V'},'QNB Finansbank':{c:'#6F2D8E',t:'Q'},'Denizbank':{c:'#00A3E0',t:'D'},'ING':{c:'#FF6200',t:'ING'},'TEB':{c:'#003087',t:'TEB'},'HSBC':{c:'#DB0011',t:'H'},'Multinet':{c:'#F7941D',t:'M'},'Edenred':{c:'#E30613',t:'E'},'Ticket Restaurant':{c:'#E30613',t:'TR'},'Sodexo':{c:'#012169',t:'S'},'Pluxee':{c:'#7B2D8B',t:'PL'},'Paye':{c:'#1DA462',t:'P'},'Enpara':{c:'#00A859',t:'EN'},'Papara':{c:'#6F2D8E',t:'PP'},'Param':{c:'#00B050',t:'PR'},'Tosla':{c:'#FF5C35',t:'T'},'Ininal':{c:'#0081FF',t:'IN'}};
+  var d=b[name]||{c:'#8E8E93',t:(name||'?').replace(/[^A-ZİÇŞĞÜÖa-zıçşğüö]/g,'').substring(0,2).toUpperCase()||'?'};
+  var fs=d.t.length<=2?'.78rem':d.t.length===3?'.65rem':'.55rem';
+  return '<div class="bank-logo-badge" style="background:'+d.c+'"><span style="color:#fff;font-size:'+fs+'">'+d.t+'</span></div>';
+}
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
 function _appInit(){
@@ -4393,13 +4416,16 @@ function loadTodayWidgets(){
         if(bankHesaplar.length){
           html+='<div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--txt2);margin:4px 0 6px;padding:0 2px">🏦 Banka Hesapları</div>';
           html+=bankHesaplar.map(function(a){
-            var ico=_aico[a.type]||'🏦';
             var balColor=a.balance>=0?'var(--g)':'var(--r)';
-            return '<div class="cc-item" onclick="goPage(\'hesaplar\',document.querySelector(\'[data-page=hesaplar]\'))" style="cursor:pointer;border-left:3px solid '+(a.color||'#007aff')+'">'+
-              '<div class="cc-item-top"><div class="cc-bank">'+ico+' '+a.bank+' · '+a.name+'</div></div>'+
-            '<div class="cc-nums" style="margin-top:4px">'+
-              '<span>Bakiye: <strong style="color:'+balColor+'">'+fmt(a.balance)+'</strong></span>'+
-            '</div>'+
+            return '<div class="cc-item" onclick="goPage(\'hesaplar\',document.querySelector(\'[data-page=hesaplar]\'))" style="cursor:pointer">'+
+              '<div class="cc-item-logo">'+
+                _bankLogo(a.bank)+
+                '<div class="cc-item-logo-info">'+
+                  '<div class="cc-bank">'+a.bank+(a.name?' · '+a.name:'')+'</div>'+
+                  '<div style="font-size:.65rem;color:var(--txt2);margin-top:2px">'+(_aname[a.type]||'Hesap')+'</div>'+
+                '</div>'+
+                '<div style="font-size:.92rem;font-weight:800;color:'+balColor+'">'+fmt(a.balance)+'</div>'+
+              '</div>'+
             '</div>';
           }).join('');
         }
@@ -4409,12 +4435,17 @@ function loadTodayWidgets(){
         if(kmhList.length){
           html+='<div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--txt2);margin:10px 0 6px;padding:0 2px">🔄 KMH / Kredi Hesapları</div>';
           html+=kmhList.map(function(a){
-            var ico=_aico[a.type]||'🔄';
             var pct=a.limit>0?Math.round(a.balance/a.limit*100):0;
             var fc=pct<50?'var(--g)':pct<80?'var(--y)':'var(--r)';
             return '<div class="cc-item" onclick="goPage(\'hesaplar\',document.querySelector(\'[data-page=hesaplar]\'))" style="cursor:pointer">'+
-              '<div class="cc-item-top"><div class="cc-bank">'+ico+' '+a.bank+' · '+a.name+'</div>'+
-              '<span class="cc-pct-badge '+(pct<50?'ok':pct<80?'warn':'high')+'">%'+pct+'</span></div>'+
+              '<div class="cc-item-logo" style="margin-bottom:9px">'+
+                _bankLogo(a.bank)+
+                '<div class="cc-item-logo-info">'+
+                  '<div class="cc-bank">'+a.bank+(a.name?' · '+a.name:'')+'</div>'+
+                  '<div style="font-size:.65rem;color:var(--txt2);margin-top:2px">'+(_aname[a.type]||'KMH')+'</div>'+
+                '</div>'+
+                '<span class="cc-pct-badge '+(pct<50?'ok':pct<80?'warn':'high')+'">%'+pct+'</span>'+
+              '</div>'+
               (a.limit>0?'<div class="cc-prog-bg"><div class="cc-prog-fill" style="width:'+pct+'%;background:'+fc+'"></div></div>':'')+
               '<div class="cc-nums">'+
                 (a.limit>0?'<span>Limit: <strong style="color:var(--b2)">'+fmt(a.limit)+'</strong></span>':'')+
@@ -4425,25 +4456,32 @@ function loadTodayWidgets(){
           }).join('');
         }
 
-        // GRUP 3: Kredi Kartları
+        // GRUP 3: Kredi & Banka Kartları
         var krediCards=(d.cards||[]).filter(function(c){return c.card_type==='kredi'||c.card_type==='banka'});
         if(krediCards.length){
           html+='<div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--txt2);margin:10px 0 6px;padding:0 2px">💳 Kredi & Banka Kartları</div>';
           html+=krediCards.map(function(c){
             var pct=c.pct||0; var fc=pct<50?'var(--g)':pct<80?'var(--y)':'var(--r)';
-            var ico=c.card_type==='banka'?'🏧':'💳';
             var nm=c.bank+(c.name?' · '+c.name:'');
             var isCredi=c.card_type==='kredi';
             var minPay=isCredi&&c.min_pct>0?Math.round(c.used*c.min_pct/100):0;
             return '<div class="cc-item" onclick="goPage(\'hesaplar\',document.querySelector(\'[data-page=hesaplar]\'))" style="cursor:pointer">'+
-              '<div class="cc-item-top"><div class="cc-bank">'+ico+' '+nm+'</div><span class="cc-pct-badge '+(pct<50?'ok':pct<80?'warn':'high')+'">%'+pct+'</span></div>'+
+              '<div class="cc-item-logo" style="margin-bottom:9px">'+
+                _bankLogo(c.bank)+
+                '<div class="cc-item-logo-info">'+
+                  '<div class="cc-bank">'+nm+'</div>'+
+                  '<div style="font-size:.65rem;color:var(--txt2);margin-top:2px">'+(c.card_type==='banka'?'Banka Kartı':'Kredi Kartı')+'</div>'+
+                '</div>'+
+                '<span class="cc-pct-badge '+(pct<50?'ok':pct<80?'warn':'high')+'">%'+pct+'</span>'+
+              '</div>'+
               '<div class="cc-prog-bg"><div class="cc-prog-fill" style="width:'+pct+'%;background:'+fc+'"></div></div>'+
               '<div class="cc-nums">'+
                 '<span>Limit: <strong style="color:var(--b2)">'+fmt(c.limit)+'</strong></span>'+
-                '<span>Kullanılan: <strong style="color:var(--r)">'+fmt(c.used)+'</strong></span>'+
+                '<span>Borç: <strong style="color:var(--r)">'+fmt(c.used)+'</strong></span>'+
                 '<span>Kullanılabilir: <strong style="color:'+(c.avail<0?'var(--r)':'var(--g)')+'">'+fmt(c.avail)+'</strong></span>'+
-                (minPay>0?'<span style="color:var(--y);font-size:.72rem">Asgari: '+fmt(minPay)+'</span>':'')+
-              '</div></div>';
+                (minPay>0?'<span style="color:var(--y)">Asgari: '+fmt(minPay)+'</span>':'')+
+              '</div>'+
+            '</div>';
           }).join('');
         }
 
@@ -4452,20 +4490,25 @@ function loadTodayWidgets(){
         if(yemekCards.length){
           html+='<div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--txt2);margin:10px 0 6px;padding:0 2px">🍽️ Yemek & Hediye Kartları</div>';
           html+=yemekCards.map(function(c){
-            var ico=c.card_type==='yemek'?'🍽️':'🎁';
             var nm=c.bank+(c.name?' · '+c.name:'');
             var pct=c.limit>0?Math.round(c.used/c.limit*100):0;
             var fc=pct<50?'var(--g)':pct<80?'var(--y)':'var(--r)';
             return '<div class="cc-item" onclick="goPage(\'hesaplar\',document.querySelector(\'[data-page=hesaplar]\'))" style="cursor:pointer">'+
-              '<div class="cc-item-top"><div class="cc-bank">'+ico+' '+nm+'</div>'+
-              (c.limit>0?'<span class="cc-pct-badge '+(pct<50?'ok':pct<80?'warn':'high')+'">%'+pct+'</span>':'')+
+              '<div class="cc-item-logo"'+(c.limit>0?' style="margin-bottom:9px"':'')+'>'+
+                _bankLogo(c.bank)+
+                '<div class="cc-item-logo-info">'+
+                  '<div class="cc-bank">'+nm+'</div>'+
+                  '<div style="font-size:.65rem;color:var(--txt2);margin-top:2px">'+(c.card_type==='yemek'?'Yemek Kartı':'Hediye Kartı')+'</div>'+
+                '</div>'+
+                (c.limit>0?'<span class="cc-pct-badge '+(pct<50?'ok':pct<80?'warn':'high')+'">%'+pct+'</span>':'')+
               '</div>'+
               (c.limit>0?'<div class="cc-prog-bg"><div class="cc-prog-fill" style="width:'+pct+'%;background:'+fc+'"></div></div>':'')+
               '<div class="cc-nums">'+
                 (c.limit>0?'<span>Limit: <strong style="color:var(--b2)">'+fmt(c.limit)+'</strong></span>':'')+
                 '<span>Kullanılan: <strong style="color:var(--r)">'+fmt(c.used)+'</strong></span>'+
                 (c.limit>0?'<span>Kullanılabilir: <strong style="color:'+(c.avail<0?'var(--r)':'var(--g)')+'">'+fmt(c.avail)+'</strong></span>':'')+
-              '</div></div>';
+              '</div>'+
+            '</div>';
           }).join('');
         }
 
@@ -5337,12 +5380,32 @@ function setTypePill(val){
   filterLedger();
 }
 
-function toggleDateRange(){
-  var row=document.getElementById('date-range-row');
-  var arrow=document.getElementById('date-range-arrow');
-  var visible=row.style.display!=='none';
-  row.style.display=visible?'none':'flex';
-  if(arrow) arrow.textContent=visible?'▸':'▾';
+var _activeQdId=null;
+function _fmtDate(d){var y=d.getFullYear(),m=d.getMonth()+1,dd=d.getDate();return y+'-'+(m<10?'0'+m:m)+'-'+(dd<10?'0'+dd:dd);}
+function clearQuickDate(){if(_activeQdId){var b=document.getElementById(_activeQdId);if(b)b.classList.remove('qd-active');_activeQdId=null;}}
+function onManualDateChange(){clearQuickDate();}
+function setQuickDate(type){
+  clearQuickDate();
+  var now=new Date(),y=now.getFullYear(),m=now.getMonth(),d=now.getDate();
+  var from,to;
+  if(type==='bugun'){from=to=_fmtDate(now);}
+  else if(type==='dun'){var d2=new Date(y,m,d-1);from=to=_fmtDate(d2);}
+  else if(type==='yarin'){var d2=new Date(y,m,d+1);from=to=_fmtDate(d2);}
+  else if(type==='bu_ay'){from=_fmtDate(new Date(y,m,1));to=_fmtDate(new Date(y,m+1,0));}
+  else if(type==='gecen_ay'){from=_fmtDate(new Date(y,m-1,1));to=_fmtDate(new Date(y,m,0));}
+  else if(type==='gelecek_ay'){from=_fmtDate(new Date(y,m+1,1));to=_fmtDate(new Date(y,m+2,0));}
+  else if(type==='bu_yil'){from=_fmtDate(new Date(y,0,1));to=_fmtDate(new Date(y,11,31));}
+  else if(type==='gecen_yil'){from=_fmtDate(new Date(y-1,0,1));to=_fmtDate(new Date(y-1,11,31));}
+  else if(type==='gelecek_yil'){from=_fmtDate(new Date(y+1,0,1));to=_fmtDate(new Date(y+1,11,31));}
+  document.getElementById('f-date-from').value=from;
+  document.getElementById('f-date-to').value=to;
+  var bid='qd-'+type;
+  var btn=document.getElementById(bid);
+  if(btn){btn.classList.add('qd-active');_activeQdId=bid;}
+  // Yıl dropdown'u temizle (çakışmasın)
+  var fy=document.getElementById('f-year');
+  if(fy) fy.value='';
+  filterLedger();
 }
 
 function sortBy(col){
@@ -5374,11 +5437,13 @@ function filterLedger(){
 function onYearFilterChange(){
   document.getElementById('f-date-from').value='';
   document.getElementById('f-date-to').value='';
+  clearQuickDate();
   filterLedger();
 }
 function clearDateRange(){
   document.getElementById('f-date-from').value='';
   document.getElementById('f-date-to').value='';
+  clearQuickDate();
   filterLedger();
 }
 
@@ -6178,13 +6243,16 @@ function loadCards(){
       totalLimit += (c.limit_||0); totalUsed += (c.used_||0);
       var isYemek = ctype==='yemek'; var isHediye = ctype==='hediye';
       var cJson=JSON.stringify({id:c.id,bank_name:c.bank_name,card_name:c.card_name,owner:c.owner,limit_:c.limit_,used_:c.used_,due_day:c.due_day,statement_day:c.statement_day,min_pct:c.min_pct,card_type:ctype}).replace(/"/g,'&quot;');
-      return '<div style="background:var(--bg3);border-radius:12px;border:1px solid var(--border);padding:16px;margin-bottom:10px" data-card-id="'+c.id+'" data-card="'+cJson+'">'+
-        '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">'+
-          '<div style="min-width:0">'+
-            '<div style="font-weight:700;font-size:.92rem">'+ico+' '+c.bank_name+(c.card_name?' · '+c.card_name:'')+'</div>'+
-            (c.owner ? '<div style="font-size:.74rem;color:var(--b2);margin-top:2px">👤 '+c.owner+'</div>' : '')+
-            '<div style="font-size:.68rem;color:var(--txt2);margin-top:3px;background:var(--bg4);display:inline-block;padding:1px 7px;border-radius:4px">'+
-              (isYemek?'Yemek Kartı':isHediye?'Hediye Kartı':ctype==='banka'?'Banka Kartı':'Kredi Kartı')+'</div>'+
+      return '<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:15px 16px;margin-bottom:10px" data-card-id="'+c.id+'" data-card="'+cJson+'">'+
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'+
+          _bankLogo(c.bank_name)+
+          '<div style="min-width:0;flex:1">'+
+            '<div style="font-weight:700;font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+c.bank_name+(c.card_name?' · '+c.card_name:'')+'</div>'+
+            '<div style="display:flex;align-items:center;gap:6px;margin-top:3px">'+
+              '<span style="font-size:.68rem;color:var(--txt2);background:var(--bg3);padding:1px 7px;border-radius:5px">'+
+                (isYemek?'🍽️ Yemek':isHediye?'🎁 Hediye':ctype==='banka'?'🏧 Banka':'💳 Kredi')+'</span>'+
+              (c.owner?'<span style="font-size:.68rem;color:var(--b2)">👤 '+c.owner+'</span>':'')+
+            '</div>'+
           '</div>'+
           '<button class="del-row" onclick="delCard('+c.id+')">✕</button>'+
         '</div>'+

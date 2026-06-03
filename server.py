@@ -800,13 +800,10 @@ def admin_required(f):
     def decorated(*args, **kwargs):
         if not session.get("user_id"):
             return redirect("/login")
-        if ADMIN_USER and session.get("username") != ADMIN_USER:
-            return "Yetkisiz erişim", 403
         if not ADMIN_USER:
-            with pg_connect() as con:
-                first = con.execute("SELECT username FROM users ORDER BY id LIMIT 1").fetchone()
-                if first and session.get("username") != first["username"]:
-                    return "Yetkisiz erişim", 403
+            return "Yetkisiz erişim — ADMIN_USERNAME tanımlanmamış", 403
+        if session.get("username") != ADMIN_USER:
+            return "Yetkisiz erişim", 403
         return f(*args, **kwargs)
     return decorated
 
@@ -2045,7 +2042,7 @@ def _tg_parse_month(text_l):
             ym = re.search(r'\b(20\d{2})\b', text_l)
             yr = int(ym.group(1)) if ym else today.year
             # Gelecek yılsa geçen yıla çek (tahmin)
-            if yr == today.year and mi > today.month:
+            if not ym and yr == today.year and mi > today.month:
                 yr -= 1
             return yr, mi
     return None
@@ -2253,10 +2250,11 @@ def _tg_cards_msg(pid, db):
 @app.route("/api/telegram/webhook", methods=["POST"])
 def telegram_webhook():
     if not TELEGRAM_TOKEN: return "ok"
-    if TELEGRAM_WEBHOOK_SECRET:
-        incoming = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
-        if not secrets.compare_digest(incoming, TELEGRAM_WEBHOOK_SECRET):
-            return "Forbidden", 403
+    if not TELEGRAM_WEBHOOK_SECRET:
+        return "Forbidden", 403
+    incoming = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+    if not secrets.compare_digest(incoming, TELEGRAM_WEBHOOK_SECRET):
+        return "Forbidden", 403
     data = request.get_json(force=True, silent=True) or {}
 
     # ── Callback query (Evet/Hayır butonları) ──
@@ -2467,7 +2465,8 @@ def telegram_webhook():
                        "bu ay ozet", "aylik ozet", "geçen ay", "gecen ay", "önceki ay")
             or (_parsed_month and any(kw in text_l for kw in
                 ["özet","ozet","harca","kalanı","kalan","ne kadar","para","para kaldı",
-                 "ayı","ayi","ayinda","ayında","bütçe","butce","gelir","gider","ay"]))
+                 "ayı","ayi","ayinda","ayında","bütçe","butce","gelir","gider","ay",
+                 "kalem","kalemler","kalemlerim","giderler","giderlerim","gelirler","gelirlerim","detay","rapor"]))
         )
         if _is_month_query:
             if _parsed_month:
