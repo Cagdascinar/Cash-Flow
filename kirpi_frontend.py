@@ -1923,6 +1923,7 @@ body{top:0!important}
         <button type="button" class="pay-chip" data-ptype="banka_kart" onclick="selectPayType(this)">🏧 Banka Kartı</button>
         <button type="button" class="pay-chip" data-ptype="kredi_kart" onclick="selectPayType(this)">💳 Kredi Kartı</button>
         <button type="button" class="pay-chip" data-ptype="yemek_kart" onclick="selectPayType(this)">🍽️ Yemek Kartı</button>
+        <button type="button" class="pay-chip" data-ptype="kmh" onclick="selectPayType(this)">🔄 KMH</button>
       </div>
       <!-- Banka kartı → vadesiz hesap seç -->
       <div id="f-account-row" style="display:none">
@@ -2228,10 +2229,9 @@ body{top:0!important}
       <div style="margin-bottom:14px">
         <label>Ürün Türü</label>
         <div class="acc-type-chips">
-          <button type="button" class="acc-type-chip" data-type="kredi_karti" onclick="selectAccType(this)">💳 Kredi Kartı</button>
-          <button type="button" class="acc-type-chip" data-type="kmh" onclick="selectAccType(this)">🔄 KMH</button>
           <button type="button" class="acc-type-chip active" data-type="vadesiz" onclick="selectAccType(this)">🏦 Vadesiz</button>
           <button type="button" class="acc-type-chip" data-type="tasarruf" onclick="selectAccType(this)">💰 Tasarruf</button>
+          <button type="button" class="acc-type-chip" data-type="kmh" onclick="selectAccType(this)">🔄 KMH</button>
           <button type="button" class="acc-type-chip" data-type="konut_kredisi" onclick="selectAccType(this)">🏠 Konut Kredisi</button>
           <button type="button" class="acc-type-chip" data-type="arac_kredisi" onclick="selectAccType(this)">🚗 Araç Kredisi</button>
           <button type="button" class="acc-type-chip" data-type="ihtiyac_kredisi" onclick="selectAccType(this)">💼 İhtiyaç Kredisi</button>
@@ -4208,10 +4208,15 @@ function selectPayType(btn){
   var pt=btn.dataset.ptype;
   var accRow=document.getElementById('f-account-row');
   var cardRow=document.getElementById('f-card-row');
+  var accLbl=document.getElementById('f-account-row')&&document.getElementById('f-account-row').querySelector('label');
   var cardLbl=document.getElementById('f-card-label');
-  if(accRow) accRow.style.display=(pt==='banka_kart'?'':'none');
+  if(accRow) accRow.style.display=(pt==='banka_kart'||pt==='kmh'?'':'none');
   if(cardRow) cardRow.style.display=(pt==='kredi_kart'||pt==='yemek_kart'?'':'none');
-  if(pt==='banka_kart') loadAccountsDropdown();
+  if(pt==='banka_kart') loadAccountsDropdown('vadesiz');
+  if(pt==='kmh'){
+    if(accLbl) accLbl.textContent='🔄 KMH Hesabı Seçin';
+    loadAccountsDropdown('kmh');
+  }
   if(pt==='kredi_kart'){
     if(cardLbl) cardLbl.textContent='💳 Kredi Kartı Seçin';
     _fillCardSel('kredi');
@@ -5020,13 +5025,16 @@ function saveAccount(){
   if(!name){toast('Ürün adı girin');return}
   var owner=(document.getElementById('acc-owner')||{}).value||'';
   var body={bank:bank,name:name,type:_accType,initial_balance:bal,limit_:lim,color:_accColor,owner:owner};
+  function _refreshAccounts(){
+    xhr('/api/accounts',null,function(list){ if(list) _allAccounts=list; loadAccounts(); loadAccountsDropdown(); loadDashboard(); });
+  }
   if(eid){
     xhr('/api/accounts/'+eid,body,function(r){
-      if(r.ok){toast('Güncellendi ✓');resetAccForm();loadAccounts();loadAccountsDropdown();}
+      if(r.ok){toast('Güncellendi ✓');resetAccForm();_refreshAccounts();}
     },true);
   } else {
     xhr('/api/accounts',body,function(r){
-      if(r.ok){toast('Hesap eklendi ✓');resetAccForm();loadAccounts();loadAccountsDropdown();}
+      if(r.ok){toast('Hesap eklendi ✓');resetAccForm();_refreshAccounts();}
     });
   }
 }
@@ -5145,15 +5153,21 @@ function _buildAccDropdown(sel, list, prev){
   if(prev) sel.value=prev;
 }
 
-function loadAccountsDropdown(){
+function loadAccountsDropdown(filterType){
   var sel=document.getElementById('f-account');
   if(!sel) return;
   var prev=sel.value;
+  var lbl=document.getElementById('f-account-row')&&document.getElementById('f-account-row').querySelector('label');
+  if(lbl&&!filterType) lbl.textContent='🏦 Hangi Hesaptan?';
+  function _doLoad(list){
+    var filtered=filterType?list.filter(function(a){return (a.type||'vadesiz')===filterType;}):list;
+    _buildAccDropdown(sel, filtered, prev);
+  }
   if(!_allAccounts.length){
-    xhr('/api/accounts',null,function(list){ _allAccounts=list||[]; _buildAccDropdown(sel,_allAccounts,prev); });
+    xhr('/api/accounts',null,function(list){ _allAccounts=list||[]; _doLoad(_allAccounts); });
     return;
   }
-  _buildAccDropdown(sel, _allAccounts, prev);
+  _doLoad(_allAccounts);
 }
 
 var _CARD_TYPE_ICONS={'kredi':'💳','banka':'🏧','yemek':'🍽️','hediye':'🎁'};
@@ -5215,7 +5229,7 @@ function addTx(){
   if(curTab==='gider'){
     var activeChip=document.querySelector('.pay-chip.active');
     var pt=activeChip?activeChip.dataset.ptype:'nakit';
-    if(pt==='banka_kart'){
+    if(pt==='banka_kart'||pt==='kmh'){
       var accSel=document.getElementById('f-account');
       if(accSel&&accSel.value) payload.account_id=parseInt(accSel.value);
     } else if(pt==='kredi_kart'||pt==='yemek_kart'){
@@ -6088,11 +6102,18 @@ function addCard(){
   };
   if(!body.bank_name){ toast('Banka/kurum seçiniz'); return; }
   if(cardType!=='yemek'&&cardType!=='hediye'&&!body.limit_){ toast('Limit giriniz'); return; }
-  xhr('/api/cards', body, function(r){ if(r.ok){ toast('Kart kaydedildi ✓'); loadCards();
-    ['card-name','card-limit','card-used','card-owner'].forEach(function(id){
-      var el=document.getElementById(id); if(el) el.value='';
-    });
-  }});
+  xhr('/api/cards', body, function(r){
+    if(r.ok){
+      toast('Kart kaydedildi ✓');
+      xhr('/api/cards',null,function(list){
+        if(list) _allCards=list;
+        loadCards(); loadCardsDropdown(); loadDashboard();
+      });
+      ['card-name','card-limit','card-used','card-owner'].forEach(function(id){
+        var el=document.getElementById(id); if(el) el.value='';
+      });
+    }
+  });
 }
 
 function loadCards(){
@@ -6193,13 +6214,14 @@ function openCardPayModal(id, name, debt, minPay, limit){
   // Vadesiz hesap dropdown'unu doldur
   var accSel=document.getElementById('cpay-account');
   if(accSel){
-    var _LOAN_TYPES=['konut_kredisi','arac_kredisi','ihtiyac_kredisi'];
+    // Kredi kartı ödemesi sadece vadesiz veya KMH ile yapılabilir
     function _fillCpayAccounts(list){
-      accSel.innerHTML='<option value="">— Hesap Belirtme —</option>';
-      (list||[]).filter(function(a){return _LOAN_TYPES.indexOf(a.type||'')===-1;}).forEach(function(a){
+      accSel.innerHTML='<option value="">— Nakit (Hesap Seçme) —</option>';
+      (list||[]).filter(function(a){return a.type==='vadesiz'||a.type==='kmh';}).forEach(function(a){
         var opt=document.createElement('option');
         opt.value=a.id;
-        opt.textContent='🏦 '+(a.bank?a.bank+' · ':'')+a.name;
+        var ico=a.type==='kmh'?'🔄':'🏦';
+        opt.textContent=ico+' '+(a.bank?a.bank+' · ':'')+a.name;
         accSel.appendChild(opt);
       });
     }

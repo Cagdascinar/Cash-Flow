@@ -3506,13 +3506,20 @@ def export_pdf():
     prof_name = profile["name"] if profile else ""
 
     txns = db.execute(
-        "SELECT type,amount,category,description,date FROM transactions "
-        "WHERE profile_id=? AND date BETWEEN ? AND ? ORDER BY date,id",
+        "SELECT t.type,t.amount,t.category,t.description,t.date,"
+        "t.card_id,t.account_id,"
+        "c.bank_name as card_bank,c.card_name as cname,c.card_type,"
+        "a.name as acc_name,a.bank as acc_bank,a.type as acc_type "
+        "FROM transactions t "
+        "LEFT JOIN cards c ON c.id=t.card_id AND t.card_id IS NOT NULL "
+        "LEFT JOIN accounts a ON a.id=t.account_id AND t.account_id IS NOT NULL "
+        "WHERE t.profile_id=? AND t.date BETWEEN ? AND ? ORDER BY t.date,t.id",
         (pid, start, end)
     ).fetchall()
 
     gelir_total = sum(r["amount"] for r in txns if r["type"] == "gelir")
     gider_total = sum(r["amount"] for r in txns if r["type"] == "gider")
+    hacim_total = gelir_total + gider_total
     net = gelir_total - gider_total
 
     gelir_cats: dict = {}
@@ -3525,6 +3532,19 @@ def export_pdf():
 
     def fmt(n):
         return f"{n:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    def pay_label(r):
+        ct = r["card_type"] or ""
+        at = r["acc_type"] or ""
+        cb = (r["card_bank"] or "") + (" " + (r["cname"] or "") if r["cname"] else "")
+        ab = (r["acc_bank"] or "") + (" " + (r["acc_name"] or "") if r["acc_name"] else "")
+        if r["card_id"]:
+            icons = {"kredi":"💳","banka":"🏧","yemek":"🍽️","hediye":"🎁"}
+            return f'{icons.get(ct,"💳")} {html_escape(cb.strip()) or "Kart"}'
+        if r["account_id"]:
+            icons = {"kmh":"🔄","vadesiz":"🏦","tasarruf":"💰","kredi_karti":"💳"}
+            return f'{icons.get(at,"🏦")} {html_escape(ab.strip()) or "Hesap"}'
+        return "💵 Nakit"
 
     def bar_rows(cats, total, color):
         if not cats: return "<p style='color:#888;font-size:.85rem'>Kayıt yok</p>"
@@ -3544,13 +3564,18 @@ def export_pdf():
         return out
 
     tx_rows = ""
+    gelir_count = gider_count = 0
     for r in txns:
         sign = "+" if r["type"] == "gelir" else "−"
         color = "#1a7a46" if r["type"] == "gelir" else "#c0392b"
+        if r["type"] == "gelir": gelir_count += 1
+        else: gider_count += 1
         tx_rows += f"""<tr>
           <td>{r['date']}</td>
+          <td>{'Gelir' if r['type']=='gelir' else 'Gider'}</td>
           <td>{html_escape(r['category'])}</td>
           <td style="color:#555">{html_escape(r['description'] or '')}</td>
+          <td style="font-size:.78rem;color:#555">{pay_label(r)}</td>
           <td style="text-align:right;font-weight:700;color:{color}">{sign}₺{fmt(r['amount'])}</td>
         </tr>"""
 
@@ -3620,14 +3645,17 @@ def export_pdf():
   <div class="card" style="border-color:#34c75930;background:#f0fdf4">
     <div class="card-lbl">Toplam Gelir</div>
     <div class="card-val" style="color:#1a7a46">₺{fmt(gelir_total)}</div>
+    <div style="font-size:.68rem;color:#888;margin-top:3px">{gelir_count} işlem</div>
   </div>
   <div class="card" style="border-color:#ff3b3030;background:#fff5f5">
     <div class="card-lbl">Toplam Gider</div>
     <div class="card-val" style="color:#c0392b">₺{fmt(gider_total)}</div>
+    <div style="font-size:.68rem;color:#888;margin-top:3px">{gider_count} işlem</div>
   </div>
   <div class="card" style="border-color:{border};background:{row_alt}">
     <div class="card-lbl">Net</div>
     <div class="card-val" style="color:{net_color}">{sign}₺{fmt(abs(net))}</div>
+    <div style="font-size:.68rem;color:#888;margin-top:3px">Toplam Hacim: ₺{fmt(hacim_total)}</div>
   </div>
 </div>
 
@@ -3642,10 +3670,23 @@ def export_pdf():
   </div>
 </div>
 
-<div class="section-title">İşlem Detayları</div>
+<div class="section-title">İşlem Detayları ({len(txns)} İşlem)</div>
 <table>
-  <thead><tr><th>Tarih</th><th>Kategori</th><th>Açıklama</th><th style="text-align:right">Tutar</th></tr></thead>
-  <tbody>{tx_rows if tx_rows else '<tr><td colspan="4" style="text-align:center;color:#888;padding:20px">Bu dönemde işlem yok</td></tr>'}</tbody>
+  <thead><tr><th>Tarih</th><th>Tür</th><th>Kategori</th><th>Açıklama</th><th>Ödeme</th><th style="text-align:right">Tutar</th></tr></thead>
+  <tbody>{tx_rows if tx_rows else '<tr><td colspan="6" style="text-align:center;color:#888;padding:20px">Bu dönemde işlem yok</td></tr>'}
+  <tr style="background:#f8f9fa;font-weight:700;border-top:2px solid #dee2e6">
+    <td colspan="5" style="font-size:.78rem;color:#495057">Alt Toplam — Gelir</td>
+    <td style="text-align:right;color:#1a7a46">+₺{fmt(gelir_total)}</td>
+  </tr>
+  <tr style="background:#fff5f5;font-weight:700">
+    <td colspan="5" style="font-size:.78rem;color:#495057">Alt Toplam — Gider</td>
+    <td style="text-align:right;color:#c0392b">−₺{fmt(gider_total)}</td>
+  </tr>
+  <tr style="background:#f0f4ff;font-weight:800">
+    <td colspan="5" style="font-size:.78rem;color:#495057">Toplam İşlem Hacmi</td>
+    <td style="text-align:right;color:#333">₺{fmt(hacim_total)}</td>
+  </tr>
+  </tbody>
 </table>
 
 <div class="footer">
