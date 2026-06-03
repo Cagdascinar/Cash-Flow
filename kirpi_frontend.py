@@ -4425,7 +4425,8 @@ function loadTodayWidgets(){
             var pct=c.pct||0; var fc=pct<50?'var(--g)':pct<80?'var(--y)':'var(--r)';
             var ico=c.card_type==='banka'?'🏧':'💳';
             var nm=c.bank+(c.name?' · '+c.name:'');
-            var minPay=c.min_pct>0&&c.card_type==='kredi'?Math.round(c.used*c.min_pct/100):0;
+            var isCredi=c.card_type==='kredi';
+            var minPay=isCredi&&c.min_pct>0?Math.round(c.used*c.min_pct/100):0;
             return '<div class="cc-item" onclick="goPage(\'hesaplar\',document.querySelector(\'[data-page=hesaplar]\'))" style="cursor:pointer">'+
               '<div class="cc-item-top"><div class="cc-bank">'+ico+' '+nm+'</div><span class="cc-pct-badge '+(pct<50?'ok':pct<80?'warn':'high')+'">%'+pct+'</span></div>'+
               '<div class="cc-prog-bg"><div class="cc-prog-fill" style="width:'+pct+'%;background:'+fc+'"></div></div>'+
@@ -4468,7 +4469,7 @@ function loadTodayWidgets(){
 
 var _heroPeriod='month';
 var _heroYear=new Date().getFullYear();
-var _dashReqId=0;
+var _dashReqId=0, _dashRetry=0;
 
 var _MONTHS_TR=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 
@@ -4545,15 +4546,21 @@ function loadDashboard(){
   xhr(url,null,function(d){
     if(reqId !== _dashReqId) return;
     hideSplash();
-    if(!d){
-      var rb=document.getElementById('dash-retry-bar'); if(rb) rb.style.display='flex';
+    if(!d || d.error){
+      // Otomatik retry: sunucu soğuk başlıyorsa bekle ve tekrar dene
+      if(_dashRetry < 4){
+        _dashRetry++;
+        var wait = _dashRetry * 3000; // 3s, 6s, 9s, 12s
+        var rb=document.getElementById('dash-retry-bar');
+        if(rb){ rb.style.display='flex'; rb.querySelector('span').textContent='🔄 Sunucu başlatılıyor... ('+_dashRetry+'/4)'; }
+        setTimeout(function(){ loadDashboard(); }, wait);
+      } else {
+        var rb=document.getElementById('dash-retry-bar');
+        if(rb){ rb.style.display='flex'; rb.querySelector('span').textContent='⚠️ '+(d&&d.error?d.error:'Bağlantı kurulamadı.'); }
+      }
       return;
     }
-    if(d.error){
-      var rb=document.getElementById('dash-retry-bar');
-      if(rb){ rb.style.display='flex'; rb.querySelector('span').textContent='⚠️ '+d.error; }
-      return;
-    }
+    _dashRetry=0;
     var rb=document.getElementById('dash-retry-bar'); if(rb) rb.style.display='none';
     summaryData=d;
     renderStats(d);
@@ -6085,7 +6092,7 @@ function xhr(url,body,cb,isPut,isDel){
   };
   r.onerror=function(){ cb&&cb(null); };
   r.ontimeout=function(){ cb&&cb(null); };
-  r.timeout=15000;
+  r.timeout=30000; // 30s: Railway cold start için
   r.send(body?JSON.stringify(body):null);
 }
 
@@ -6144,7 +6151,8 @@ function loadCards(){
       var ico     = _ctypeIco[ctype]||'💳';
       var avail   = (c.limit_||0) - (c.used_||0);
       var usePct  = c.limit_>0 ? Math.min(100, Math.round((c.used_||0) / c.limit_ * 100)) : 0;
-      var minPay  = Math.round((c.used_||0) * (c.min_pct||25) / 100);
+      var isKredi = ctype==='kredi';
+      var minPay  = isKredi ? Math.round((c.used_||0) * (c.min_pct||25) / 100) : 0;
       var color   = usePct>80 ? 'var(--r)' : usePct>50 ? 'var(--y)' : 'var(--g)';
       var daysLeft = c.due_day >= today ? c.due_day - today : 30 - today + c.due_day;
       totalLimit += (c.limit_||0); totalUsed += (c.used_||0);
@@ -6166,7 +6174,7 @@ function loadCards(){
           '<div><div style="color:var(--txt2)">Kullanılabilir</div><div style="font-weight:700;color:'+(avail<0?'var(--r)':'var(--g)')+'">'+fmt(avail)+'</div></div>'+
         '</div>'+
         (c.limit_>0?'<div class="prog-bg" style="margin-bottom:10px"><div class="prog-fill" style="width:'+usePct+'%;background:'+color+'"></div></div>':'')+
-        (!isYemek&&!isHediye?
+        (isKredi?
           '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:.75rem">'+
             '<div style="background:var(--bg4);padding:8px;border-radius:8px;text-align:center">'+
               '<div style="color:var(--txt2)">Son Ödeme</div><div style="font-weight:600">'+c.due_day+'. gün</div>'+
