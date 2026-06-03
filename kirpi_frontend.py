@@ -3266,9 +3266,6 @@ function _appInit(){
   try{ setupNumInputs(); }catch(e){}
   try{ requestBrowserNotifPermission(); }catch(e){}
 
-  // Dashboard + işlemleri hemen yükle
-  try{ loadDashboard(); }catch(e){ console.error('loadDashboard error:',e); }
-  try{ loadAllTx(); }catch(e){}
   // 5 saniye içinde veri gelmediyse retry butonu göster
   setTimeout(function(){
     var bal=document.getElementById('s-bal');
@@ -3317,11 +3314,18 @@ function _appInit(){
       }
       if(preferred&&preferred!==curPid){
         var match=d.profiles.find(function(p){return p.id===preferred;});
-        if(match) switchProfile(preferred);
+        if(match){
+          // Profil switch tamamlanınca dashboard'ı yükle
+          switchProfileThen(preferred, function(){
+            loadDashboard(); loadAllTx(); loadReminders(); loadNotifications();
+          });
+          return; // aşağıdaki loadDashboard'u atla
+        }
       }
     }
-    // Profil verisi yüklendikten sonra dashboard'ı bir kez daha yenile
+    // Profil switch gerekmiyorsa hemen yükle
     loadDashboard();
+    loadAllTx();
     loadReminders();
     loadNotifications();
     // Insights sadece dashboard açıksa
@@ -3620,24 +3624,25 @@ function updateSidebarProfileAvatar(avatar){
   el.innerHTML=avatar?'<img src="'+avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':'';
 }
 
-function switchProfile(pid){
+function switchProfileThen(pid, cb){
   xhr('/api/profiles/'+pid+'/switch','POST',function(d){
-    if(!d.ok) return;
-    document.getElementById('user-dropdown').classList.remove('open');
+    if(!d||!d.ok){ if(cb) cb(); return; }
     sessionStorage.setItem('cur_pid', pid);
     sessionStorage.setItem('cur_pname', d.name||'');
     sessionStorage.setItem('cur_ptype', d.type||'');
     localStorage.setItem('preferred_pid', pid);
-    renderDropdownProfiles();
-    renderSettingsProfiles();
-    showToast('Profil: '+d.name,'#6366f1');
+    renderDropdownProfiles(); renderSettingsProfiles();
     applyProfileType(d.type);
-    // Önbelleği temizle — yeni profilin verilerini çek
-    allTx = []; filteredTx = [];
-    loadDashboard();
-    loadAllTx();
-    loadInsights();
-    loadReminders();
+    allTx=[]; filteredTx=[];
+    if(cb) cb();
+  });
+}
+function switchProfile(pid){
+  switchProfileThen(pid, function(){
+    var dd=document.getElementById('user-dropdown');
+    if(dd) dd.classList.remove('open');
+    showToast('Profil değiştirildi','#6366f1');
+    loadDashboard(); loadAllTx(); loadInsights(); loadReminders();
   });
 }
 
