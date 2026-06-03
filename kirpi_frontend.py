@@ -8,7 +8,7 @@ AUTH_HTML = r"""<!DOCTYPE html>
 <meta name="theme-color" content="#f2f2f7">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="icon" href="/icon-192.png" sizes="192x192" type="image/png">
-<title>Kirpi — Nakit Akış Yönetimi</title>
+<title>Kirpi — Nakit Akışın Cebinde!</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#f2f2f7;color:#1c1c1e;font-family:'Inter',system-ui,sans-serif;
@@ -135,11 +135,11 @@ HTML = r"""<!DOCTYPE html>
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="icon" href="/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icon-192.png">
-<meta property="og:title" content="Kirpi — Nakit Akış Yönetimi">
+<meta property="og:title" content="Kirpi — Nakit Akışın Cebinde!">
 <meta property="og:description" content="Gelir, gider, kart borçları ve bütçenizi tek yerden yönetin.">
 <meta property="og:image" content="/icon-512.png">
 <meta property="og:type" content="website">
-<title>Kirpi — Nakit Akış Yönetimi</title>
+<title>Kirpi — Nakit Akışın Cebinde!</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{overflow-x:hidden}

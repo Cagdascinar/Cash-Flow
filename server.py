@@ -154,7 +154,7 @@ def pg_connect(): return _PGConn()
 MAIL_FROM       = os.environ.get("MAIL_FROM", "")
 MAIL_PASSWORD   = os.environ.get("MAIL_PASSWORD", "")
 BACKUP_EMAIL    = os.environ.get("BACKUP_EMAIL", MAIL_FROM)
-APP_URL         = os.environ.get("APP_URL", "https://web-production-ba700.up.railway.app")
+APP_URL         = os.environ.get("APP_URL", "https://kirpifinans.com")
 TELEGRAM_TOKEN  = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME", "KirpiNakitBot")
 
