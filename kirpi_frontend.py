@@ -5262,11 +5262,21 @@ function addTx(){
       toast('İşlem eklendi ✓');
       document.getElementById('f-amount').value='';
       document.getElementById('f-desc').value='';
-      // Seçimleri sıfırla
       var acc=document.getElementById('f-account'); if(acc) acc.value='';
       var crd=document.getElementById('f-card'); if(crd) crd.value='';
       var inc=document.getElementById('f-income-account'); if(inc) inc.value='';
-      loadDashboard();loadAllTx();
+      loadDashboard(); loadAllTx();
+      // Kart veya hesap kullanıldıysa cache ve listeler güncelle
+      if(payload.card_id){
+        xhr('/api/cards',null,function(list){
+          if(list){ _allCards=list; loadCardsDropdown(); loadCards(); }
+        });
+      }
+      if(payload.account_id){
+        xhr('/api/accounts',null,function(list){
+          if(list){ _allAccounts=list; loadAccountsDropdown(); }
+        });
+      }
     }
   });
 }
