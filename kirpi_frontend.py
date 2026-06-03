@@ -126,7 +126,7 @@ HTML = r"""<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0a0c12">
-<meta name="description" content="Kirpi — Kişisel nakit akış yönetim uygulaması. Gelir, gider, kart borçları ve bütçenizi tek yerden takip edin.">
+<meta name="description" content="Kirpi — Nakit Akışın Cebinde! Gelir, gider, kart borçları ve bütçenizi tek yerden yönetin.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
@@ -136,7 +136,7 @@ HTML = r"""<!DOCTYPE html>
 <link rel="icon" href="/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <meta property="og:title" content="Kirpi — Nakit Akışın Cebinde!">
-<meta property="og:description" content="Gelir, gider, kart borçları ve bütçenizi tek yerden yönetin.">
+<meta property="og:description" content="Nakit Akışın Cebinde! Gelir, gider, kart borçları ve bütçenizi tek yerden yönetin.">
 <meta property="og:image" content="/icon-512.png">
 <meta property="og:type" content="website">
 <title>Kirpi — Nakit Akışın Cebinde!</title>
