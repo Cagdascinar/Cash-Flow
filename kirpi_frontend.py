@@ -4545,19 +4545,27 @@ function loadTodayWidgets(){
         var _aico={'vadesiz':'🏦','tasarruf':'📅','vadeli':'📅','kredi_karti':'💳','kmh':'🔄','konut_kredisi':'🏠','arac_kredisi':'🚗','ihtiyac_kredisi':'💼','diger':'📋'};
         var _aname={'vadesiz':'Vadesiz','tasarruf':'Vadeli','vadeli':'Vadeli','kredi_karti':'Kredi Kartı','kmh':'KMH','konut_kredisi':'Konut Kredisi','arac_kredisi':'Araç Kredisi','ihtiyac_kredisi':'İhtiyaç Kredisi','diger':'Diğer'};
         var html='';
-        // Toplam özet: Limit > Kullanılan > Kullanılabilir
-        html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">'+
-          '<div style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">'+
-            '<div style="font-size:.6rem;color:var(--txt2);margin-bottom:2px;text-transform:uppercase;letter-spacing:.06em">Toplam Limit</div>'+
-            '<div style="font-size:.88rem;font-weight:800;color:var(--b2)">'+fmt(d.total_limit)+'</div>'+
+        // ── Özet: Kredi Kartı Kullanılabilir  |  Hesap Bakiyesi ──────────────
+        var nakitColor=(d.nakit_bakiye||0)>=0?'var(--g)':'var(--r)';
+        html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'+
+          // Sol: Kredi Kartı Kullanılabilir
+          '<div style="background:linear-gradient(135deg,#1a3a5c,#0d2b45);border-radius:12px;padding:12px 14px;cursor:pointer" onclick="showAvailableLimitModal()">'+
+            '<div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#90b4d4;margin-bottom:4px">💳 Kredi Kartı</div>'+
+            '<div style="font-size:1rem;font-weight:900;color:#fff;margin-bottom:2px">'+fmt(d.total_avail)+'</div>'+
+            '<div style="font-size:.65rem;color:#90b4d4">Kullanılabilir</div>'+
+            '<div style="border-top:1px solid #1e4a6e;margin-top:8px;padding-top:6px;display:flex;justify-content:space-between;font-size:.65rem;color:#90b4d4">'+
+              '<span>Limit: <b style="color:#a0c4e8">'+fmt(d.total_limit)+'</b></span>'+
+              '<span>Borç: <b style="color:#f87171">'+fmt(d.total_used)+'</b></span>'+
+            '</div>'+
           '</div>'+
-          '<div style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">'+
-            '<div style="font-size:.6rem;color:var(--txt2);margin-bottom:2px;text-transform:uppercase;letter-spacing:.06em">Kullanılan</div>'+
-            '<div style="font-size:.88rem;font-weight:800;color:var(--r)">'+fmt(d.total_used)+'</div>'+
-          '</div>'+
-          '<div style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">'+
-            '<div style="font-size:.6rem;color:var(--txt2);margin-bottom:2px;text-transform:uppercase;letter-spacing:.06em">Kullanılabilir</div>'+
-            '<div style="font-size:.88rem;font-weight:800;color:var(--g)">'+fmt(d.total_avail)+'</div>'+
+          // Sağ: Hesap Nakit Bakiyesi
+          '<div style="background:linear-gradient(135deg,#0f3d24,#072b18);border-radius:12px;padding:12px 14px;cursor:pointer" onclick="goPage(\'hesaplar\',document.querySelector(\'[data-page=hesaplar]\'))">'+
+            '<div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6bba8c;margin-bottom:4px">🏦 Hesaplarım</div>'+
+            '<div style="font-size:1rem;font-weight:900;color:'+(d.nakit_bakiye>=0?'#4ade80':'#f87171')+'">'+fmt(d.nakit_bakiye||0)+'</div>'+
+            '<div style="font-size:.65rem;color:#6bba8c">Nakit Bakiye</div>'+
+            '<div style="border-top:1px solid #14532d;margin-top:8px;padding-top:6px;font-size:.65rem;color:#6bba8c">'+
+              '<span>'+(d.accounts&&d.accounts.filter(function(a){return a.type==='vadesiz'||a.type==='vadeli'||a.type==='tasarruf';}).length||0)+' vadesiz/vadeli hesap</span>'+
+            '</div>'+
           '</div>'+
         '</div>';
 

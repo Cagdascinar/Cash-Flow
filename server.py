@@ -4438,36 +4438,40 @@ def today_summary():
             "pct":       round(used/lim*100) if lim else 0,
         })
 
-    # Banka hesapları + güncel bakiyeler
-    accounts = db.execute(
-        "SELECT * FROM accounts WHERE profile_id=? AND active=1 ORDER BY bank,name", (pid,)
+    # Banka hesapları + güncel bakiyeler — tek JOIN sorgusu (N+1 giderildi)
+    acc_rows = db.execute(
+        """SELECT a.*,
+             COALESCE(SUM(CASE WHEN t.type='gelir' THEN t.amount ELSE 0 END),0) AS tx_gelir,
+             COALESCE(SUM(CASE WHEN t.type='gider' THEN t.amount ELSE 0 END),0) AS tx_gider
+           FROM accounts a
+           LEFT JOIN transactions t ON t.account_id=a.id AND t.profile_id=a.profile_id
+           WHERE a.profile_id=? AND a.active=1
+           GROUP BY a.id
+           ORDER BY a.bank, a.name""",
+        (pid,)
     ).fetchall()
     account_list = []
-    for a in accounts:
-        gelir_a = db.execute(
-            "SELECT COALESCE(SUM(amount),0) FROM transactions WHERE profile_id=? AND account_id=? AND type='gelir'", (pid, a["id"])
-        ).fetchone()[0] or 0
-        gider_a = db.execute(
-            "SELECT COALESCE(SUM(amount),0) FROM transactions WHERE profile_id=? AND account_id=? AND type='gider'", (pid, a["id"])
-        ).fetchone()[0] or 0
-        init = float(a.get("initial_balance") or 0)
-        lim  = float(a.get("limit_") or 0)
+    for a in acc_rows:
+        init  = float(a.get("initial_balance") or 0)
+        lim   = float(a.get("limit_") or 0)
         atype = a.get("type","vadesiz")
+        g     = float(a["tx_gelir"] or 0)
+        z     = float(a["tx_gider"] or 0)
         if atype in ("kredi_karti","kmh"):
-            balance = init + float(gider_a) - float(gelir_a)
-            avail   = lim - balance if lim > 0 else None
+            balance = round(init + z - g, 2)
+            avail   = round(lim - balance, 2) if lim > 0 else None
         else:
-            balance = init + float(gelir_a) - float(gider_a)
+            balance = round(init + g - z, 2)
             avail   = None
         account_list.append({
-            "id":    a["id"],
-            "bank":  a["bank"],
-            "name":  a["name"],
-            "type":  atype,
-            "color": a.get("color","#007aff"),
-            "balance": round(balance, 2),
+            "id":      a["id"],
+            "bank":    a["bank"],
+            "name":    a["name"],
+            "type":    atype,
+            "color":   a.get("color","#007aff"),
+            "balance": balance,
             "limit":   lim,
-            "available": round(avail, 2) if avail is not None else None,
+            "available": avail,
         })
 
     # Check for recurring income expected today
@@ -4492,6 +4496,10 @@ def today_summary():
         "total_limit": round(total_limit, 2),
         "total_used":  round(total_used, 2),
         "total_avail": round(total_limit - total_used, 2),
+        "nakit_bakiye": round(sum(
+            a["balance"] for a in account_list
+            if a["type"] in ("vadesiz","vadeli","tasarruf")
+        ), 2),
         "recurring_gelir_today": recurring_gelir_today,
     })
 
