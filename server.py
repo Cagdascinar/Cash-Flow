@@ -5629,6 +5629,42 @@ def icon_512():
     import base64
     return base64.b64decode(ICON_512_B64), 200, {"Content-Type": "image/png"}
 
+_BANK_DOMAINS = {
+    'Garanti BBVA':'garantibbva.com.tr','İş Bankası':'isbank.com.tr',
+    'Akbank':'akbank.com','Yapı Kredi':'yapikredi.com.tr',
+    'Ziraat Bankası':'ziraatbank.com.tr','Halkbank':'halkbank.com.tr',
+    'Vakıfbank':'vakifbank.com.tr','QNB Finansbank':'qnbfinansbank.com',
+    'Denizbank':'denizbank.com','ING':'ingbank.com.tr','TEB':'teb.com.tr',
+    'HSBC':'hsbc.com.tr','Multinet':'multinetup.com','Edenred':'edenred.com.tr',
+    'Ticket Restaurant':'ticket.com.tr','Sodexo':'sodexo.com.tr',
+    'Pluxee':'pluxee.com','Paye':'paye.com.tr','Enpara':'enpara.com',
+    'Papara':'papara.com','Param':'param.com.tr','Tosla':'tosla.com',
+    'Ininal':'ininal.com','Albaraka Türk':'albaraka.com.tr',
+    'Kuveyt Türk':'kuveytturk.com.tr','Türkiye Finans':'turkiyefinans.com.tr',
+    'Revolut':'revolut.com','Wise':'wise.com','Paycell':'paycell.com.tr',
+}
+_bank_logo_cache = {}
+
+@app.route("/bank-logo/<path:bank>")
+def bank_logo_route(bank):
+    from flask import Response as _Resp
+    if bank in _bank_logo_cache:
+        ct, data = _bank_logo_cache[bank]
+        return _Resp(data, mimetype=ct, headers={"Cache-Control":"public,max-age=604800"})
+    domain = _BANK_DOMAINS.get(bank)
+    if not domain:
+        return "", 404
+    try:
+        r = requests.get(f"https://logo.clearbit.com/{domain}?size=64", timeout=4,
+                         headers={"User-Agent":"Mozilla/5.0"})
+        if r.status_code == 200 and r.headers.get("content-type","").startswith("image"):
+            ct = r.headers["content-type"].split(";")[0].strip()
+            _bank_logo_cache[bank] = (ct, r.content)
+            return _Resp(r.content, mimetype=ct, headers={"Cache-Control":"public,max-age=604800"})
+    except Exception:
+        pass
+    return "", 404
+
 # Digital Asset Links for TWA (Google Play) — set ASSETLINKS_JSON env var after PWABuilder
 @app.route("/.well-known/assetlinks.json")
 def assetlinks():

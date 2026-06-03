@@ -3270,47 +3270,42 @@ function _cardName(id){ var c=_allCards.find(function(x){return x.id==id}); retu
 function _accName(id){ var a=_allAccounts.find(function(x){return x.id==id}); return a?((a.bank?a.bank+' · ':'')+a.name):''; }
 function _cardIco(id){ var c=_allCards.find(function(x){return x.id==id}); var t=c&&c.card_type; return t==='yemek'?'🍽️':t==='banka'?'🏧':t==='hediye'?'🎁':'💳'; }
 function _cardType(id){ var c=_allCards.find(function(x){return x.id==id}); return (c&&c.card_type)||'kredi'; }
+function _blErr(img){
+  img.onerror=null;
+  var bg=img.getAttribute('data-bg')||'#8E8E93';
+  var nm=img.getAttribute('data-bank')||'?';
+  var ws=nm.trim().split(/\s+/);
+  var t=ws.length>=2?ws[0][0]+ws[1][0]:nm.substring(0,2);
+  var tx=t.toUpperCase();
+  var fs=tx.length<=2?18:tx.length===3?13:10;
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 38 38"><rect width="38" height="38" rx="10" fill="'+bg+'"/><text x="19" y="22" font-size="'+fs+'" font-weight="900" fill="white" text-anchor="middle" dominant-baseline="middle" font-family="Arial Black,Arial,sans-serif">'+tx+'</text></svg>';
+  img.src='data:image/svg+xml,'+encodeURIComponent(svg);
+}
 function _bankLogo(name){
-  var info={
-    'Garanti BBVA':     {c:'#009A44',t:'G',  r:10},
-    'İş Bankası':       {c:'#003087',t:'İŞ', r:10},
-    'Akbank':           {c:'#E30613',t:'A',  r:10},
-    'Yapı Kredi':       {c:'#003087',t:'YK', r:10},
-    'Ziraat Bankası':   {c:'#C8102E',t:'Z',  r:10},
-    'Halkbank':         {c:'#0072CE',t:'H',  r:10},
-    'Vakıfbank':        {c:'#F5A623',t:'V',  r:10},
-    'QNB Finansbank':   {c:'#6F2D8E',t:'QNB',r:10},
-    'Denizbank':        {c:'#00A3E0',t:'D',  r:10},
-    'ING':              {c:'#FF6200',t:'ING',r:10},
-    'TEB':              {c:'#003087',t:'TEB',r:10},
-    'HSBC':             {c:'#DB0011',t:'H',  r:6},
-    'Multinet':         {c:'#F7941D',t:'M',  r:10},
-    'Edenred':          {c:'#E30613',t:'E',  r:10},
-    'Ticket Restaurant':{c:'#E30613',t:'TR', r:10},
-    'Sodexo':           {c:'#012169',t:'S',  r:10},
-    'Pluxee':           {c:'#7B2D8B',t:'PL', r:10},
-    'Paye':             {c:'#1DA462',t:'P',  r:19},
-    'Enpara':           {c:'#00A859',t:'EN', r:10},
-    'Papara':           {c:'#6F2D8E',t:'PP', r:10},
-    'Param':            {c:'#00B050',t:'PR', r:10},
-    'Tosla':            {c:'#FF5C35',t:'T',  r:19},
-    'Ininal':           {c:'#0081FF',t:'IN', r:10},
-    'Albaraka Türk':    {c:'#006D3B',t:'AL', r:10},
-    'Kuveyt Türk':      {c:'#009B77',t:'KT', r:10},
-    'Türkiye Finans':   {c:'#00305E',t:'TF', r:10},
-    'Odeabank':         {c:'#1D3557',t:'O',  r:10},
-    'Şekerbank':        {c:'#E63946',t:'ŞK', r:10},
-    'Fibabanka':        {c:'#9C27B0',t:'F',  r:10},
-    'Wise':             {c:'#9FE870',t:'W',  r:10},
-    'Paycell':          {c:'#0055A5',t:'PC', r:10},
-    'Revolut':          {c:'#191C1F',t:'R',  r:10}
+  var colors={
+    'Garanti BBVA':'#009A44','İş Bankası':'#003087','Akbank':'#E30613',
+    'Yapı Kredi':'#003087','Ziraat Bankası':'#C8102E','Halkbank':'#0072CE',
+    'Vakıfbank':'#F5A623','QNB Finansbank':'#6F2D8E','Denizbank':'#00A3E0',
+    'ING':'#FF6200','TEB':'#003087','HSBC':'#DB0011','Multinet':'#F7941D',
+    'Edenred':'#E30613','Ticket Restaurant':'#E30613','Sodexo':'#012169',
+    'Pluxee':'#7B2D8B','Paye':'#1DA462','Enpara':'#00A859','Papara':'#6F2D8E',
+    'Param':'#00B050','Tosla':'#FF5C35','Ininal':'#0081FF',
+    'Albaraka Türk':'#006D3B','Kuveyt Türk':'#009B77','Türkiye Finans':'#00305E',
+    'Revolut':'#191C1F','Wise':'#9FE870','Paycell':'#0055A5'
   };
-  var b=info[name];
-  if(!b){var ws=(name||'?').trim().split(/\s+/);var tx=ws.length>=2?ws[0][0]+ws[1][0]:(name||'?').substring(0,2);b={c:'#8E8E93',t:tx.toUpperCase(),r:10};}
-  var fs=b.t.length<=2?18:b.t.length===3?13:10;
-  var yt=b.t.length<=2?25:24;
-  var svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 38 38"><rect width="38" height="38" rx="'+b.r+'" fill="'+b.c+'"/><text x="19" y="'+yt+'" font-size="'+fs+'" font-weight="900" fill="white" text-anchor="middle" dominant-baseline="middle" font-family="\'Arial Black\',Arial,sans-serif">'+b.t+'</text></svg>';
-  return '<img class="bank-logo-badge" src="data:image/svg+xml,'+encodeURIComponent(svg)+'" width="38" height="38" alt="'+name+'">';
+  var c=colors[name];
+  if(c){
+    return '<img class="bank-logo-badge" src="/bank-logo/'+encodeURIComponent(name)+'" '+
+      'data-bank="'+name.replace(/"/g,'&quot;')+'" data-bg="'+c+'" '+
+      'onerror="_blErr(this)" width="38" height="38" style="border-radius:10px;object-fit:contain;background:#fff;padding:2px" alt="">';
+  }
+  var bg='#8E8E93';
+  var ws=(name||'?').trim().split(/\s+/);
+  var t=ws.length>=2?ws[0][0]+ws[1][0]:(name||'?').substring(0,2);
+  var tx=t.toUpperCase();
+  var fs=tx.length<=2?18:tx.length===3?13:10;
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 38 38"><rect width="38" height="38" rx="10" fill="'+bg+'"/><text x="19" y="22" font-size="'+fs+'" font-weight="900" fill="white" text-anchor="middle" dominant-baseline="middle" font-family="Arial Black,Arial,sans-serif">'+tx+'</text></svg>';
+  return '<img class="bank-logo-badge" src="data:image/svg+xml,'+encodeURIComponent(svg)+'" width="38" height="38" style="border-radius:10px" alt="">';
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
