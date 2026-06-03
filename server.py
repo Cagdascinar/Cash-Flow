@@ -2907,22 +2907,26 @@ def delete_account(aid):
 @premium_required
 def export_excel():
     from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, GradientFill
     from openpyxl.utils import get_column_letter
+    from openpyxl.worksheet.table import Table, TableStyleInfo
     from collections import defaultdict
 
     pid = get_pid(); db = get_db()
     today_d = date.today()
 
-    # ── Renkler ──────────────────────────────────────────────────────────────
-    BLUE   = "0A84FF"
-    NAVY   = "0D1B2A"
-    GREEN  = "1D7A46"
-    RED    = "C0392B"
-    LGRAY  = "F5F5F7"
-    DGRAY  = "E5E5EA"
-    WHITE  = "FFFFFF"
-    ORANGE = "FF9500"
+    # ── Renk paleti (iOS/Apple HIG uyumlu) ───────────────────────────────────
+    NAVY    = "0D1B2A"   # koyu lacivert — başlıklar
+    BLUE    = "0A84FF"   # mavi — vurgu
+    GREEN   = "1A6B3A"   # koyu yeşil — gelir
+    RED     = "C0392B"   # kırmızı — gider
+    AMBER   = "B7610A"   # turuncu/amber — uyarı
+    LGRAY   = "F7F8FA"   # açık gri — alt satırlar
+    DGRAY   = "E5E5EA"   # orta gri — ayırıcılar
+    MGRAY   = "6D6D72"   # metin gri
+    WHITE   = "FFFFFF"
+    G_LIGHT = "EBF7F0"   # açık yeşil bg
+    R_LIGHT = "FDEDEC"   # açık kırmızı bg
 
     MONTHS_TR = ["","Ocak","Şubat","Mart","Nisan","Mayıs","Haziran",
                  "Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"]
@@ -2931,53 +2935,93 @@ def export_excel():
         return Font(name="Calibri", bold=bold, size=size, color=color)
     def fill(hex_):
         return PatternFill("solid", fgColor=hex_)
-    def border():
-        s = Side(style="thin", color="D1D1D6")
+    def bdr(style="thin", color="D1D1D6"):
+        s = Side(style=style, color=color)
         return Border(left=s, right=s, top=s, bottom=s)
-    def C(): return Alignment(horizontal="center", vertical="center")
-    def L(): return Alignment(horizontal="left",   vertical="center")
-    def R(): return Alignment(horizontal="right",  vertical="center")
+    def bdr_bottom(color="B0B0B8"):
+        s = Side(style="medium", color=color)
+        return Border(bottom=s)
+    def AL(wrap=False): return Alignment(horizontal="left",   vertical="top" if wrap else "center", wrap_text=wrap)
+    def AC():           return Alignment(horizontal="center", vertical="center")
+    def AR():           return Alignment(horizontal="right",  vertical="center")
+    def AWrap():        return Alignment(horizontal="left",   vertical="top", wrap_text=True)
 
-    def row_fill(i):
-        return fill(LGRAY) if i % 2 == 0 else fill(WHITE)
-
-    def set_cell(ws, r, c, val, bold=False, size=10, color="1C1C1E",
-                 bg=None, align="L", fmt=None):
+    def sc(ws, r, c, val, bold=False, size=10, color="1C1C1E",
+           bg=None, align="L", fmt=None, wrap=False):
+        """Set cell — merkezi yardımcı."""
         cell = ws.cell(row=r, column=c, value=val)
         cell.font   = F(bold=bold, size=size, color=color)
-        cell.border = border()
-        cell.alignment = C() if align == "C" else (R() if align == "R" else L())
-        if bg:   cell.fill = fill(bg)
-        if fmt:  cell.number_format = fmt
+        cell.border = bdr()
+        if align == "C":   cell.alignment = AC()
+        elif align == "R": cell.alignment = AR()
+        elif wrap:         cell.alignment = AWrap()
+        else:              cell.alignment = AL()
+        if bg:  cell.fill = fill(bg)
+        if fmt: cell.number_format = fmt
         return cell
+
+    def title_row(ws, text, cols, row=1, bg=NAVY, size=14):
+        ws.merge_cells(f"A{row}:{get_column_letter(cols)}{row}")
+        c = ws[f"A{row}"]
+        c.value = text; c.font = Font(name="Calibri", bold=True, size=size, color=WHITE)
+        c.fill = fill(bg); c.alignment = AL()
+        ws.row_dimensions[row].height = 38
+
+    def sub_row(ws, text, cols, row=2, bg=NAVY):
+        ws.merge_cells(f"A{row}:{get_column_letter(cols)}{row}")
+        c = ws[f"A{row}"]
+        c.value = text; c.font = Font(name="Calibri", size=9, color="90A4AE")
+        c.fill = fill(bg); c.alignment = AL()
+        ws.row_dimensions[row].height = 20
+
+    def hdr_row(ws, headers, row, bg=BLUE, sizes=None):
+        for ci, h in enumerate(headers, 1):
+            c = sc(ws, row, ci, h, bold=True, size=9, color=WHITE, bg=bg, align="C")
+        ws.row_dimensions[row].height = 24
 
     # ── Veri çekme ───────────────────────────────────────────────────────────
     profile_row  = db.execute("SELECT name FROM profiles WHERE id=?", (pid,)).fetchone()
     profile_name = profile_row["name"] if profile_row else ""
 
+    # Ödeme yöntemi bilgisiyle birlikte işlemler
     txs = db.execute(
-        "SELECT type,amount,category,description,date FROM transactions "
-        "WHERE profile_id=? ORDER BY date, id", (pid,)
+        """SELECT t.type, t.amount, t.category, t.description, t.date,
+                  c.bank_name AS card_bank, c.card_name, c.card_type,
+                  a.bank AS acc_bank, a.name AS acc_name, a.type AS acc_type
+           FROM transactions t
+           LEFT JOIN cards    c ON t.card_id    = c.id
+           LEFT JOIN accounts a ON t.account_id = a.id
+           WHERE t.profile_id=? ORDER BY t.date, t.id""",
+        (pid,)
     ).fetchall()
+
+    def pay_method(r):
+        if r["card_bank"]:
+            ico = "🍽" if r["card_type"] == "yemek" else "🏧" if r["card_type"] == "banka" else "💳"
+            lbl = f"{ico} {r['card_bank']}"
+            if r["card_name"]: lbl += f" {r['card_name']}"
+            return lbl
+        if r["acc_bank"]:
+            ico = "🔄" if r["acc_type"] == "kmh" else "🏦"
+            return f"{ico} {r['acc_bank']} · {r['acc_name']}"
+        return "💵 Nakit"
 
     # Ay bazlı gruplama
     by_month  = defaultdict(list)
-    cat_pivot = defaultdict(lambda: defaultdict(float))  # cat → ym → amt
+    cat_pivot = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
     gelir_total = gider_total = 0.0
     active_months = set()
+    cat_totals = defaultdict(lambda: defaultdict(float))
     for r in txs:
         ym = r["date"][:7]
         by_month[ym].append(r)
         active_months.add(ym)
         cat_pivot[r["type"]][r["category"]][ym] += float(r["amount"])
+        cat_totals[r["type"]][r["category"]]     += float(r["amount"])
         if r["type"] == "gelir": gelir_total += float(r["amount"])
         else:                    gider_total += float(r["amount"])
 
     sorted_months = sorted(active_months)
-    pending = db.execute(
-        "SELECT * FROM supplier_invoices WHERE profile_id=? AND status='bekliyor' ORDER BY due_date",
-        (pid,)
-    ).fetchall()
     assets = db.execute(
         "SELECT * FROM assets WHERE profile_id=? AND active=1 ORDER BY name", (pid,)
     ).fetchall()
@@ -2988,243 +3032,272 @@ def export_excel():
     # SHEET 1 — DASHBOARD
     # ══════════════════════════════════════════════════════════════════════════
     ws0 = wb.active
-    ws0.title = "📊 Dashboard"
+    ws0.title = "📊 Özet"
 
-    # Başlık bandı
-    ws0.merge_cells("A1:H1")
-    h = ws0["A1"]
-    h.value = f"🦔  KİRPİ  —  FİNANSAL RAPOR"
-    h.font  = Font(name="Calibri", bold=True, size=18, color=WHITE)
-    h.fill  = fill(NAVY); h.alignment = C()
-    ws0.row_dimensions[1].height = 42
+    N_COLS = 8
+    title_row(ws0, f"   🦔  KİRPİ — FİNANSAL RAPOR", N_COLS, row=1)
+    sub_row(ws0,   f"   {profile_name}  ·  Tüm Dönem  ·  {today_d.strftime('%d %B %Y')}", N_COLS, row=2)
+    ws0.row_dimensions[3].height = 10
 
-    ws0.merge_cells("A2:H2")
-    s = ws0["A2"]
-    s.value = f"{profile_name}  ·  Tüm Dönem  ·  Oluşturulma: {today_d.strftime('%d.%m.%Y')}"
-    s.font  = Font(name="Calibri", size=10, color="90A4AE")
-    s.fill  = fill(NAVY); s.alignment = C()
-    ws0.row_dimensions[2].height = 22
-
-    # KPI kartları — satır 4
-    ws0.row_dimensions[3].height = 14  # boşluk
-    kpi_data = [
-        ("TOPLAM GELİR",  gelir_total, GREEN,  "A4:B6"),
-        ("TOPLAM GİDER",  gider_total, RED,    "C4:D6"),
-        ("NET BAKİYE",    gelir_total - gider_total,
-         GREEN if gelir_total >= gider_total else RED, "E4:F6"),
-        ("TOPLAM İŞLEM",  len(txs),   BLUE,   "G4:H6"),
+    # ── KPI BANNER ───────────────────────────────────────────────────────────
+    net_ = gelir_total - gider_total
+    kpis = [
+        ("TOPLAM GELİR",  f"₺{gelir_total:,.2f}", GREEN),
+        ("TOPLAM GİDER",  f"₺{gider_total:,.2f}", RED),
+        ("NET BAKİYE",    f"₺{net_:,.2f}", GREEN if net_>=0 else RED),
+        ("İŞLEM SAYISI",  str(len(txs)), BLUE),
     ]
-    for label, val, clr, cells in kpi_data:
-        ws0.merge_cells(cells)
-        c_obj = ws0[cells.split(":")[0]]
-        c_obj.fill = fill(clr)
-        for r_ in range(4, 7):
-            for c_ in range(ord(cells[0])-64, ord(cells.split(":")[1][0])-64+1):
-                ws0.cell(row=r_, column=c_).fill = fill(clr)
-        ws0.row_dimensions[4].height = 18
-        ws0.row_dimensions[5].height = 28
-        ws0.row_dimensions[6].height = 18
-        lbl_cell = ws0[cells.split(":")[0]]
-        lbl_cell.value = label
-        lbl_cell.font  = Font(name="Calibri", bold=True, size=9, color=WHITE)
-        lbl_cell.alignment = C()
-        val_cell = ws0.cell(row=5, column=ord(cells[0])-64)
-        val_cell.value  = val if isinstance(val, int) else round(val, 2)
-        val_cell.font   = Font(name="Calibri", bold=True, size=15, color=WHITE)
-        val_cell.fill   = fill(clr)
-        val_cell.alignment = C()
-        if not isinstance(val, int):
-            val_cell.number_format = '#,##0.00 ₺'
+    for ki, (lbl, val, clr) in enumerate(kpis):
+        col1 = ki * 2 + 1; col2 = col1 + 1
+        c1 = get_column_letter(col1); c2 = get_column_letter(col2)
+        ws0.merge_cells(f"{c1}4:{c2}4")
+        ws0.merge_cells(f"{c1}5:{c2}5")
+        ws0.merge_cells(f"{c1}6:{c2}6")
+        for rr in [4,5,6]:
+            for cc in [col1, col2]:
+                ws0.cell(row=rr, column=cc).fill = fill(clr)
+        lc = ws0[f"{c1}4"]; lc.value = lbl
+        lc.font = Font(name="Calibri", bold=True, size=8, color="FFFFFF99")
+        lc.alignment = AC()
+        vc = ws0[f"{c1}5"]; vc.value = val
+        vc.font = Font(name="Calibri", bold=True, size=14, color=WHITE)
+        vc.fill = fill(clr); vc.alignment = AC()
+    ws0.row_dimensions[4].height = 16
+    ws0.row_dimensions[5].height = 32
+    ws0.row_dimensions[6].height = 16
+    ws0.row_dimensions[7].height = 12
 
-    ws0.row_dimensions[7].height = 14  # boşluk
-
-    # Aylık özet tablosu
-    ws0.merge_cells("A8:H8")
-    sh = ws0["A8"]
-    sh.value = "  AYLIK GELİR / GİDER ÖZETİ"
-    sh.font  = Font(name="Calibri", bold=True, size=11, color=WHITE)
-    sh.fill  = fill(BLUE); sh.alignment = L()
-    ws0.row_dimensions[8].height = 24
-
+    # ── AYLIK ÖZET ───────────────────────────────────────────────────────────
     mo_summary = defaultdict(lambda: {"gelir": 0.0, "gider": 0.0})
     for r in txs:
         mo_summary[r["date"][:7]][r["type"]] += float(r["amount"])
 
-    hdr_row = 9
-    for ci, h_ in enumerate(["Yıl","Ay","Gelir","Gider","Net","Değişim"], 1):
-        set_cell(ws0, hdr_row, ci, h_, bold=True, color=WHITE, bg=NAVY, align="C")
-    ws0.row_dimensions[hdr_row].height = 22
+    # Bölüm başlığı
+    ws0.merge_cells("A8:H8")
+    bh = ws0["A8"]
+    bh.value = "   AYLIK GELİR / GİDER ÖZETİ"
+    bh.font = Font(name="Calibri", bold=True, size=10, color=WHITE)
+    bh.fill = fill(BLUE); bh.alignment = AL()
+    ws0.row_dimensions[8].height = 22
+
+    for ci, h in enumerate(["YIL","AY","GELİR","GİDER","NET","DEĞİŞİM (NET)"], 1):
+        sc(ws0, 9, ci, h, bold=True, size=9, color=WHITE, bg=NAVY, align="C")
+    ws0.row_dimensions[9].height = 22
 
     prev_net = None
     for i, ym in enumerate(sorted(mo_summary.keys(), reverse=True)):
         yr_, mo_ = int(ym[:4]), int(ym[5:7])
         g_ = mo_summary[ym]["gelir"]; z_ = mo_summary[ym]["gider"]
-        net_ = g_ - z_
-        change = "" if prev_net is None else f"{'▲' if net_ >= prev_net else '▼'} {abs(net_-prev_net):,.0f}"
-        prev_net = net_
-        dr = hdr_row + 1 + i
+        net_mo = g_ - z_
+        change_val = net_mo - prev_net if prev_net is not None else None
+        prev_net = net_mo
+        dr = 10 + i
         bg_ = LGRAY if i % 2 == 0 else WHITE
-        set_cell(ws0, dr, 1, yr_,                  bg=bg_, align="C")
-        set_cell(ws0, dr, 2, MONTHS_TR[mo_] if mo_<=12 else mo_, bg=bg_, align="C")
-        set_cell(ws0, dr, 3, round(g_,2),   fmt='#,##0.00 ₺', color=GREEN, bold=True, bg=bg_, align="R")
-        set_cell(ws0, dr, 4, round(z_,2),   fmt='#,##0.00 ₺', color=RED,   bold=True, bg=bg_, align="R")
-        set_cell(ws0, dr, 5, round(net_,2), fmt='#,##0.00 ₺',
-                 color=GREEN if net_>=0 else RED, bold=True, bg=bg_, align="R")
-        set_cell(ws0, dr, 6, change, color="888888", bg=bg_, align="C")
+        sc(ws0, dr, 1, yr_,                                           bg=bg_, align="C", size=9)
+        sc(ws0, dr, 2, MONTHS_TR[mo_] if mo_ <= 12 else mo_,         bg=bg_, align="C", size=9)
+        sc(ws0, dr, 3, round(g_,2),  fmt='#,##0.00 ₺', color=GREEN,  bg=bg_, align="R", bold=True, size=9)
+        sc(ws0, dr, 4, round(z_,2),  fmt='#,##0.00 ₺', color=RED,    bg=bg_, align="R", bold=True, size=9)
+        sc(ws0, dr, 5, round(net_mo,2), fmt='#,##0.00 ₺',
+           color=GREEN if net_mo>=0 else RED, bg=bg_, align="R", bold=True, size=9)
+        change_str = "" if change_val is None else f"{'▲' if change_val>=0 else '▼'} ₺{abs(change_val):,.0f}"
+        sc(ws0, dr, 6, change_str, color=GREEN if (change_val or 0)>=0 else RED, bg=bg_, align="C", size=9)
         ws0.row_dimensions[dr].height = 18
 
-    for ci, w in enumerate([8, 14, 16, 16, 16, 14, 16, 16], 1):
+    # ── TOP GİDER KATEGORİLERİ ───────────────────────────────────────────────
+    last_mo_row = 10 + len(mo_summary)
+    sep_row = last_mo_row + 2
+    ws0.row_dimensions[sep_row-1].height = 12
+    ws0.merge_cells(f"A{sep_row}:H{sep_row}")
+    bh2 = ws0[f"A{sep_row}"]
+    bh2.value = "   EN BÜYÜK GİDER KATEGORİLERİ (Tüm Dönem)"
+    bh2.font = Font(name="Calibri", bold=True, size=10, color=WHITE)
+    bh2.fill = fill("8E4545"); bh2.alignment = AL()
+    ws0.row_dimensions[sep_row].height = 22
+
+    for ci, h in enumerate(["KATEGORİ","TOPLAM GİDER","%"], 1):
+        sc(ws0, sep_row+1, ci, h, bold=True, size=9, color=WHITE, bg=NAVY, align="C")
+    ws0.row_dimensions[sep_row+1].height = 20
+
+    top_gider = sorted(cat_totals["gider"].items(), key=lambda x: -x[1])[:12]
+    for i, (cat, amt) in enumerate(top_gider):
+        pct = round(amt/gider_total*100, 1) if gider_total else 0
+        dr = sep_row + 2 + i
+        bg_ = R_LIGHT if i % 2 == 0 else WHITE
+        sc(ws0, dr, 1, cat,         bg=bg_, size=9)
+        sc(ws0, dr, 2, round(amt,2), fmt='#,##0.00 ₺', color=RED, bg=bg_, align="R", bold=True, size=9)
+        sc(ws0, dr, 3, f"%{pct}",   bg=bg_, align="C", size=9, color=MGRAY)
+        ws0.row_dimensions[dr].height = 17
+
+    for ci, w in enumerate([10, 14, 14, 14, 14, 18, 12, 12], 1):
         ws0.column_dimensions[get_column_letter(ci)].width = w
+    ws0.freeze_panes = "A10"
 
     # ══════════════════════════════════════════════════════════════════════════
-    # SHEET 2 — GELİR PİVOT (kategoriler × aylar)
+    # SHEET 2/3 — KATEGORİ PİVOT (Gelir + Gider)
     # ══════════════════════════════════════════════════════════════════════════
     def make_pivot_sheet(wb_, title, ttype, color):
         ws = wb_.create_sheet(title)
         cats = sorted(cat_pivot[ttype].keys())
         months = sorted_months
+        N = len(months) + 3  # Kategori + aylar + Toplam + %
 
-        ws.merge_cells(f"A1:{get_column_letter(len(months)+2)}1")
-        h_ = ws["A1"]
-        h_.value = f"🦔  {title.upper()}"
-        h_.font  = Font(name="Calibri", bold=True, size=14, color=WHITE)
-        h_.fill  = fill(NAVY); h_.alignment = C()
-        ws.row_dimensions[1].height = 36
+        title_row(ws, f"   🦔  {title.upper()}", N, row=1, bg=NAVY)
+        sub_row(ws,   f"   {profile_name}  ·  {today_d.strftime('%d.%m.%Y')}", N, row=2, bg=NAVY)
 
         # Sütun başlıkları
-        set_cell(ws, 2, 1, "Kategori", bold=True, color=WHITE, bg=color, align="C")
+        sc(ws, 3, 1, "KATEGORİ", bold=True, size=9, color=WHITE, bg=color, align="C")
         for mi, ym in enumerate(months, 2):
             yr_, mo_ = int(ym[:4]), int(ym[5:7])
-            set_cell(ws, 2, mi, f"{MONTHS_TR[mo_]}\n{yr_}", bold=True, color=WHITE, bg=color, align="C")
-            ws.column_dimensions[get_column_letter(mi)].width = 13
-        set_cell(ws, 2, len(months)+2, "TOPLAM", bold=True, color=WHITE, bg=NAVY, align="C")
-        ws.row_dimensions[2].height = 30
-        ws.column_dimensions["A"].width = 24
-        ws.column_dimensions[get_column_letter(len(months)+2)].width = 16
+            cell = ws.cell(row=3, column=mi)
+            cell.value = f"{MONTHS_TR[mo_]}\n{yr_}"
+            cell.font  = Font(name="Calibri", bold=True, size=8, color=WHITE)
+            cell.fill  = fill(color); cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            cell.border = bdr()
+            ws.column_dimensions[get_column_letter(mi)].width = 12
+        sc(ws, 3, len(months)+2, "TOPLAM",  bold=True, size=9, color=WHITE, bg=NAVY, align="C")
+        sc(ws, 3, len(months)+3, "PAY %",   bold=True, size=9, color=WHITE, bg=NAVY, align="C")
+        ws.row_dimensions[3].height = 30
+        ws.column_dimensions["A"].width = 26
+        ws.column_dimensions[get_column_letter(len(months)+2)].width = 14
+        ws.column_dimensions[get_column_letter(len(months)+3)].width = 10
 
         # Kategori satırları
-        cat_totals = {}
+        grand = 0.0
         for ci_, cat in enumerate(cats):
-            dr = 3 + ci_
-            bg_ = LGRAY if ci_ % 2 == 0 else WHITE
-            set_cell(ws, dr, 1, cat, bold=True, bg=bg_)
+            dr = 4 + ci_
+            bg_ = G_LIGHT if ttype=="gelir" and ci_%2==0 else (R_LIGHT if ttype=="gider" and ci_%2==0 else (LGRAY if ci_%2==0 else WHITE))
+            sc(ws, dr, 1, cat, bold=True, size=9, bg=bg_)
             row_total = 0.0
             for mi, ym in enumerate(months, 2):
                 v = cat_pivot[ttype][cat].get(ym, 0)
                 row_total += v
-                set_cell(ws, dr, mi, round(v, 2) if v else "",
-                         fmt='#,##0.00' if v else None, color=color if v else "CCCCCC",
-                         bg=bg_, align="R")
-            set_cell(ws, dr, len(months)+2, round(row_total, 2),
-                     bold=True, fmt='#,##0.00', color=color, bg=DGRAY, align="R")
-            cat_totals[cat] = row_total
+                if v:
+                    sc(ws, dr, mi, round(v,2), fmt='#,##0.00', color=color, bg=bg_, align="R", size=9)
+                else:
+                    ws.cell(row=dr, column=mi).fill = fill(bg_)
+                    ws.cell(row=dr, column=mi).border = bdr()
+            sc(ws, dr, len(months)+2, round(row_total,2), bold=True, fmt='#,##0.00', color=color, bg=DGRAY, align="R", size=9)
+            grand_pct = f"%{row_total/cat_totals[ttype].get(cat,1)*100:.1f}" if gider_total else ""
+            total_all = sum(cat_totals[ttype].values())
+            grand_pct = f"%{round(row_total/total_all*100,1)}" if total_all else ""
+            sc(ws, dr, len(months)+3, grand_pct, size=9, color=MGRAY, bg=DGRAY, align="C")
+            grand += row_total
             ws.row_dimensions[dr].height = 18
 
         # Toplam satırı
-        total_row = 3 + len(cats)
-        set_cell(ws, total_row, 1, "TOPLAM", bold=True, size=11, color=WHITE, bg=NAVY, align="C")
-        grand = 0.0
+        total_row = 4 + len(cats)
+        sc(ws, total_row, 1, "TOPLAM", bold=True, size=10, color=WHITE, bg=NAVY, align="C")
         for mi, ym in enumerate(months, 2):
-            col_sum = sum(cat_pivot[ttype][c].get(ym, 0) for c in cats)
-            grand += col_sum
-            set_cell(ws, total_row, mi, round(col_sum, 2), bold=True,
-                     fmt='#,##0.00', color=WHITE, bg=NAVY, align="R")
-        set_cell(ws, total_row, len(months)+2, round(grand, 2), bold=True,
-                 size=12, fmt='#,##0.00', color=WHITE, bg=color, align="R")
-        ws.row_dimensions[total_row].height = 26
-
-        ws.freeze_panes = "B3"
+            col_sum = sum(cat_pivot[ttype][c].get(ym,0) for c in cats)
+            sc(ws, total_row, mi, round(col_sum,2), bold=True, fmt='#,##0.00', color=WHITE, bg=NAVY, align="R", size=9)
+        sc(ws, total_row, len(months)+2, round(grand,2), bold=True, size=11, fmt='#,##0.00', color=WHITE, bg=color, align="R")
+        sc(ws, total_row, len(months)+3, "%100", bold=True, size=9, color=WHITE, bg=NAVY, align="C")
+        ws.row_dimensions[total_row].height = 28
+        ws.freeze_panes = "B4"
         return ws
 
     make_pivot_sheet(wb, "💚 Gelir Pivot", "gelir", GREEN)
     make_pivot_sheet(wb, "❤️ Gider Pivot", "gider", RED)
 
     # ══════════════════════════════════════════════════════════════════════════
-    # SHEET 3 — HESAP HAREKETLERİ (ay gruplu)
+    # SHEET 3 — HESAP HAREKETLERİ (yeniden tasarım)
     # ══════════════════════════════════════════════════════════════════════════
     ws_tx = wb.create_sheet("📋 Hareketler")
-    ws_tx.merge_cells("A1:F1")
-    h_ = ws_tx["A1"]
-    h_.value = "🦔  HESAP HAREKETLERİ"
-    h_.font  = Font(name="Calibri", bold=True, size=14, color=WHITE)
-    h_.fill  = fill(NAVY); h_.alignment = C()
-    ws_tx.row_dimensions[1].height = 36
+    TX_COLS = 7
+    title_row(ws_tx, "   🦔  HESAP HAREKETLERİ", TX_COLS, row=1)
+    sub_row(ws_tx, f"   {profile_name}  ·  {today_d.strftime('%d.%m.%Y')}", TX_COLS, row=2)
 
-    col_w = [13, 10, 20, 36, 16, 14]
-    for ci_, w in enumerate(col_w, 1):
+    # Sütun genişlikleri: Tarih | Tür | Kategori | Açıklama | Ödeme Yöntemi | Tutar | Bakiye
+    col_cfg = [("Tarih",11), ("Tür",10), ("Kategori",20), ("Açıklama",40),
+               ("Ödeme Yöntemi",22), ("Tutar (₺)",14), ("Aylık Net",12)]
+    for ci_, (_, w) in enumerate(col_cfg, 1):
         ws_tx.column_dimensions[get_column_letter(ci_)].width = w
 
-    cur_row = 2
+    cur_row = 3
     for ym in sorted(by_month.keys(), reverse=True):
         yr_, mo_ = int(ym[:4]), int(ym[5:7])
-        mo_txs = by_month[ym]
-        mo_g = sum(float(r["amount"]) for r in mo_txs if r["type"] == "gelir")
-        mo_z = sum(float(r["amount"]) for r in mo_txs if r["type"] == "gider")
+        mo_txs = sorted(by_month[ym], key=lambda x: x["date"])
+        mo_g  = sum(float(r["amount"]) for r in mo_txs if r["type"]=="gelir")
+        mo_z  = sum(float(r["amount"]) for r in mo_txs if r["type"]=="gider")
         mo_net = mo_g - mo_z
 
-        # Ay başlığı
-        ws_tx.merge_cells(f"A{cur_row}:D{cur_row}")
+        # ── Ay başlık şeridi ────────────────────────────────────────────────
+        ws_tx.merge_cells(f"A{cur_row}:E{cur_row}")
         mc = ws_tx[f"A{cur_row}"]
-        mc.value = f"  {MONTHS_TR[mo_]} {yr_}  —  {len(mo_txs)} işlem"
+        mc.value = f"   {MONTHS_TR[mo_]} {yr_}  ·  {len(mo_txs)} işlem"
         mc.font  = Font(name="Calibri", bold=True, size=11, color=WHITE)
-        mc.fill  = fill(BLUE); mc.alignment = L()
-        set_cell(ws_tx, cur_row, 5, round(mo_g, 2),   bold=True, fmt='#,##0.00 ₺',
-                 color=WHITE, bg=BLUE, align="R")
-        set_cell(ws_tx, cur_row, 6, round(mo_z, 2),   bold=True, fmt='#,##0.00 ₺',
-                 color=WHITE, bg=BLUE, align="R")
-        ws_tx.row_dimensions[cur_row].height = 24
+        mc.fill  = fill(BLUE); mc.alignment = AL()
+        # Gelir/Gider toplamı sağda
+        sc(ws_tx, cur_row, 6, round(mo_g,2), bold=True, fmt='#,##0.00 ₺', color=WHITE, bg=GREEN, align="R", size=10)
+        sc(ws_tx, cur_row, 7, round(mo_z,2), bold=True, fmt='#,##0.00 ₺', color=WHITE, bg=RED,   align="R", size=10)
+        ws_tx.row_dimensions[cur_row].height = 26
         cur_row += 1
 
-        # Sütun başlıkları
-        for ci_, h_ in enumerate(["Tarih","Tür","Kategori","Açıklama","Tutar",""], 1):
-            set_cell(ws_tx, cur_row, ci_, h_, bold=True, color=WHITE, bg=NAVY, align="C")
-        ws_tx.row_dimensions[cur_row].height = 20
+        # ── Sütun başlıkları ────────────────────────────────────────────────
+        for ci_, (h, _) in enumerate(col_cfg, 1):
+            sc(ws_tx, cur_row, ci_, h, bold=True, size=9, color=WHITE, bg=NAVY, align="C")
+        ws_tx.row_dimensions[cur_row].height = 22
         cur_row += 1
 
-        # İşlemler
-        for i, r in enumerate(sorted(mo_txs, key=lambda x: x["date"])):
-            is_g = r["type"] == "gelir"
-            bg_  = ("EDFAF3" if is_g else "FEF0F0") if i%2==0 else WHITE
-            set_cell(ws_tx, cur_row, 1, r["date"],           bg=bg_, align="C")
-            set_cell(ws_tx, cur_row, 2, "Gelir" if is_g else "Gider",
-                     bold=True, color=GREEN if is_g else RED, bg=bg_, align="C")
-            set_cell(ws_tx, cur_row, 3, r["category"],       bg=bg_)
-            set_cell(ws_tx, cur_row, 4, r["description"] or "", bg=bg_)
-            set_cell(ws_tx, cur_row, 5, float(r["amount"]),
-                     bold=True, fmt='#,##0.00 ₺',
-                     color=GREEN if is_g else RED, bg=bg_, align="R")
-            ws_tx.row_dimensions[cur_row].height = 18
+        # ── İşlem satırları ─────────────────────────────────────────────────
+        for i, r in enumerate(mo_txs):
+            is_g  = r["type"] == "gelir"
+            desc  = (r["description"] or "").strip()
+            # Açıklamaya göre dinamik satır yüksekliği
+            lines = max(1, (len(desc) // 38) + 1) if desc else 1
+            row_h = min(60, 18 + (lines - 1) * 14)
+            # Satır rengi
+            bg_ = (G_LIGHT if is_g else R_LIGHT) if i % 2 == 0 else WHITE
+
+            sc(ws_tx, cur_row, 1, r["date"],               bg=bg_, align="C", size=9)
+            # Tür badge
+            type_cell = ws_tx.cell(row=cur_row, column=2)
+            type_cell.value = "▲ Gelir" if is_g else "▼ Gider"
+            type_cell.font  = Font(name="Calibri", bold=True, size=9,
+                                   color=GREEN if is_g else RED)
+            type_cell.fill  = fill(bg_)
+            type_cell.alignment = AC()
+            type_cell.border = bdr()
+
+            sc(ws_tx, cur_row, 3, r["category"],            bg=bg_, size=9)
+            # Açıklama — wrap_text aktif
+            desc_cell = ws_tx.cell(row=cur_row, column=4)
+            desc_cell.value     = desc
+            desc_cell.font      = Font(name="Calibri", size=9, color="3D3D3D")
+            desc_cell.fill      = fill(bg_)
+            desc_cell.alignment = AWrap()
+            desc_cell.border    = bdr()
+
+            sc(ws_tx, cur_row, 5, pay_method(r),            bg=bg_, size=8, color=MGRAY)
+            sc(ws_tx, cur_row, 6, float(r["amount"]),
+               bold=True, fmt='#,##0.00 ₺',
+               color=GREEN if is_g else RED,
+               bg=bg_, align="R", size=10)
+            ws_tx.row_dimensions[cur_row].height = row_h
             cur_row += 1
 
-        # Ay net toplamı
-        set_cell(ws_tx, cur_row, 1, "", bg=DGRAY)
-        ws_tx.merge_cells(f"B{cur_row}:D{cur_row}")
-        ws_tx.cell(row=cur_row, column=2).value = f"NET: {'▲' if mo_net>=0 else '▼'} ₺{abs(mo_net):,.2f}"
-        ws_tx.cell(row=cur_row, column=2).font  = Font(name="Calibri", bold=True, size=10,
-                                                        color=GREEN if mo_net>=0 else RED)
-        ws_tx.cell(row=cur_row, column=2).fill  = fill(DGRAY)
-        ws_tx.cell(row=cur_row, column=2).alignment = R()
-        ws_tx.row_dimensions[cur_row].height = 18
-        cur_row += 2  # boşluk
+        # ── Ay net özet satırı ──────────────────────────────────────────────
+        ws_tx.merge_cells(f"A{cur_row}:E{cur_row}")
+        nc = ws_tx[f"A{cur_row}"]
+        nc.value = f"   {'▲' if mo_net>=0 else '▼'} {MONTHS_TR[mo_]} Net"
+        nc.font  = Font(name="Calibri", bold=True, size=9, color=GREEN if mo_net>=0 else RED)
+        nc.fill  = fill(DGRAY); nc.alignment = AL()
+        sc(ws_tx, cur_row, 6, round(mo_net,2), bold=True, fmt='#,##0.00 ₺',
+           color=GREEN if mo_net>=0 else RED, bg=DGRAY, align="R", size=10)
+        ws_tx.row_dimensions[cur_row].height = 20
+        cur_row += 2  # boşluk satırı
 
-    ws_tx.freeze_panes = "A2"
+    ws_tx.freeze_panes = "A3"
 
     # ══════════════════════════════════════════════════════════════════════════
-    # SHEET 4 — TEDARİKÇİ FATURALARI (var ise)
+    # SHEET 4 — TEDARİKÇİ FATURALARI
     # ══════════════════════════════════════════════════════════════════════════
     ws_sup = wb.create_sheet("🏭 Tedarikçi")
-    ws_sup.merge_cells("A1:G1")
-    h_ = ws_sup["A1"]
-    h_.value = "🦔  TEDARİKÇİ FATURALARI & YAŞLANDIRMA"
-    h_.font  = Font(name="Calibri", bold=True, size=14, color=WHITE)
-    h_.fill  = fill(NAVY); h_.alignment = C()
-    ws_sup.row_dimensions[1].height = 36
-
-    for ci_, (hdr, w) in enumerate(zip(
-        ["Tedarikçi","Fatura No","Tutar","Para Birimi","Fatura Tar.","Vade","Durum"],
-        [22, 14, 14, 10, 13, 13, 14]
-    ), 1):
-        set_cell(ws_sup, 2, ci_, hdr, bold=True, color=WHITE, bg=BLUE, align="C")
+    sup_hdrs = [("Tedarikçi",22),("Fatura No",14),("Tutar",14),("Döviz",10),
+                ("Fatura Tar.",13),("Vade",13),("Durum",14)]
+    title_row(ws_sup, "   🦔  TEDARİKÇİ FATURALARI", len(sup_hdrs), row=1)
+    for ci_, (h,w) in enumerate(sup_hdrs, 1):
+        sc(ws_sup, 2, ci_, h, bold=True, size=9, color=WHITE, bg=BLUE, align="C")
         ws_sup.column_dimensions[get_column_letter(ci_)].width = w
     ws_sup.row_dimensions[2].height = 22
 
@@ -3233,55 +3306,59 @@ def export_excel():
     ).fetchall()):
         dr = 3 + i
         try:
-            due_d  = date.fromisoformat(row["due_date"])
+            due_d   = date.fromisoformat(row["due_date"])
             is_late = due_d < today_d and row["status"] == "bekliyor"
-        except:
-            is_late = False
+            days_ov = (today_d - due_d).days if is_late else 0
+        except: is_late = False; days_ov = 0
         bg_ = LGRAY if i % 2 == 0 else WHITE
-        status_lbl = "✅ Ödendi" if row["status"] == "odendi" else ("⚠️ Gecikmiş" if is_late else "🕐 Bekliyor")
-        set_cell(ws_sup, dr, 1, row["supplier_name"],   bg=bg_)
-        set_cell(ws_sup, dr, 2, row["invoice_no"] or "", bg=bg_, align="C")
-        set_cell(ws_sup, dr, 3, float(row["amount"]),    fmt='#,##0.00', bg=bg_, align="R")
-        set_cell(ws_sup, dr, 4, row["currency"],         bg=bg_, align="C")
-        set_cell(ws_sup, dr, 5, row["invoice_date"],     bg=bg_, align="C")
-        set_cell(ws_sup, dr, 6, row["due_date"],         bg=bg_, align="C",
-                 color=RED if is_late else "1C1C1E")
-        set_cell(ws_sup, dr, 7, status_lbl, bold=True, bg=bg_, align="C",
-                 color=GREEN if row["status"]=="odendi" else (RED if is_late else ORANGE))
+        if is_late: bg_ = R_LIGHT
+        elif row["status"] == "odendi": bg_ = G_LIGHT
+        status_lbl = ("✅ Ödendi" if row["status"]=="odendi"
+                      else f"⚠️ {days_ov} gün gecikmiş" if is_late else "🕐 Bekliyor")
+        sc(ws_sup, dr, 1, row["supplier_name"],     bg=bg_, size=9)
+        sc(ws_sup, dr, 2, row["invoice_no"] or "",  bg=bg_, align="C", size=9)
+        sc(ws_sup, dr, 3, float(row["amount"]),     fmt='#,##0.00', bg=bg_, align="R", size=9)
+        sc(ws_sup, dr, 4, row["currency"],          bg=bg_, align="C", size=9)
+        sc(ws_sup, dr, 5, row["invoice_date"],      bg=bg_, align="C", size=9)
+        sc(ws_sup, dr, 6, row["due_date"],          bg=bg_, align="C", size=9,
+           color=RED if is_late else "1C1C1E")
+        sc(ws_sup, dr, 7, status_lbl, bold=True,    bg=bg_, align="C", size=9,
+           color=GREEN if row["status"]=="odendi" else (RED if is_late else AMBER))
         ws_sup.row_dimensions[dr].height = 18
 
     # ══════════════════════════════════════════════════════════════════════════
     # SHEET 5 — VARLIKLAR & AMORTİSMAN
     # ══════════════════════════════════════════════════════════════════════════
     ws_ast = wb.create_sheet("🚗 Varlıklar")
-    ws_ast.merge_cells("A1:G1")
-    h_ = ws_ast["A1"]
-    h_.value = "🦔  VARLIKLAR & AMORTİSMAN"
-    h_.font  = Font(name="Calibri", bold=True, size=14, color=WHITE)
-    h_.fill  = fill(NAVY); h_.alignment = C()
-    ws_ast.row_dimensions[1].height = 36
-
-    for ci_, (hdr, w) in enumerate(zip(
-        ["Varlık Adı","Tür","Alış Tarihi","Alış Bedeli","Oran %","Yıllık Amort.","Defter Değeri"],
-        [24, 14, 13, 14, 10, 16, 16]
-    ), 1):
-        set_cell(ws_ast, 2, ci_, hdr, bold=True, color=WHITE, bg=BLUE, align="C")
+    ast_hdrs = [("Varlık Adı",26),("Tür",14),("Alış Tarihi",13),("Alış Bedeli",16),
+                ("Amortisman %",12),("Yıllık Amort.",16),("Defter Değeri",16)]
+    title_row(ws_ast, "   🦔  VARLIKLAR & AMORTİSMAN", len(ast_hdrs), row=1)
+    for ci_, (h,w) in enumerate(ast_hdrs, 1):
+        sc(ws_ast, 2, ci_, h, bold=True, size=9, color=WHITE, bg=BLUE, align="C")
         ws_ast.column_dimensions[get_column_letter(ci_)].width = w
     ws_ast.row_dimensions[2].height = 22
 
+    total_cost = total_book = 0.0
     for i, row in enumerate(assets):
         dep = calc_depreciation(float(row["purchase_price"]), row["purchase_date"],
                                 float(row["depreciation_rate"]))
-        dr = 3 + i
+        dr  = 3 + i
         bg_ = LGRAY if i % 2 == 0 else WHITE
-        set_cell(ws_ast, dr, 1, row["name"],                      bg=bg_)
-        set_cell(ws_ast, dr, 2, row["asset_type"],                bg=bg_, align="C")
-        set_cell(ws_ast, dr, 3, row["purchase_date"],             bg=bg_, align="C")
-        set_cell(ws_ast, dr, 4, float(row["purchase_price"]),     fmt='#,##0.00 ₺', bg=bg_, align="R")
-        set_cell(ws_ast, dr, 5, f"%{float(row['depreciation_rate']):.0f}", bg=bg_, align="C")
-        set_cell(ws_ast, dr, 6, dep["annual"],    fmt='#,##0.00 ₺', bold=True, color=RED,  bg=bg_, align="R")
-        set_cell(ws_ast, dr, 7, dep["book_value"],fmt='#,##0.00 ₺', bold=True, color=BLUE, bg=bg_, align="R")
+        sc(ws_ast, dr, 1, row["name"],                     bg=bg_, size=9)
+        sc(ws_ast, dr, 2, row["asset_type"],               bg=bg_, align="C", size=9)
+        sc(ws_ast, dr, 3, row["purchase_date"],            bg=bg_, align="C", size=9)
+        sc(ws_ast, dr, 4, float(row["purchase_price"]),    fmt='#,##0.00 ₺', bg=bg_, align="R", size=9)
+        sc(ws_ast, dr, 5, f"%{float(row['depreciation_rate']):.0f}", bg=bg_, align="C", size=9)
+        sc(ws_ast, dr, 6, dep["annual"],    fmt='#,##0.00 ₺', bold=True, color=RED,  bg=bg_, align="R", size=9)
+        sc(ws_ast, dr, 7, dep["book_value"],fmt='#,##0.00 ₺', bold=True, color=BLUE, bg=bg_, align="R", size=9)
         ws_ast.row_dimensions[dr].height = 18
+        total_cost += float(row["purchase_price"]); total_book += dep["book_value"]
+    if assets:
+        dr_t = 3 + len(assets)
+        sc(ws_ast, dr_t, 1, "TOPLAM", bold=True, size=10, color=WHITE, bg=NAVY, align="C")
+        sc(ws_ast, dr_t, 4, round(total_cost,2), fmt='#,##0.00 ₺', bold=True, color=WHITE, bg=NAVY, align="R")
+        sc(ws_ast, dr_t, 7, round(total_book,2), fmt='#,##0.00 ₺', bold=True, color=WHITE, bg=NAVY, align="R")
+        ws_ast.row_dimensions[dr_t].height = 24
 
     buf = io.BytesIO()
     wb.save(buf)
