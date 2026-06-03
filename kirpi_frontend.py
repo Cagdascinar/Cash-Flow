@@ -4288,6 +4288,7 @@ function goToTx(id){
 
 function loadTodayWidgets(){
   xhr('/api/today?date='+_todayDate,null,function(d){
+    if(!d) return;
     // Gelir list
     renderTxList('today-gelir-list', d.gelir_list, 'gelir');
     var gb=document.getElementById('gelir-badge');
@@ -4522,46 +4523,6 @@ function updateHeroLabel(){
   else lbl.textContent='TÜM ZAMANLAR';
 }
 
-function loadDashboard(){
-  var url;
-  if(_dateRangeActive){
-    url='/api/summary?start='+_rangeStart+'&end='+_rangeEnd;
-  } else if(_heroPeriod==='year'){
-    url='/api/summary?period=year&year='+_heroYear;
-  } else if(_heroPeriod==='month'){
-    url='/api/summary?period=month&year='+curYear+'&month='+curMonth;
-  } else {
-    url='/api/summary?period='+_heroPeriod;
-  }
-  var reqId = ++_dashReqId;
-  xhr(url,null,function(d){
-    if(reqId !== _dashReqId) return;
-    hideSplash();
-    if(!d || d.error){
-      // Otomatik retry: sunucu soğuk başlıyorsa bekle ve tekrar dene
-      if(_dashRetry < 4){
-        _dashRetry++;
-        var wait = _dashRetry * 3000; // 3s, 6s, 9s, 12s
-        var rb=document.getElementById('dash-retry-bar');
-        if(rb){ rb.style.display='flex'; rb.querySelector('span').textContent='🔄 Sunucu başlatılıyor... ('+_dashRetry+'/4)'; }
-        setTimeout(function(){ loadDashboard(); }, wait);
-      } else {
-        var rb=document.getElementById('dash-retry-bar');
-        if(rb){ rb.style.display='flex'; rb.querySelector('span').textContent='⚠️ '+(d&&d.error?d.error:'Bağlantı kurulamadı.'); }
-      }
-      return;
-    }
-    _dashRetry=0;
-    var rb=document.getElementById('dash-retry-bar'); if(rb) rb.style.display='none';
-    summaryData=d;
-    renderStats(d);
-    drawBar(d.bar);
-    drawDonut(d.gider_cats);
-    renderBudgetPage(d.gider_cats,d.budgets);
-  });
-  xhr('/api/motivation',null,renderMotivation);
-  loadTodayWidgets();
-}
 
 // ── SES SİSTEMİ ──────────────────────────────────────────────────────────────
 var _soundEnabled=(localStorage.getItem('kirpi_sound')==='1');
@@ -4768,6 +4729,7 @@ function renderStats(d){
 function topCat(o){var t=null,m=0;Object.keys(o).forEach(function(k){if(o[k]>m){m=o[k];t=k}});return t}
 
 function renderMotivation(d){
+  if(!d) return;
   document.getElementById('motiv-fill').style.width=d.score+'%';
   document.getElementById('motiv-fill').style.background=d.color;
   var badge=document.getElementById('health-badge');
@@ -5677,38 +5639,42 @@ function changeYear(d){ curYear+=d; document.getElementById('ylabel').textConten
 loadDashboard = function(){
   loadTodayWidgets();
   var reqId = ++_dashReqId;
-
-  // Hero period tabs (Ay / Yıl / Tüm Zamanlar) take priority
-  if(_heroPeriod === 'year'){
-    xhr('/api/summary?period=year&year='+_heroYear, null, function(d){
-      if(reqId !== _dashReqId) return;
-      summaryData=d; renderStats(d); drawBar(d.bar); drawDonut(d.gider_cats); renderBudgetPage(d.gider_cats,d.budgets);
-    });
-    xhr('/api/motivation',null,renderMotivation);
-    return;
+  var url;
+  if(_dateRangeActive){
+    url='/api/summary?start='+_rangeStart+'&end='+_rangeEnd;
+  } else if(_heroPeriod==='year'){
+    url='/api/summary?period=year&year='+_heroYear;
+  } else if(_heroPeriod==='all'){
+    url='/api/summary?period=all';
+  } else if(dbView==='year'){
+    url='/api/summary?period=year&year='+curYear;
+  } else {
+    url='/api/summary?year='+curYear+'&month='+curMonth;
   }
-  if(_heroPeriod === 'all'){
-    xhr('/api/summary?period=all', null, function(d){
-      if(reqId !== _dashReqId) return;
-      summaryData=d; renderStats(d); drawBar(d.bar); drawDonut(d.gider_cats); renderBudgetPage(d.gider_cats,d.budgets);
-    });
-    xhr('/api/motivation',null,renderMotivation);
-    return;
-  }
-
-  // Month mode — use ledger year/month nav
-  if(dbView==='year'){
-    xhr('/api/summary?period=year&year='+curYear, null, function(d){
-      if(reqId !== _dashReqId) return;
-      summaryData=d; renderStats(d); drawBar(d.bar); drawDonut(d.gider_cats); renderBudgetPage(d.gider_cats,d.budgets);
-      var sub=document.getElementById('db-sub'); if(sub) sub.textContent=curYear+' yılı';
-    });
-    xhr('/api/motivation',null,renderMotivation);
-    return;
-  }
-  xhr('/api/summary?year='+curYear+'&month='+curMonth, null, function(d){
+  xhr(url,null,function(d){
     if(reqId !== _dashReqId) return;
-    summaryData=d; renderStats(d); drawBar(d.bar); drawDonut(d.gider_cats); renderBudgetPage(d.gider_cats,d.budgets);
+    hideSplash();
+    if(!d || d.error){
+      if(_dashRetry < 4){
+        _dashRetry++;
+        var wait = _dashRetry * 3000;
+        var rb=document.getElementById('dash-retry-bar');
+        if(rb){ rb.style.display='flex'; rb.querySelector('span').textContent='🔄 Sunucu başlatılıyor... ('+_dashRetry+'/4)'; }
+        setTimeout(function(){ loadDashboard(); }, wait);
+      } else {
+        var rb=document.getElementById('dash-retry-bar');
+        if(rb){ rb.style.display='flex'; rb.querySelector('span').textContent='⚠️ '+(d&&d.error?d.error:'Bağlantı kurulamadı.'); }
+      }
+      return;
+    }
+    _dashRetry=0;
+    var rb=document.getElementById('dash-retry-bar'); if(rb) rb.style.display='none';
+    summaryData=d;
+    renderStats(d);
+    drawBar(d.bar);
+    drawDonut(d.gider_cats);
+    renderBudgetPage(d.gider_cats,d.budgets);
+    if(dbView==='year'){ var sub=document.getElementById('db-sub'); if(sub) sub.textContent=curYear+' yılı'; }
   });
   xhr('/api/motivation',null,renderMotivation);
 };
