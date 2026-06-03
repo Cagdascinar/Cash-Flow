@@ -3266,23 +3266,16 @@ function _appInit(){
   try{ setupNumInputs(); }catch(e){}
   try{ requestBrowserNotifPermission(); }catch(e){}
 
-  // 5 saniye içinde veri gelmediyse retry butonu göster
-  setTimeout(function(){
-    var bal=document.getElementById('s-bal');
-    if(bal&&(bal.textContent==='—'||!bal.textContent.trim())){
-      var rb=document.getElementById('dash-retry-bar'); if(rb) rb.style.display='flex';
-    }
-  }, 5000);
+  // Hemen yükle — profile bilgisi gelmeden önce
+  loadDashboard();
+  loadAllTx();
 
-  // Arka planda profil + kategori + kart verisi
+  // Profil + kategoriler arka planda kur
   xhr('/api/init',null,function(d){
-    if(!d) return;
-    // Kategoriler
+    if(!d) { loadReminders(); loadNotifications(); return; }
     if(d.categories){ CATS=d.categories; fillSel('f-cat',CATS[curTab]); }
-    // Kartlar + hesaplar — isim lookup için sakla
     if(d.cards){ _allCards=d.cards; }
     if(d.accounts){ _allAccounts=d.accounts; }
-    // Profil + kullanıcı
     if(d.user){
       var me=d.user;
       _curAvatar=me.avatar||'';
@@ -3298,40 +3291,33 @@ function _appInit(){
       if(s) s.textContent='@'+me.username+(me.email?' · '+me.email:'');
       applyProfileType(me.profile_type);
     }
-    // Profil listesi
     if(d.profiles){
       _profiles=d.profiles;
-      renderDropdownProfiles();
-      renderSettingsProfiles();
+      renderDropdownProfiles(); renderSettingsProfiles();
       var curPid=parseInt(sessionStorage.getItem('cur_pid')||'0');
       var preferred=parseInt(localStorage.getItem('preferred_pid')||'0');
-      var activePid=preferred&&preferred!==curPid?preferred:curPid;
-      var activeP=d.profiles.find(function(p){return p.id===activePid;})||d.profiles[0];
-      if(activeP){
-        var snEl=document.getElementById('sidebar-profile-name');
-        if(snEl) snEl.textContent=activeP.name;
-        updateSidebarProfileAvatar(activeP.avatar||'');
-      }
+      var activeP=d.profiles.find(function(p){return p.id===(preferred||curPid);})||d.profiles[0];
+      if(activeP){ var snEl=document.getElementById('sidebar-profile-name'); if(snEl) snEl.textContent=activeP.name; updateSidebarProfileAvatar(activeP.avatar||''); }
       if(preferred&&preferred!==curPid){
         var match=d.profiles.find(function(p){return p.id===preferred;});
         if(match){
-          // Profil switch tamamlanınca dashboard'ı yükle
-          switchProfileThen(preferred, function(){
-            loadDashboard(); loadAllTx(); loadReminders(); loadNotifications();
-          });
-          return; // aşağıdaki loadDashboard'u atla
+          // Farklı profil: switch et ve yenile
+          switchProfileThen(preferred, function(){ loadDashboard(); loadAllTx(); });
         }
       }
     }
-    // Profil switch gerekmiyorsa hemen yükle
-    loadDashboard();
-    loadAllTx();
-    loadReminders();
-    loadNotifications();
-    // Insights sadece dashboard açıksa
+    loadReminders(); loadNotifications();
     var dashPage=document.getElementById('page-dashboard');
     if(dashPage&&dashPage.classList.contains('active')) loadInsights();
   });
+
+  // 6 saniye sonra hâlâ boşsa retry göster
+  setTimeout(function(){
+    var bal=document.getElementById('s-bal');
+    if(bal&&(bal.textContent==='—'||!bal.textContent.trim())){
+      var rb=document.getElementById('dash-retry-bar'); if(rb) rb.style.display='flex';
+    }
+  }, 6000);
 
   populateYearFilter();
   document.addEventListener('click',function(e){
