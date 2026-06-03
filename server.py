@@ -2172,6 +2172,43 @@ def _tg_budget_msg(pid, db):
 
 _CTYPE_ICO = {"kredi": "💳", "banka": "🏧", "yemek": "🍽️", "hediye": "🎁"}
 
+def _tg_parse_card_payment(text_l):
+    """Kart ödeme mesajını ayrıştır. None döner veya dict."""
+    pay_kws = ["ödeme", "ödendi", "öde", "odeme", "odendi", "odedim", "ödedim"]
+    if not any(k in text_l for k in pay_kws):
+        return None
+    # Kart/kredi ipucu
+    card_kws = ["kart", "kredi", "card"]
+    if not any(k in text_l for k in card_kws):
+        return None
+    is_asgari = any(k in text_l for k in ["asgari","asgarisi","minimum","min ","min."])
+    is_tam    = any(k in text_l for k in ["tam ödeme","tüm borç","tum borc","tam borç","tamamını","tamamini","hepsini","hepsi"])
+    amount = None
+    m = re.search(r'(\d[\d.]*(?:[.,]\d+)?)\s*(?:tl|₺|lira)?', text_l)
+    if m:
+        try: amount = float(m.group(1).replace('.','').replace(',','.'))
+        except: pass
+    return {"is_asgari": is_asgari, "is_tam": is_tam, "amount": amount, "raw": text_l}
+
+def _tg_find_card(db, pid, text_l):
+    """Metinden kart bul (banka adı fuzzy eşleme)."""
+    cards = db.execute(
+        "SELECT * FROM cards WHERE profile_id=%s AND card_type IN ('kredi','banka') ORDER BY bank_name", (pid,)
+    ).fetchall()
+    if not cards: return None
+    import unicodedata
+    def norm(s): return unicodedata.normalize('NFKD',s.lower()).encode('ascii','ignore').decode()
+    text_n = norm(text_l)
+    best, best_score = None, 0
+    for c in cards:
+        bank_n = norm(c['bank_name'] or '')
+        cname_n = norm(c['card_name'] or '')
+        score = sum(2 for w in bank_n.split() if len(w)>2 and w in text_n)
+        score += sum(1 for w in cname_n.split() if len(w)>2 and w in text_n)
+        if score > best_score:
+            best_score, best = score, c
+    return best if best_score > 0 else None
+
 def _tg_cards_msg(pid, db):
     cards = db.execute("SELECT * FROM cards WHERE profile_id=%s ORDER BY bank_name",(pid,)).fetchall()
     if not cards:
@@ -2264,6 +2301,40 @@ def telegram_webhook():
                 db.commit()
                 tg_edit_msg(chat_id, msg_id, "❌ İptal edildi.")
                 tg_answer_cb(cb_id, "İptal edildi.")
+            elif cdata.startswith("cardpay:"):
+                parts = cdata.split(":")
+                if parts[1] == "cancel":
+                    tg_edit_msg(chat_id, msg_id, "❌ Kart ödemesi iptal edildi.")
+                    tg_answer_cb(cb_id, "İptal.")
+                else:
+                    card_id = int(parts[1]); pay_amount = float(parts[2])
+                    link2 = db.execute("SELECT user_id,profile_id FROM telegram_links WHERE tg_user_id=%s",(tg_uid,)).fetchone()
+                    if link2:
+                        card = db.execute("SELECT * FROM cards WHERE id=%s AND profile_id=%s",(card_id,link2["profile_id"])).fetchone()
+                        if card:
+                            cur_debt = float(card["used_"] or 0)
+                            paid = round(min(pay_amount, cur_debt), 2)
+                            new_debt = round(max(0, cur_debt - paid), 2)
+                            cat = "Yemek Kartı Ödemesi" if card.get("card_type")=="yemek" else "Kredi Kartı Ödemesi"
+                            desc = f"{card['bank_name']} {card.get('card_name') or ''} ödemesi".strip()
+                            db.execute(
+                                "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                                (link2["user_id"],link2["profile_id"],"gider",paid,cat,desc,date.today().isoformat(),datetime.now().isoformat())
+                            )
+                            db.execute("UPDATE cards SET used_=%s WHERE id=%s",(new_debt,card_id))
+                            db.commit()
+                            clbl = card['bank_name']+(f" {card['card_name']}" if card.get('card_name') else "")
+                            tg_edit_msg(chat_id,msg_id,
+                                f"✅ <b>Kart ödemesi kaydedildi!</b>\n\n"
+                                f"💳 {clbl}\n"
+                                f"💸 Ödenen: {_tg_fmt_amount(paid)}\n"
+                                f"📉 Kalan borç: {_tg_fmt_amount(new_debt)}"
+                            )
+                            tg_answer_cb(cb_id,"✅ Kaydedildi!")
+                        else:
+                            tg_answer_cb(cb_id,"Kart bulunamadı.")
+                    else:
+                        tg_answer_cb(cb_id,"Yetki hatası.")
             elif cdata.startswith("deltx:"):
                 val = cdata.split(":")[1]
                 if val == "cancel":
@@ -2358,6 +2429,10 @@ def telegram_webhook():
                 "  <code>kartlar</code> → kart borçları\n"
                 "  <code>yatirim</code> → portföy özeti\n"
                 "  <code>hedef</code> → hedefler\n\n"
+                "<b>💳 Kart Ödeme:</b>\n"
+                "  <code>yapı kredi asgari ödeme</code>\n"
+                "  <code>garanti gold 5000 ödendi</code>\n"
+                "  <code>akbank kart tam borç ödeme</code>\n\n"
                 "<b>✏️ Yönetim:</b>\n"
                 "  <code>sil</code> → son işlemi sil\n"
                 "  <code>iptal</code> → bekleyen işlemi iptal et")
@@ -2419,6 +2494,38 @@ def telegram_webhook():
                       "yemek kart", "yemek kartı", "yemek kartim"):
             tg_send(chat_id, _tg_cards_msg(pid, db))
             return "ok"
+
+        # ── Kart ödeme algılama ──
+        _cp = _tg_parse_card_payment(text_l)
+        if _cp:
+            found_card = _tg_find_card(db, pid, text_l)
+            if found_card:
+                cur_debt = float(found_card["used_"] or 0)
+                if cur_debt <= 0:
+                    tg_send(chat_id, f"💳 {found_card['bank_name']} kartında ödenecek borç yok.")
+                    return "ok"
+                min_pay = round(cur_debt * float(found_card["min_pct"] or 25) / 100, 2)
+                if _cp["is_asgari"]:
+                    pay_amount = min_pay
+                elif _cp["is_tam"]:
+                    pay_amount = cur_debt
+                elif _cp["amount"]:
+                    pay_amount = min(_cp["amount"], cur_debt)
+                else:
+                    pay_amount = min_pay  # varsayılan: asgari
+                clbl = found_card['bank_name']+(f" {found_card['card_name']}" if found_card.get('card_name') else "")
+                pay_type = "asgari ödeme" if _cp["is_asgari"] or (not _cp["is_tam"] and not _cp["amount"]) else "tam borç" if _cp["is_tam"] else "ödeme"
+                tg_send(chat_id,
+                    f"💳 <b>{clbl}</b> için {pay_type} onayı?\n\n"
+                    f"💸 Ödenecek: <b>{_tg_fmt_amount(pay_amount)}</b>\n"
+                    f"📉 Mevcut borç: {_tg_fmt_amount(cur_debt)}\n"
+                    f"📉 Ödeme sonrası: {_tg_fmt_amount(max(0,cur_debt-pay_amount))}",
+                    reply_markup={"inline_keyboard": [[
+                        {"text": "✅ Evet, kaydet", "callback_data": f"cardpay:{found_card['id']}:{pay_amount}"},
+                        {"text": "❌ İptal", "callback_data": "cardpay:cancel"}
+                    ]]}
+                )
+                return "ok"
 
         if text_l in ("/hesaplar", "hesaplar", "hesabım", "hesaplarim",
                       "🏦 hesaplar", "hesap bakiye", "bakiyeler"):
