@@ -386,6 +386,12 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
   to{opacity:1;transform:translateY(0) scale(1)}
 }
 .page.slide-back{transform:translateX(-12px);opacity:0}
+/* Dil butonu */
+.lang-btn{padding:8px 6px;border-radius:10px;border:1.5px solid var(--border2);background:var(--bg3);
+  color:var(--txt);font-size:.75rem;font-weight:600;cursor:pointer;transition:.14s;text-align:center;
+  -webkit-tap-highlight-color:transparent}
+.lang-btn:hover{border-color:var(--b);background:rgba(0,122,255,.07)}
+.lang-btn.active{border-color:var(--b);background:rgba(0,122,255,.13);color:var(--b)}
 /* Ödeme yöntemi çipleri */
 .pay-chip{padding:7px 13px;border-radius:10px;border:1.5px solid var(--border2);background:var(--bg3);
   color:var(--txt2);font-size:.8rem;font-weight:600;cursor:pointer;transition:.14s;
@@ -1278,8 +1284,18 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
 <script>
 (function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();
 </script>
+<!-- Google Translate -->
+<style>
+.goog-te-banner-frame,.goog-te-balloon-frame,.goog-te-menu-frame{display:none!important}
+body{top:0!important}
+.goog-logo-link,.goog-te-gadget span{display:none!important}
+.goog-te-gadget{font-size:0!important}
+#google_translate_element{display:none}
+</style>
+<script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async></script>
 </head>
 <body>
+<div id="google_translate_element"></div>
 
 <!-- ── SPLASH SCREEN ── -->
 <div id="splash-screen">
@@ -2661,6 +2677,41 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
   </div>
 
   <div class="settings-card">
+    <!-- DİL SEÇİCİ -->
+    <div class="settings-sect-title">🌍 Dil / Language</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px" id="lang-grid">
+      <button class="lang-btn active" onclick="setLang('tr')" data-lang="tr">🇹🇷 Türkçe</button>
+      <button class="lang-btn" onclick="setLang('en')" data-lang="en">🇬🇧 English</button>
+      <button class="lang-btn" onclick="setLang('de')" data-lang="de">🇩🇪 Deutsch</button>
+      <button class="lang-btn" onclick="setLang('fr')" data-lang="fr">🇫🇷 Français</button>
+      <button class="lang-btn" onclick="setLang('es')" data-lang="es">🇪🇸 Español</button>
+      <button class="lang-btn" onclick="setLang('it')" data-lang="it">🇮🇹 Italiano</button>
+      <button class="lang-btn" onclick="setLang('ru')" data-lang="ru">🇷🇺 Русский</button>
+      <button class="lang-btn" onclick="setLang('ar')" data-lang="ar">🇸🇦 العربية</button>
+      <button class="lang-btn" onclick="setLang('zh-CN')" data-lang="zh-CN">🇨🇳 中文</button>
+      <button class="lang-btn" onclick="setLang('ja')" data-lang="ja">🇯🇵 日本語</button>
+      <button class="lang-btn" onclick="setLang('ko')" data-lang="ko">🇰🇷 한국어</button>
+      <button class="lang-btn" onclick="setLang('pt')" data-lang="pt">🇵🇹 Português</button>
+      <button class="lang-btn" onclick="setLang('nl')" data-lang="nl">🇳🇱 Nederlands</button>
+      <button class="lang-btn" onclick="setLang('pl')" data-lang="pl">🇵🇱 Polski</button>
+      <button class="lang-btn" onclick="setLang('uk')" data-lang="uk">🇺🇦 Українська</button>
+      <button class="lang-btn" onclick="setLang('sv')" data-lang="sv">🇸🇪 Svenska</button>
+      <button class="lang-btn" onclick="setLang('no')" data-lang="no">🇳🇴 Norsk</button>
+      <button class="lang-btn" onclick="setLang('da')" data-lang="da">🇩🇰 Dansk</button>
+      <button class="lang-btn" onclick="setLang('fi')" data-lang="fi">🇫🇮 Suomi</button>
+      <button class="lang-btn" onclick="setLang('hi')" data-lang="hi">🇮🇳 हिन्दी</button>
+      <button class="lang-btn" onclick="setLang('fa')" data-lang="fa">🇮🇷 فارسی</button>
+      <button class="lang-btn" onclick="setLang('id')" data-lang="id">🇮🇩 Indonesia</button>
+      <button class="lang-btn" onclick="setLang('ms')" data-lang="ms">🇲🇾 Melayu</button>
+      <button class="lang-btn" onclick="setLang('th')" data-lang="th">🇹🇭 ไทย</button>
+      <button class="lang-btn" onclick="setLang('vi')" data-lang="vi">🇻🇳 Tiếng Việt</button>
+      <button class="lang-btn" onclick="setLang('ro')" data-lang="ro">🇷🇴 Română</button>
+      <button class="lang-btn" onclick="setLang('el')" data-lang="el">🇬🇷 Ελληνικά</button>
+      <button class="lang-btn" onclick="setLang('hu')" data-lang="hu">🇭🇺 Magyar</button>
+      <button class="lang-btn" onclick="setLang('cs')" data-lang="cs">🇨🇿 Čeština</button>
+      <button class="lang-btn" onclick="setLang('he')" data-lang="he">🇮🇱 עברית</button>
+    </div>
+
     <div class="settings-sect-title">Uygulama</div>
     <button class="settings-link-row" onclick="triggerInstall()">
       <span>⬇️ Uygulamayı Telefona Kur</span><span style="color:var(--txt2);font-size:.8rem">›</span>
@@ -3116,6 +3167,49 @@ document.addEventListener('touchstart', function(e){
 }, {passive:true});
 
 // ── DARK MODE ────────────────────────────────────────────────────────────────
+// ── GOOGLE TRANSLATE ─────────────────────────────────────────────────────────
+function googleTranslateElementInit(){
+  new google.translate.TranslateElement({
+    pageLanguage:'tr',
+    layout:google.translate.TranslateElement.InlineLayout.SIMPLE,
+    autoDisplay:false
+  },'google_translate_element');
+  // Kaydedilmiş dili uygula
+  var saved=localStorage.getItem('kirpi_lang');
+  if(saved&&saved!=='tr') setTimeout(function(){ _applyGoogleLang(saved); },800);
+  _syncLangBtns();
+}
+
+function _applyGoogleLang(lang){
+  var sel=document.querySelector('.goog-te-combo');
+  if(sel){ sel.value=lang; sel.dispatchEvent(new Event('change')); }
+}
+
+function setLang(lang){
+  localStorage.setItem('kirpi_lang',lang);
+  _syncLangBtns();
+  if(lang==='tr'){
+    // Türkçeye dön — sayfayı yenile (Google Translate'i sıfırla)
+    var c=document.cookie.split(';');
+    for(var i=0;i<c.length;i++){
+      var k=c[i].split('=')[0].trim();
+      if(k==='googtrans') document.cookie=k+'=;expires=Thu, 01 Jan 1970 00:00:01 GMT;path=/';
+    }
+    location.reload();
+    return;
+  }
+  var sel=document.querySelector('.goog-te-combo');
+  if(sel){ sel.value=lang; sel.dispatchEvent(new Event('change')); }
+  else { setTimeout(function(){ _applyGoogleLang(lang); },500); }
+}
+
+function _syncLangBtns(){
+  var cur=localStorage.getItem('kirpi_lang')||'tr';
+  document.querySelectorAll('.lang-btn').forEach(function(b){
+    b.classList.toggle('active',b.dataset.lang===cur);
+  });
+}
+
 function _syncDarkModeUI(){
   var isDark=document.documentElement.getAttribute('data-theme')==='dark';
   var btn=document.getElementById('dark-mode-btn');
@@ -4310,8 +4404,8 @@ function loadTodayWidgets(){
               '<span class="cc-pct-badge '+(pct<50?'ok':pct<80?'warn':'high')+'">%'+pct+'</span></div>'+
               (a.limit>0?'<div class="cc-prog-bg"><div class="cc-prog-fill" style="width:'+pct+'%;background:'+fc+'"></div></div>':'')+
               '<div class="cc-nums">'+
-                '<span>Borç: <strong style="color:var(--r)">'+fmt(a.balance)+'</strong></span>'+
                 (a.limit>0?'<span>Limit: <strong style="color:var(--b2)">'+fmt(a.limit)+'</strong></span>':'')+
+                '<span>Kullanılan: <strong style="color:var(--r)">'+fmt(a.balance)+'</strong></span>'+
                 (a.available!=null?'<span>Kalan: <strong style="color:var(--g)">'+fmt(a.available)+'</strong></span>':'')+
               '</div>'+
             '</div>';
