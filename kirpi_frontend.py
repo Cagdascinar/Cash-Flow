@@ -379,6 +379,8 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 }
 .page.active{
   display:block;
+  opacity:1;
+  transform:none;
 }
 .page.slide-back{transform:translateX(-12px);opacity:0}
 /* Dil butonu */
