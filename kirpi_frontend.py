@@ -4550,9 +4550,9 @@ function loadTodayWidgets(){
         html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'+
           // Sol: Kredi Kartı Kullanılabilir
           '<div style="background:linear-gradient(135deg,#1a3a5c,#0d2b45);border-radius:12px;padding:12px 14px;cursor:pointer" onclick="showAvailableLimitModal()">'+
-            '<div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#90b4d4;margin-bottom:4px">💳 Kredi Kartı</div>'+
+            '<div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#90b4d4;margin-bottom:4px">💳 Tüm Kartlar</div>'+
             '<div style="font-size:1rem;font-weight:900;color:#fff;margin-bottom:2px">'+fmt(d.total_avail)+'</div>'+
-            '<div style="font-size:.65rem;color:#90b4d4">Kullanılabilir</div>'+
+            '<div style="font-size:.65rem;color:#90b4d4">Kullanılabilir Limit</div>'+
             '<div style="border-top:1px solid #1e4a6e;margin-top:8px;padding-top:6px;display:flex;justify-content:space-between;font-size:.65rem;color:#90b4d4">'+
               '<span>Limit: <b style="color:#a0c4e8">'+fmt(d.total_limit)+'</b></span>'+
               '<span>Borç: <b style="color:#f87171">'+fmt(d.total_used)+'</b></span>'+
@@ -7297,30 +7297,51 @@ function showAvailableLimitModal(){
   var m=document.getElementById('avail-limit-modal');
   var list=document.getElementById('avail-limit-list');
   if(!m||!list) return;
-  var cards=_allCards||[];
-  var available=cards.filter(function(c){ return (c.card_type==='kredi'||c.card_type==='banka')&&c.limit_>0&&(c.limit_-c.used_)>0; });
-  if(!available.length){
-    list.innerHTML='<div style="text-align:center;padding:20px;color:var(--txt2);font-size:.86rem">Kullanılabilir limitli kart yok.</div>';
-  } else {
-    list.innerHTML=available.map(function(c){
-      var avail=Math.round(c.limit_-c.used_);
-      var pct=Math.round((c.used_/c.limit_)*100);
-      var barColor=pct>80?'var(--r)':pct>50?'var(--y)':'var(--g)';
-      return '<div style="background:var(--bg3);border-radius:14px;padding:14px 16px">'
-        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
-        +'<div style="font-size:.86rem;font-weight:700;color:var(--txt)">💳 '+c.bank_name+(c.card_name?' · '+c.card_name:'')+'</div>'
-        +'<div style="font-size:.9rem;font-weight:800;color:var(--g)">₺'+avail.toLocaleString('tr-TR')+'</div>'
-        +'</div>'
-        +'<div style="background:var(--bg);border-radius:4px;height:6px;overflow:hidden;margin-bottom:6px">'
-        +'<div style="width:'+pct+'%;height:100%;background:'+barColor+';border-radius:4px;transition:width .5s"></div>'
-        +'</div>'
-        +'<div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--txt2)">'
-        +'<span>Kullanılan: ₺'+Math.round(c.used_).toLocaleString('tr-TR')+'</span>'
-        +'<span>Limit: ₺'+Math.round(c.limit_).toLocaleString('tr-TR')+'</span>'
-        +'</div>'
-        +'</div>';
-    }).join('');
+  // Tüm kart tipleri — limiti olan hepsi
+  var cards=(_allCards||[]).filter(function(c){ return parseFloat(c.limit_||0)>0; });
+  if(!cards.length){
+    list.innerHTML='<div style="text-align:center;padding:20px;color:var(--txt2);font-size:.86rem">Limiti tanımlı kart yok.</div>';
+    m.style.display='flex'; return;
   }
+  // Tipe göre sırala: kredi → banka → yemek → hediye
+  var typeOrder={kredi:0,banka:1,yemek:2,hediye:3};
+  cards.sort(function(a,b){ return (typeOrder[a.card_type]||9)-(typeOrder[b.card_type]||9)||a.bank_name.localeCompare(b.bank_name); });
+  var totalAvail=0, totalLimit=0;
+  cards.forEach(function(c){ totalAvail+=Math.max(0,parseFloat(c.limit_)-parseFloat(c.used_||0)); totalLimit+=parseFloat(c.limit_); });
+  var _ico={kredi:'💳',banka:'🏧',yemek:'🍽️',hediye:'🎁'};
+  var topHtml='<div style="background:var(--bg3);border-radius:14px;padding:14px 16px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">'
+    +'<div><div style="font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt2);margin-bottom:2px">Toplam Kullanılabilir</div>'
+    +'<div style="font-size:1.1rem;font-weight:900;color:var(--g)">'+fmt(totalAvail)+'</div></div>'
+    +'<div style="text-align:right"><div style="font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:var(--txt2);margin-bottom:2px">Toplam Limit</div>'
+    +'<div style="font-size:.9rem;font-weight:700;color:var(--b2)">'+fmt(totalLimit)+'</div></div>'
+    +'</div>';
+  list.innerHTML=topHtml+cards.map(function(c){
+    var lim=parseFloat(c.limit_||0);
+    var used=parseFloat(c.used_||0);
+    var avail=Math.max(0,lim-used);
+    var pct=lim>0?Math.min(100,Math.round(used/lim*100)):0;
+    var barColor=pct>80?'var(--r)':pct>50?'var(--y)':'var(--g)';
+    var ico=_ico[c.card_type]||'💳';
+    var unavail=avail<=0;
+    return '<div style="background:var(--bg3);border-radius:14px;padding:14px 16px">'
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'
+      +_bankLogo(c.bank_name)
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:.86rem;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+ico+' '+c.bank_name+(c.card_name?' · '+c.card_name:'')+'</div>'
+      +'<div style="font-size:.65rem;color:var(--txt2)">'+({kredi:'Kredi Kartı',banka:'Banka Kartı',yemek:'Yemek Kartı',hediye:'Hediye Kartı'}[c.card_type]||'Kart')+'</div>'
+      +'</div>'
+      +'<div style="font-size:.95rem;font-weight:900;color:'+(unavail?'var(--r)':'var(--g)')+'">'+fmt(avail)+'</div>'
+      +'</div>'
+      +'<div style="background:var(--bg);border-radius:4px;height:6px;overflow:hidden;margin-bottom:6px">'
+      +'<div style="width:'+pct+'%;height:100%;background:'+barColor+';border-radius:4px;transition:width .6s"></div>'
+      +'</div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--txt2)">'
+      +'<span>Kullanılan: <b style="color:var(--r)">'+fmt(used)+'</b></span>'
+      +'<span>Limit: <b style="color:var(--b2)">'+fmt(lim)+'</b></span>'
+      +'<span style="color:'+(unavail?'var(--r)':pct>80?'var(--y)':'var(--g)')+'"><b>%'+pct+'</b> dolu</span>'
+      +'</div>'
+      +'</div>';
+  }).join('');
   m.style.display='flex';
 }
 function closeAvailLimitModal(){ var m=document.getElementById('avail-limit-modal'); if(m) m.style.display='none'; }
@@ -7510,10 +7531,10 @@ function closeAvailLimitModal(){ var m=document.getElementById('avail-limit-moda
 <div id="avail-limit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeAvailLimitModal()">
   <div style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:28px 24px 40px;border-top:1px solid var(--border)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-      <div style="font-size:1rem;font-weight:800;color:var(--txt)">🟢 Kullanılabilir Limitler</div>
+      <div style="font-size:1rem;font-weight:800;color:var(--txt)">💳 Kart Kullanılabilir Limitler</div>
       <button onclick="closeAvailLimitModal()" style="width:32px;height:32px;border-radius:50%;border:1px solid var(--border2);background:var(--bg3);color:var(--txt2);cursor:pointer">✕</button>
     </div>
-    <div id="avail-limit-list" style="display:flex;flex-direction:column;gap:10px"></div>
+    <div id="avail-limit-list" style="display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch"></div>
   </div>
 </div>
 
