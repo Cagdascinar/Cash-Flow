@@ -2267,27 +2267,48 @@ def telegram_webhook():
         db = pg_connect()
         try:
             if cdata.startswith("confirm:"):
-                pid_pending = int(cdata.split(":")[1])
+                parts = cdata.split(":")
+                pid_pending = int(parts[1])
+                card_id = int(parts[3]) if len(parts) >= 4 and parts[2] == "c" else None
                 row = db.execute(
                     "SELECT * FROM telegram_pending WHERE id=%s AND tg_user_id=%s",
                     (pid_pending, tg_uid)
                 ).fetchone()
                 if row:
+                    # Kart bilgisini önceden al (display için)
+                    card_info = None
+                    if card_id:
+                        card_info = db.execute(
+                            "SELECT bank_name,card_name FROM cards WHERE id=%s AND profile_id=%s",
+                            (card_id, row["profile_id"])
+                        ).fetchone()
+                        if not card_info: card_id = None  # güvenlik: başka profil
                     tx_date_val = row.get("tx_date") or date.today().isoformat()
                     db.execute(
-                        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,card_id,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                         (row["user_id"], row["profile_id"], row["type"], row["amount"],
                          row["category"], row["description"], tx_date_val,
-                         datetime.now().isoformat())
+                         card_id, datetime.now().isoformat())
                     )
+                    if card_id:
+                        if row["type"] == "gider":
+                            db.execute("UPDATE cards SET used_=used_+%s WHERE id=%s", (row["amount"], card_id))
+                        else:
+                            db.execute("UPDATE cards SET used_=GREATEST(0,used_-%s) WHERE id=%s", (row["amount"], card_id))
                     db.execute("DELETE FROM telegram_pending WHERE id=%s", (pid_pending,))
                     db.commit()
                     icon = "📈" if row["type"] == "gelir" else "📉"
+                    pay_str = ""
+                    if card_info:
+                        pay_str = f"\n💳 Kart: {card_info['bank_name']}" + (f" {card_info['card_name']}" if card_info.get("card_name") else "")
+                    else:
+                        pay_str = "\n💵 Nakit"
                     tg_edit_msg(chat_id, msg_id,
                         f"{icon} <b>Kaydedildi!</b>\n\n"
                         f"{'Gelir' if row['type']=='gelir' else 'Gider'}: <b>₺{row['amount']:,.2f}</b>\n"
                         f"Kategori: {row['category']}\n"
                         f"Not: {row['description']}"
+                        + pay_str
                     )
                     tg_answer_cb(cb_id, "✅ Kaydedildi!")
                 else:
@@ -2657,17 +2678,43 @@ def telegram_webhook():
 
         icon = "📈" if parsed["type"] == "gelir" else "📉"
         date_str = f" ({tx_date.strftime('%d.%m')})" if tx_date != date.today() else ""
+
+        # Gider ise kartları göster
+        keyboard_rows = []
+        if parsed["type"] == "gider":
+            all_cards = db.execute(
+                "SELECT id,bank_name,card_name,card_type,used_,limit_ FROM cards WHERE profile_id=%s ORDER BY bank_name",
+                (pid,)
+            ).fetchall()
+            is_yemek = "yemek" in parsed["category"].lower()
+            relevant = [c for c in all_cards if c["card_type"] in ("yemek","kredi") if is_yemek or c["card_type"]=="kredi"]
+            if not relevant:
+                relevant = [c for c in all_cards if c["card_type"] in ("kredi","yemek","banka")]
+            row = []
+            for c in relevant[:6]:
+                ico = "🍽️" if c["card_type"]=="yemek" else "💳"
+                lbl = f"{ico} {c['bank_name']}"
+                if c.get("card_name"): lbl += f" {c['card_name']}"
+                if c["limit_"]:
+                    avail = round(float(c["limit_"])-float(c["used_"] or 0),2)
+                    lbl += f" ·{_tg_fmt_amount(avail)}"
+                if len(lbl) > 28: lbl = lbl[:27]+"…"
+                row.append({"text": lbl, "callback_data": f"confirm:{pending_id}:c:{c['id']}"})
+                if len(row) == 2:
+                    keyboard_rows.append(row); row = []
+            if row: keyboard_rows.append(row)
+
+        keyboard_rows.append([
+            {"text": "💵 Nakit Kaydet", "callback_data": f"confirm:{pending_id}"},
+            {"text": "❌  İptal",       "callback_data": f"cancel:{pending_id}"}
+        ])
+
         tg_send(chat_id,
             f"{icon} <b>{'Gelir' if parsed['type']=='gelir' else 'Gider'}: {_tg_fmt_amount(parsed['amount'])}</b>{date_str}\n"
             f"📂 Kategori: {parsed['category']}\n"
             f"📝 Not: {parsed['description']}\n\n"
-            f"Kayıt edilsin mi?",
-            reply_markup={
-                "inline_keyboard": [[
-                    {"text": "✅  Evet, kaydet", "callback_data": f"confirm:{pending_id}"},
-                    {"text": "❌  Hayır",        "callback_data": f"cancel:{pending_id}"}
-                ]]
-            }
+            + ("💳 Kartla kaydet ya da nakit seç:" if parsed["type"]=="gider" else "Kayıt edilsin mi?"),
+            reply_markup={"inline_keyboard": keyboard_rows}
         )
     except Exception as e:
         log.error("Telegram webhook error: %s", e)
