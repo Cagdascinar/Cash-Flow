@@ -4628,7 +4628,7 @@ function loadTodayWidgets(){
               '<div class="cc-nums">'+
                 '<span>Limit: <strong style="color:var(--b2)">'+fmt(c.limit)+'</strong></span>'+
                 '<span>Borç: <strong style="color:var(--r)">'+fmt(c.used)+'</strong></span>'+
-                '<span>Kullanılabilir: <strong style="color:'+(c.avail<0?'var(--r)':'var(--g)')+'">'+fmt(c.avail)+'</strong></span>'+
+                (c.avail!=null?'<span>Kullanılabilir: <strong style="color:'+(c.avail<0?'var(--r)':'var(--g)')+'">'+fmt(c.avail)+'</strong></span>':'')+
                 (minPay>0?'<span style="color:var(--y)">Asgari: '+fmt(minPay)+'</span>':'')+
               '</div>'+
             '</div>';

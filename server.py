@@ -4418,10 +4418,13 @@ def today_summary():
     card_list = []
     total_limit = total_used = 0
     for c in cards:
-        lim  = c["limit_"] or 0
-        used = c["used_"]  or 0
-        avail= lim - used
-        total_limit += lim; total_used += used
+        lim  = float(c["limit_"] or 0)
+        used = float(c["used_"]  or 0)
+        avail = round(lim - used, 2) if lim > 0 else None
+        # Sadece limiti tanımlı kartlar toplama dahil edilir
+        if lim > 0:
+            total_limit += lim
+            total_used  += min(used, lim)  # limitin üstüne çıkamazız
         card_list.append({
             "id":        c["id"],
             "bank":      c["bank_name"],
