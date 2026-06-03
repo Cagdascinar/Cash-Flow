@@ -2533,7 +2533,7 @@ def telegram_webhook():
             if not accs:
                 tg_send(chat_id, "🏦 Kayıtlı hesap yok.")
             else:
-                _ACC_ICO_TG = {"vadesiz":"🏦","tasarruf":"💰","kredi_karti":"💳","kmh":"🔄","konut_kredisi":"🏠","arac_kredisi":"🚗","ihtiyac_kredisi":"💼","diger":"📋"}
+                _ACC_ICO_TG = {"vadesiz":"🏦","tasarruf":"📅","vadeli":"📅","kredi_karti":"💳","kmh":"🔄","konut_kredisi":"🏠","arac_kredisi":"🚗","ihtiyac_kredisi":"💼","diger":"📋"}
                 lines = ["🏦 <b>Hesaplarım</b>\n"]
                 for a in accs:
                     ico = _ACC_ICO_TG.get(a["type"],"🏦")

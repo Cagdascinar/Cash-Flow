@@ -1098,7 +1098,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .cc-item-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
 .cc-item-logo{display:flex;align-items:center;gap:10px}
 .cc-item-logo-info{min-width:0;flex:1}
-.bank-logo-badge{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;letter-spacing:-.01em;font-family:system-ui,sans-serif}
+.bank-logo-badge{width:38px;height:38px;border-radius:10px;flex-shrink:0;display:block;object-fit:cover}
 .cc-bank{font-size:.85rem;font-weight:700;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cc-pct-badge{font-size:.66rem;font-weight:700;padding:3px 9px;border-radius:8px;flex-shrink:0}
 .cc-pct-badge.ok{background:#34c75914;color:var(--g);border:1px solid #34c75928}
@@ -2244,7 +2244,7 @@ body{top:0!important}
 <!-- HESAPLAR (Banka Ürünleri) -->
 <div class="page" id="page-hesaplar">
   <div class="page-title">Kartlar & Hesaplar</div>
-  <div class="page-sub">Kredi kartı, KMH, vadesiz, tasarruf — ekle ve masraf eklerken ödeme yöntemi olarak seç</div>
+  <div class="page-sub">Banka hesapları ve kartların — limit, bakiye, borç takibi</div>
 
   <div class="grid2">
     <!-- ADD FORM -->
@@ -2256,12 +2256,8 @@ body{top:0!important}
         <label>Tür</label>
         <div class="acc-type-chips">
           <button type="button" class="acc-type-chip active" data-type="vadesiz" onclick="selectAccType(this)">🏦 Vadesiz</button>
-          <button type="button" class="acc-type-chip" data-type="tasarruf" onclick="selectAccType(this)">💰 Tasarruf</button>
+          <button type="button" class="acc-type-chip" data-type="vadeli" onclick="selectAccType(this)">📅 Vadeli</button>
           <button type="button" class="acc-type-chip" data-type="kmh" onclick="selectAccType(this)">🔄 KMH</button>
-          <button type="button" class="acc-type-chip" data-type="konut_kredisi" onclick="selectAccType(this)">🏠 Konut Kredisi</button>
-          <button type="button" class="acc-type-chip" data-type="arac_kredisi" onclick="selectAccType(this)">🚗 Araç Kredisi</button>
-          <button type="button" class="acc-type-chip" data-type="ihtiyac_kredisi" onclick="selectAccType(this)">💼 İhtiyaç Kredisi</button>
-          <button type="button" class="acc-type-chip" data-type="diger" onclick="selectAccType(this)">📋 Diğer</button>
         </div>
         <div id="acc-kmh-hint" style="display:none;margin-top:8px;padding:7px 10px;background:rgba(99,102,241,.08);border-radius:8px;font-size:.72rem;color:var(--txt2)">
           🔄 KMH: Vadesiz hesabınıza bağlı eksi bakiye (overdraft) limitidir. Limit alanına maksimum eksi bakiye tutarını girin.
@@ -3274,42 +3270,47 @@ function _cardName(id){ var c=_allCards.find(function(x){return x.id==id}); retu
 function _accName(id){ var a=_allAccounts.find(function(x){return x.id==id}); return a?((a.bank?a.bank+' · ':'')+a.name):''; }
 function _cardIco(id){ var c=_allCards.find(function(x){return x.id==id}); var t=c&&c.card_type; return t==='yemek'?'🍽️':t==='banka'?'🏧':t==='hediye'?'🎁':'💳'; }
 function _cardType(id){ var c=_allCards.find(function(x){return x.id==id}); return (c&&c.card_type)||'kredi'; }
-function _blFallback(img,bg,txt){var p=img.parentElement;p.style.background=bg;p.style.display='flex';p.style.alignItems='center';p.style.justifyContent='center';p.innerHTML='<span style="color:#fff;font-weight:800;font-size:.78rem">'+txt+'</span>';}
 function _bankLogo(name){
   var info={
-    'Garanti BBVA':  {c:'#009A44',t:'G',  d:'garantibbva.com.tr'},
-    'İş Bankası':    {c:'#003087',t:'İŞ', d:'isbank.com.tr'},
-    'Akbank':        {c:'#E30613',t:'A',  d:'akbank.com'},
-    'Yapı Kredi':    {c:'#003087',t:'YK', d:'yapikredi.com.tr'},
-    'Ziraat Bankası':{c:'#C8102E',t:'Z',  d:'ziraatbank.com.tr'},
-    'Halkbank':      {c:'#0072CE',t:'H',  d:'halkbank.com.tr'},
-    'Vakıfbank':     {c:'#F5A623',t:'V',  d:'vakifbank.com.tr'},
-    'QNB Finansbank':{c:'#6F2D8E',t:'Q',  d:'qnbfinansbank.com'},
-    'Denizbank':     {c:'#00A3E0',t:'D',  d:'denizbank.com'},
-    'ING':           {c:'#FF6200',t:'ING',d:'ingbank.com.tr'},
-    'TEB':           {c:'#003087',t:'TEB',d:'teb.com.tr'},
-    'HSBC':          {c:'#DB0011',t:'H',  d:'hsbc.com.tr'},
-    'Multinet':      {c:'#F7941D',t:'M',  d:'multinetup.com'},
-    'Edenred':       {c:'#E30613',t:'E',  d:'edenred.com.tr'},
-    'Ticket Restaurant':{c:'#E30613',t:'TR',d:'ticket.com.tr'},
-    'Sodexo':        {c:'#012169',t:'S',  d:'sodexo.com.tr'},
-    'Pluxee':        {c:'#7B2D8B',t:'PL', d:'pluxee.com'},
-    'Paye':          {c:'#1DA462',t:'P',  d:'paye.com.tr'},
-    'Enpara':        {c:'#00A859',t:'EN', d:'enpara.com'},
-    'Papara':        {c:'#6F2D8E',t:'PP', d:'papara.com'},
-    'Param':         {c:'#00B050',t:'PR', d:'param.com.tr'},
-    'Tosla':         {c:'#FF5C35',t:'T',  d:'tosla.com'},
-    'Ininal':        {c:'#0081FF',t:'IN', d:'ininal.com'}
+    'Garanti BBVA':     {c:'#009A44',t:'G',  r:10},
+    'İş Bankası':       {c:'#003087',t:'İŞ', r:10},
+    'Akbank':           {c:'#E30613',t:'A',  r:10},
+    'Yapı Kredi':       {c:'#003087',t:'YK', r:10},
+    'Ziraat Bankası':   {c:'#C8102E',t:'Z',  r:10},
+    'Halkbank':         {c:'#0072CE',t:'H',  r:10},
+    'Vakıfbank':        {c:'#F5A623',t:'V',  r:10},
+    'QNB Finansbank':   {c:'#6F2D8E',t:'QNB',r:10},
+    'Denizbank':        {c:'#00A3E0',t:'D',  r:10},
+    'ING':              {c:'#FF6200',t:'ING',r:10},
+    'TEB':              {c:'#003087',t:'TEB',r:10},
+    'HSBC':             {c:'#DB0011',t:'H',  r:6},
+    'Multinet':         {c:'#F7941D',t:'M',  r:10},
+    'Edenred':          {c:'#E30613',t:'E',  r:10},
+    'Ticket Restaurant':{c:'#E30613',t:'TR', r:10},
+    'Sodexo':           {c:'#012169',t:'S',  r:10},
+    'Pluxee':           {c:'#7B2D8B',t:'PL', r:10},
+    'Paye':             {c:'#1DA462',t:'P',  r:19},
+    'Enpara':           {c:'#00A859',t:'EN', r:10},
+    'Papara':           {c:'#6F2D8E',t:'PP', r:10},
+    'Param':            {c:'#00B050',t:'PR', r:10},
+    'Tosla':            {c:'#FF5C35',t:'T',  r:19},
+    'Ininal':           {c:'#0081FF',t:'IN', r:10},
+    'Albaraka Türk':    {c:'#006D3B',t:'AL', r:10},
+    'Kuveyt Türk':      {c:'#009B77',t:'KT', r:10},
+    'Türkiye Finans':   {c:'#00305E',t:'TF', r:10},
+    'Odeabank':         {c:'#1D3557',t:'O',  r:10},
+    'Şekerbank':        {c:'#E63946',t:'ŞK', r:10},
+    'Fibabanka':        {c:'#9C27B0',t:'F',  r:10},
+    'Wise':             {c:'#9FE870',t:'W',  r:10},
+    'Paycell':          {c:'#0055A5',t:'PC', r:10},
+    'Revolut':          {c:'#191C1F',t:'R',  r:10}
   };
   var b=info[name];
-  if(!b){var ab=(name||'?').trim().split(/\s+/);var t=ab.length>=2?ab[0][0]+ab[1][0]:name.substring(0,2);b={c:'#8E8E93',t:t.toUpperCase()};}
-  if(b.d){
-    return '<div class="bank-logo-badge" style="background:#f0f0f0;overflow:hidden;padding:3px">'+
-      '<img src="https://www.google.com/s2/favicons?domain='+b.d+'&sz=64" width="32" height="32" style="object-fit:contain;border-radius:6px" '+
-      'onerror="_blFallback(this,\''+b.c+'\',\''+b.t+'\')" /></div>';
-  }
-  var fs=b.t.length<=2?'.78rem':b.t.length===3?'.65rem':'.55rem';
-  return '<div class="bank-logo-badge" style="background:'+b.c+'"><span style="color:#fff;font-size:'+fs+'">'+b.t+'</span></div>';
+  if(!b){var ws=(name||'?').trim().split(/\s+/);var tx=ws.length>=2?ws[0][0]+ws[1][0]:(name||'?').substring(0,2);b={c:'#8E8E93',t:tx.toUpperCase(),r:10};}
+  var fs=b.t.length<=2?18:b.t.length===3?13:10;
+  var yt=b.t.length<=2?25:24;
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 38 38"><rect width="38" height="38" rx="'+b.r+'" fill="'+b.c+'"/><text x="19" y="'+yt+'" font-size="'+fs+'" font-weight="900" fill="white" text-anchor="middle" dominant-baseline="middle" font-family="\'Arial Black\',Arial,sans-serif">'+b.t+'</text></svg>';
+  return '<img class="bank-logo-badge" src="data:image/svg+xml,'+encodeURIComponent(svg)+'" width="38" height="38" alt="'+name+'">';
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
@@ -4423,8 +4424,8 @@ function loadTodayWidgets(){
         co.innerHTML='<div class="empty-cc">💳 Kart veya hesap eklenmemiş<br><span style="font-size:.75rem;color:var(--txt2)">Kartlarım veya Hesaplar sayfasından ekleyebilirsiniz</span></div>';
       } else {
         var _cico={'kredi':'💳','banka':'🏧','yemek':'🍽️','hediye':'🎁'};
-        var _aico={'vadesiz':'🏦','tasarruf':'💰','kredi_karti':'💳','kmh':'🔄','konut_kredisi':'🏠','arac_kredisi':'🚗','ihtiyac_kredisi':'💼','diger':'📋'};
-        var _aname={'vadesiz':'Vadesiz','tasarruf':'Tasarruf','kredi_karti':'Kredi Kartı','kmh':'KMH','konut_kredisi':'Konut Kredisi','arac_kredisi':'Araç Kredisi','ihtiyac_kredisi':'İhtiyaç Kredisi','diger':'Diğer'};
+        var _aico={'vadesiz':'🏦','tasarruf':'📅','vadeli':'📅','kredi_karti':'💳','kmh':'🔄','konut_kredisi':'🏠','arac_kredisi':'🚗','ihtiyac_kredisi':'💼','diger':'📋'};
+        var _aname={'vadesiz':'Vadesiz','tasarruf':'Vadeli','vadeli':'Vadeli','kredi_karti':'Kredi Kartı','kmh':'KMH','konut_kredisi':'Konut Kredisi','arac_kredisi':'Araç Kredisi','ihtiyac_kredisi':'İhtiyaç Kredisi','diger':'Diğer'};
         var html='';
         // Toplam özet: Limit > Kullanılan > Kullanılabilir
         html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">'+
@@ -5066,7 +5067,7 @@ function selectAccType(btn){
   document.querySelectorAll('.acc-type-chip').forEach(function(b){b.classList.remove('active')});
   btn.classList.add('active');
   _accType=btn.getAttribute('data-type');
-  var isDebt=(_accType==='kmh'||_accType==='konut_kredisi'||_accType==='arac_kredisi'||_accType==='ihtiyac_kredisi');
+  var isDebt=(_accType==='kmh');
   var isKmh=(_accType==='kmh');
   var lbl=document.getElementById('acc-bal-lbl');
   var limitCol=document.getElementById('acc-limit-col');
@@ -5156,8 +5157,8 @@ function deleteAccount(id){
   },false,true);
 }
 
-var _ACC_LABELS={kredi_karti:'Kredi Kartı',kmh:'KMH',vadesiz:'Vadesiz',tasarruf:'Tasarruf',diger:'Diğer'};
-var _ACC_ICONS={kredi_karti:'💳',kmh:'🔄',vadesiz:'🏦',tasarruf:'💰',diger:'📋'};
+var _ACC_LABELS={kredi_karti:'Kredi Kartı',kmh:'KMH',vadesiz:'Vadesiz',tasarruf:'Vadeli',vadeli:'Vadeli',konut_kredisi:'Konut Kredisi',arac_kredisi:'Araç Kredisi',ihtiyac_kredisi:'İhtiyaç Kredisi',diger:'Diğer'};
+var _ACC_ICONS={kredi_karti:'💳',kmh:'🔄',vadesiz:'🏦',tasarruf:'📅',vadeli:'📅',konut_kredisi:'🏠',arac_kredisi:'🚗',ihtiyac_kredisi:'💼',diger:'📋'};
 
 function loadAccounts(){
   xhr('/api/accounts',null,function(list){
@@ -5180,7 +5181,7 @@ function loadAccounts(){
       var tagColor=isCard?'var(--r)':'var(--g)';
       html+='<div class="acc-list-item" style="border-left:4px solid '+a.color+'">';
       html+='<div class="acc-list-top">';
-      html+='<div class="acc-list-dot" style="background:'+a.color+'">'+icon+'</div>';
+      html+=_bankLogo(a.bank);
       html+='<div class="acc-list-info">';
       html+='<div class="acc-list-bank">'+a.bank+'</div>';
       html+='<div class="acc-list-name">'+a.name+'</div>';
@@ -5222,10 +5223,9 @@ function _buildAccDropdown(sel, list, prev){
   sel.innerHTML='<option value="">— Hesap Belirtme —</option>';
   var accGroups=[
     {types:['vadesiz'],           label:'🏦 Vadesiz Hesaplar'},
-    {types:['tasarruf'],          label:'💰 Tasarruf Hesapları'},
+    {types:['tasarruf','vadeli'], label:'📅 Vadeli Hesaplar'},
     {types:['kmh','kredi_karti'], label:'🔄 KMH / Kredi Hesapları'},
-    {types:['konut_kredisi','arac_kredisi','ihtiyac_kredisi'], label:'💼 Kredi Hesapları'},
-    {types:['diger'],             label:'📋 Diğer Hesaplar'},
+    {types:['konut_kredisi','arac_kredisi','ihtiyac_kredisi','diger'], label:'💼 Diğer'},
   ];
   accGroups.forEach(function(g){
     var inGrp=(list||[]).filter(function(a){return g.types.indexOf(a.type||'vadesiz')!==-1;});
@@ -5234,7 +5234,9 @@ function _buildAccDropdown(sel, list, prev){
     inGrp.forEach(function(a){
       var opt=document.createElement('option');
       opt.value=a.id;
-      opt.textContent=(a.bank?a.bank+' · ':'')+a.name;
+      var bal=a.computed_balance||a.initial_balance||0;
+      var balStr=bal!==0?' — '+fmt(bal):'';
+      opt.textContent=(a.bank?a.bank+' · ':'')+a.name+balStr;
       grp.appendChild(opt);
     });
     sel.appendChild(grp);
