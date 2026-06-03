@@ -379,11 +379,6 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 }
 .page.active{
   display:block;
-  animation:page-in .28s cubic-bezier(.25,.46,.45,.94) forwards;
-}
-@keyframes page-in{
-  from{opacity:0;transform:translateY(14px) scale(.99)}
-  to{opacity:1;transform:translateY(0) scale(1)}
 }
 .page.slide-back{transform:translateX(-12px);opacity:0}
 /* Dil butonu */
@@ -1128,7 +1123,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   from{opacity:0;transform:translateY(12px)}
   to{opacity:1;transform:translateY(0)}
 }
-.page.active{animation:page-in .22s ease-out}
+.page.active{animation:page-in .22s ease-out forwards}
 
 /* ── TAP FEEDBACK ────────────────────────────────────────────── */
 .tappable{cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s,opacity .12s;touch-action:manipulation}
