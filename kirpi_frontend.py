@@ -155,8 +155,10 @@ body{position:relative;overflow-x:hidden}
   --font:'Inter',system-ui,sans-serif;
 }
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-body{background:var(--bg);color:var(--txt);font-family:var(--font);min-height:100vh;overflow-x:hidden;
-  overscroll-behavior:none;-webkit-overflow-scrolling:touch;
+html{height:auto;overflow-y:auto}
+body{background:var(--bg);color:var(--txt);font-family:var(--font);min-height:100vh;
+  overflow-x:hidden;overflow-y:auto;height:auto;
+  overscroll-behavior-x:none;-webkit-overflow-scrolling:touch;touch-action:pan-y;
   -webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:text}
 
@@ -374,8 +376,8 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 .main{display:flex;flex-direction:column}
 .page{
   display:none;padding:20px 28px;max-width:1280px;
-  will-change:opacity,transform;
   opacity:0;transform:translateY(14px) scale(.99);
+  touch-action:pan-y;
 }
 .page.active{
   display:block;
@@ -1705,7 +1707,7 @@ body{top:0!important}
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
         <div style="color:var(--txt2)">💳 Kart borcu: <span id="ins-kart-borcu" style="font-weight:700;color:var(--r)">—</span></div>
         <div style="color:var(--txt2)">Asgari ödeme: <span id="ins-kart-asgari" style="font-weight:700;color:var(--y)">—</span></div>
-        <div style="color:var(--txt2)">Kullanılabilir limit: <span id="ins-kart-limit" style="font-weight:700;color:var(--g)">—</span></div>
+        <div onclick="showAvailableLimitModal()" style="color:var(--txt2);cursor:pointer">🟢 Kullanılabilir limit: <span id="ins-kart-limit" style="font-weight:700;color:var(--g)">—</span> <span style="font-size:.65rem;opacity:.6">›</span></div>
         <button onclick="goPage('hesaplar',document.querySelector('[data-page=hesaplar]'))" style="background:var(--b);color:#fff;border:none;border-radius:8px;padding:4px 12px;font-size:.72rem;cursor:pointer;font-weight:600">Ödeme Yap →</button>
       </div>
     </div>
@@ -6937,6 +6939,38 @@ function showLiquidityDetail(){
   m.style.display='flex';
 }
 function closeLiquidityDetail(){ var m=document.getElementById('liquidity-detail-modal'); if(m) m.style.display='none'; }
+
+function showAvailableLimitModal(){
+  var m=document.getElementById('avail-limit-modal');
+  var list=document.getElementById('avail-limit-list');
+  if(!m||!list) return;
+  var cards=_allCards||[];
+  var available=cards.filter(function(c){ return (c.card_type==='kredi'||c.card_type==='banka')&&c.limit_>0&&(c.limit_-c.used_)>0; });
+  if(!available.length){
+    list.innerHTML='<div style="text-align:center;padding:20px;color:var(--txt2);font-size:.86rem">Kullanılabilir limitli kart yok.</div>';
+  } else {
+    list.innerHTML=available.map(function(c){
+      var avail=Math.round(c.limit_-c.used_);
+      var pct=Math.round((c.used_/c.limit_)*100);
+      var barColor=pct>80?'var(--r)':pct>50?'var(--y)':'var(--g)';
+      return '<div style="background:var(--bg3);border-radius:14px;padding:14px 16px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+        +'<div style="font-size:.86rem;font-weight:700;color:var(--txt)">💳 '+c.bank_name+(c.card_name?' · '+c.card_name:'')+'</div>'
+        +'<div style="font-size:.9rem;font-weight:800;color:var(--g)">₺'+avail.toLocaleString('tr-TR')+'</div>'
+        +'</div>'
+        +'<div style="background:var(--bg);border-radius:4px;height:6px;overflow:hidden;margin-bottom:6px">'
+        +'<div style="width:'+pct+'%;height:100%;background:'+barColor+';border-radius:4px;transition:width .5s"></div>'
+        +'</div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--txt2)">'
+        +'<span>Kullanılan: ₺'+Math.round(c.used_).toLocaleString('tr-TR')+'</span>'
+        +'<span>Limit: ₺'+Math.round(c.limit_).toLocaleString('tr-TR')+'</span>'
+        +'</div>'
+        +'</div>';
+    }).join('');
+  }
+  m.style.display='flex';
+}
+function closeAvailLimitModal(){ var m=document.getElementById('avail-limit-modal'); if(m) m.style.display='none'; }
 </script>
 
 <!-- KART ÖDEME MODALI -->
@@ -7116,6 +7150,17 @@ function closeLiquidityDetail(){ var m=document.getElementById('liquidity-detail
     <div style="margin-top:16px;padding:12px 14px;background:var(--bg3);border-radius:10px;font-size:.76rem;color:var(--txt2);line-height:1.6">
       💡 Hesap bakiyesi = Hesapların başlangıç bakiyesi + Bugüne kadar kaydedilen gelir/gider işlemleri
     </div>
+  </div>
+</div>
+
+<!-- KULLANILABİLİR LİMİT MODALI -->
+<div id="avail-limit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeAvailLimitModal()">
+  <div style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:28px 24px 40px;border-top:1px solid var(--border)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div style="font-size:1rem;font-weight:800;color:var(--txt)">🟢 Kullanılabilir Limitler</div>
+      <button onclick="closeAvailLimitModal()" style="width:32px;height:32px;border-radius:50%;border:1px solid var(--border2);background:var(--bg3);color:var(--txt2);cursor:pointer">✕</button>
+    </div>
+    <div id="avail-limit-list" style="display:flex;flex-direction:column;gap:10px"></div>
   </div>
 </div>
 
