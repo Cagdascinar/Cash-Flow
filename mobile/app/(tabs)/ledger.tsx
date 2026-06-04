@@ -4,32 +4,27 @@ import {
 } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors } from '../../constants/Colors';
+import { C, money } from '../../constants/Colors';
 import { transactions } from '../../services/api';
-import { TransactionItem } from '../../components/TransactionItem';
+import { TransactionItem, type Tx } from '../../components/TransactionItem';
 
 type Filter = 'hepsi' | 'gelir' | 'gider';
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: 'hepsi', label: 'Hepsi' },
-  { key: 'gelir', label: 'Gelir' },
-  { key: 'gider', label: 'Gider' },
-];
 
 export default function LedgerScreen() {
-  const [all,        setAll]        = useState<any[]>([]);
-  const [filtered,   setFiltered]   = useState<any[]>([]);
-  const [search,     setSearch]     = useState('');
-  const [filter,     setFilter]     = useState<Filter>('hepsi');
-  const [loading,    setLoading]    = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [all,        setAll]     = useState<Tx[]>([]);
+  const [filtered,   setFilt]    = useState<Tx[]>([]);
+  const [search,     setSearch]  = useState('');
+  const [filter,     setFilter]  = useState<Filter>('hepsi');
+  const [loading,    setLoad]    = useState(true);
+  const [refreshing, setRef]     = useState(false);
 
   const load = useCallback(async (pull = false) => {
-    if (pull) setRefreshing(true); else setLoading(true);
+    if (pull) setRef(true); else setLoad(true);
     try {
-      const data = await transactions.list();
-      setAll(Array.isArray(data) ? data : []);
-    } catch {}
-    finally { setLoading(false); setRefreshing(false); }
+      const d = await transactions.list();
+      setAll(Array.isArray(d) ? d as Tx[] : []);
+    } catch { }
+    finally { setLoad(false); setRef(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -40,15 +35,15 @@ export default function LedgerScreen() {
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(t =>
-        t.description?.toLowerCase().includes(q) ||
-        t.category?.toLowerCase().includes(q)
+        t.category?.toLowerCase().includes(q) ||
+        t.description?.toLowerCase().includes(q)
       );
     }
-    setFiltered(list);
+    setFilt(list);
   }, [all, filter, search]);
 
-  async function onDelete(id: number) {
-    Alert.alert('İşlemi Sil', 'Bu işlemi silmek istediğinize emin misiniz?', [
+  async function del(id: number) {
+    Alert.alert('Sil', 'Bu işlemi silmek istiyor musunuz?', [
       { text: 'İptal', style: 'cancel' },
       { text: 'Sil', style: 'destructive', onPress: async () => {
         try { await transactions.delete(id); setAll(p => p.filter(t => t.id !== id)); }
@@ -62,68 +57,45 @@ export default function LedgerScreen() {
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
-      {/* Başlık */}
       <View style={s.header}>
         <Text style={s.title}>İşlemler</Text>
         <Text style={s.count}>{filtered.length} kayıt</Text>
       </View>
 
       {/* Arama */}
-      <View style={s.searchRow}>
+      <View style={s.searchWrap}>
         <View style={s.searchBox}>
-          <Text style={s.searchIco}>🔍</Text>
-          <TextInput
-            style={s.searchInput}
-            placeholder="Ara..."
-            placeholderTextColor={Colors.textMuted}
-            value={search}
-            onChangeText={setSearch}
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')}>
-              <Text style={s.clearBtn}>✕</Text>
-            </TouchableOpacity>
-          )}
+          <Text>🔍</Text>
+          <TextInput style={s.searchInput} placeholder="Ara…" placeholderTextColor={C.muted} value={search} onChangeText={setSearch} />
+          {!!search && <TouchableOpacity onPress={() => setSearch('')}><Text style={{ color: C.muted }}>✕</Text></TouchableOpacity>}
         </View>
       </View>
 
-      {/* Filtre */}
+      {/* Filtre + toplam */}
       <View style={s.filterRow}>
-        {FILTERS.map(f => (
-          <TouchableOpacity
-            key={f.key}
-            style={[s.filterBtn, filter === f.key && s.filterActive]}
-            onPress={() => setFilter(f.key)}
-          >
-            <Text style={[s.filterTxt, filter === f.key && s.filterTxtActive]}>{f.label}</Text>
+        {(['hepsi', 'gelir', 'gider'] as Filter[]).map(f => (
+          <TouchableOpacity key={f} style={[s.fBtn, filter === f && s.fActive]} onPress={() => setFilter(f)}>
+            <Text style={[s.fTxt, filter === f && s.fTxtActive]}>{f === 'hepsi' ? 'Hepsi' : f === 'gelir' ? 'Gelir' : 'Gider'}</Text>
           </TouchableOpacity>
         ))}
-        {filter !== 'hepsi' && (
-          <View style={s.totalBadge}>
-            <Text style={s.totalTxt}>
-              {filter === 'gelir'
-                ? `+₺${totalGelir.toLocaleString('tr-TR')}`
-                : `-₺${totalGider.toLocaleString('tr-TR')}`
-              }
-            </Text>
-          </View>
-        )}
+        {filter === 'gelir' && <Text style={[s.total, { color: C.green }]}>+{money(totalGelir)}</Text>}
+        {filter === 'gider' && <Text style={[s.total, { color: C.red   }]}>-{money(totalGider)}</Text>}
       </View>
 
       {loading
-        ? <View style={s.center}><ActivityIndicator size="large" color={Colors.blue} /></View>
+        ? <View style={s.center}><ActivityIndicator size="large" color={C.blue} /></View>
         : <FlatList
             data={filtered}
-            keyExtractor={item => String(item.id)}
-            renderItem={({ item }) => <TransactionItem item={item} onDelete={onDelete} />}
-            ItemSeparatorComponent={() => <View style={s.sep} />}
+            keyExtractor={i => String(i.id)}
+            renderItem={({ item }) => <TransactionItem item={item} onDelete={del} />}
+            ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: C.border, marginHorizontal: 14 }} />}
             contentContainerStyle={{ paddingBottom: 24 }}
             showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={Colors.blue} />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={C.blue} />}
             ListEmptyComponent={
               <View style={s.empty}>
                 <Text style={s.emptyIco}>{search ? '🔎' : '📭'}</Text>
-                <Text style={s.emptyTxt}>{search ? 'Sonuç bulunamadı' : 'Henüz işlem yok'}</Text>
+                <Text style={s.emptyTxt}>{search ? 'Sonuç yok' : 'Henüz işlem yok'}</Text>
               </View>
             }
           />
@@ -133,25 +105,21 @@ export default function LedgerScreen() {
 }
 
 const s = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: Colors.bg },
-  center:         { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
-  title:          { fontSize: 24, fontWeight: '800', color: Colors.textPrimary },
-  count:          { fontSize: 13, color: Colors.textSecondary },
-  searchRow:      { paddingHorizontal: 16, paddingVertical: 8 },
-  searchBox:      { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bgInput, borderRadius: 12, paddingHorizontal: 12, borderWidth: 1, borderColor: Colors.border, gap: 8 },
-  searchIco:      { fontSize: 16 },
-  searchInput:    { flex: 1, paddingVertical: 12, fontSize: 15, color: Colors.textPrimary },
-  clearBtn:       { fontSize: 14, color: Colors.textMuted, padding: 4 },
-  filterRow:      { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 8, alignItems: 'center' },
-  filterBtn:      { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, backgroundColor: Colors.bgInput, borderWidth: 1, borderColor: Colors.border },
-  filterActive:   { backgroundColor: Colors.blue, borderColor: Colors.blue },
-  filterTxt:      { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
-  filterTxtActive:{ color: Colors.white },
-  totalBadge:     { marginLeft: 'auto' as any, backgroundColor: Colors.bgCard, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: Colors.border },
-  totalTxt:       { fontSize: 13, fontWeight: '700', color: Colors.textPrimary },
-  sep:            { height: 1, backgroundColor: Colors.border, marginHorizontal: 14 },
-  empty:          { alignItems: 'center', paddingVertical: 48 },
-  emptyIco:       { fontSize: 40, marginBottom: 8 },
-  emptyTxt:       { fontSize: 14, color: Colors.textSecondary },
+  container:   { flex: 1, backgroundColor: C.bg },
+  center:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8 },
+  title:       { fontSize: 24, fontWeight: '800', color: C.txt },
+  count:       { fontSize: 13, color: C.txt2 },
+  searchWrap:  { paddingHorizontal: 16, paddingVertical: 10 },
+  searchBox:   { flexDirection: 'row', alignItems: 'center', backgroundColor: C.input, borderRadius: 12, paddingHorizontal: 12, borderWidth: 1, borderColor: C.border, gap: 8 },
+  searchInput: { flex: 1, paddingVertical: 12, fontSize: 15, color: C.txt },
+  filterRow:   { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 8, alignItems: 'center' },
+  fBtn:        { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, backgroundColor: C.input, borderWidth: 1, borderColor: C.border },
+  fActive:     { backgroundColor: C.blue, borderColor: C.blue },
+  fTxt:        { fontSize: 13, fontWeight: '600', color: C.txt2 },
+  fTxtActive:  { color: C.white },
+  total:       { marginLeft: 'auto' as any, fontSize: 14, fontWeight: '800' },
+  empty:       { alignItems: 'center', paddingVertical: 48 },
+  emptyIco:    { fontSize: 40, marginBottom: 8 },
+  emptyTxt:    { fontSize: 14, color: C.txt2 },
 });

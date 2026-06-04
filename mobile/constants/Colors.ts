@@ -1,35 +1,40 @@
-// Web uygulamasıyla birebir eşleştirilmiş renk sistemi
-export const Colors = {
-  // Arka planlar
-  bg:      '#0b0e11',   // --bg
-  bgCard:  '#1e2026',   // --bg2
-  bgInput: '#2b2f36',   // --bg3
-  bgAlt:   '#363c45',   // --bg4
-
-  // Sınırlar
-  border:  '#2b2f36',   // --border
-  border2: '#363c45',   // --border2
-
-  // Ana renkler
-  green:   '#0ecb81',   // --g  (gelir)
-  red:     '#f6465d',   // --r  (gider)
-  yellow:  '#f0b90b',   // --y  (uyarı / kart borcu)
-  blue:    '#007aff',   // iOS mavi (butonlar, linkler)
-  purple:  '#af52de',   // --p
-
-  // Yazı
-  textPrimary:   '#eaecef',  // --txt
-  textSecondary: '#848e9c',  // --txt2
-  textMuted:     '#4b5563',
-
-  // Hero kart degradesi
-  heroBg: ['#050e22', '#0d1f3c', '#1a3a6b', '#0f2244'] as const,
-
-  // Tab bar
-  tabBar: '#131720',
-
-  white: '#ffffff',
-
-  // Kısayollar
-  primary: '#007aff',  // iOS blue = web'deki buton rengi
+export const C = {
+  bg:      '#0b0e11',
+  card:    '#1e2026',
+  input:   '#2b2f36',
+  border:  '#2b2f36',
+  green:   '#0ecb81',
+  red:     '#f6465d',
+  yellow:  '#f0b90b',
+  blue:    '#007aff',
+  txt:     '#eaecef',
+  txt2:    '#848e9c',
+  muted:   '#4b5563',
+  tab:     '#131720',
+  white:   '#ffffff',
+  hero:    '#0d1f3c',
 };
+
+// Para formatla
+export function money(n: number, decimals = 0) {
+  return new Intl.NumberFormat('tr-TR', {
+    style: 'currency', currency: 'TRY',
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(n ?? 0);
+}
+
+// Kısa para
+export function moneyShort(n: number) {
+  if (!n) return '₺0';
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  if (abs >= 1e6) return `${sign}₺${(abs / 1e6).toFixed(1)}M`;
+  if (abs >= 1e3) return `${sign}₺${(abs / 1e3).toFixed(1)}B`;
+  return `${sign}₺${Math.round(abs)}`;
+}
+
+// Tarih
+export function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+}
