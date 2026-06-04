@@ -1,156 +1,139 @@
 import {
   View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, Alert,
+  TouchableOpacity, Alert, ActivityIndicator,
 } from 'react-native';
+import { useState, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
 import { api } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 
-interface MenuItem {
-  icon: string;
-  label: string;
-  sub?: string;
-  onPress: () => void;
-  danger?: boolean;
+interface MenuItemProps {
+  icon: string; label: string; sub?: string;
+  onPress: () => void; danger?: boolean;
 }
 
-function MenuRow({ icon, label, sub, onPress, danger }: MenuItem) {
+function MenuRow({ icon, label, sub, onPress, danger }: MenuItemProps) {
   return (
-    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.rowLeft}>
-        <View style={[styles.iconBox, danger && { backgroundColor: '#2A1018' }]}>
-          <Text style={styles.rowIcon}>{icon}</Text>
+    <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={0.7}>
+      <View style={s.rowLeft}>
+        <View style={[s.iconBox, danger && { backgroundColor: '#2A1018' }]}>
+          <Text style={s.rowIcon}>{icon}</Text>
         </View>
-        <View style={styles.rowText}>
-          <Text style={[styles.rowLabel, danger && { color: Colors.red }]}>{label}</Text>
-          {sub && <Text style={styles.rowSub}>{sub}</Text>}
+        <View>
+          <Text style={[s.rowLabel, danger && { color: Colors.red }]}>{label}</Text>
+          {sub && <Text style={s.rowSub}>{sub}</Text>}
         </View>
       </View>
-      <Text style={styles.chevron}>›</Text>
+      <Text style={s.chevron}>›</Text>
     </TouchableOpacity>
   );
 }
 
 export default function MoreScreen() {
-  const { user, activeProfile, logout } = useAuthStore();
-  const router = useRouter();
+  const { user, logout } = useAuthStore();
+  const [cards, setCards]   = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.cards.list()
+      .then((d: any) => setCards(d.cards ?? d ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   async function handleLogout() {
     Alert.alert('Çıkış', 'Oturumu kapatmak istiyor musunuz?', [
       { text: 'İptal', style: 'cancel' },
       {
-        text: 'Çıkış Yap',
-        style: 'destructive',
-        onPress: async () => {
-          try { await api.auth.logout(); } catch {}
-          logout();
-        },
+        text: 'Çıkış Yap', style: 'destructive',
+        onPress: async () => { await api.auth.logout(); logout(); },
       },
     ]);
   }
 
-  const isPremium = user?.is_premium;
+  const totalDebt  = cards.reduce((s, c) => s + (c.used_ ?? 0), 0);
+  const totalLimit = cards.reduce((s, c) => s + (c.limit_ ?? 0), 0);
+  const fmt = (n: number) =>
+    new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 0 }).format(n);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={s.container} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Daha Fazla</Text>
-        </View>
+        <View style={s.header}><Text style={s.title}>Daha Fazla</Text></View>
 
-        {/* Profile Card */}
-        <View style={styles.profileCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {user?.username?.charAt(0).toUpperCase() ?? '?'}
-            </Text>
+        {/* Profil kartı */}
+        <View style={s.profileCard}>
+          <View style={s.avatar}>
+            <Text style={s.avatarText}>{user?.username?.charAt(0).toUpperCase() ?? '?'}</Text>
           </View>
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{user?.username}</Text>
-            <Text style={styles.profileEmail}>{user?.email}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={s.profileName}>{user?.username}</Text>
+            <Text style={s.profileEmail}>{user?.email}</Text>
           </View>
-          {isPremium && (
-            <View style={styles.premiumBadge}>
-              <Text style={styles.premiumText}>PRO</Text>
-            </View>
+          {user?.is_premium && (
+            <View style={s.proBadge}><Text style={s.proText}>PRO</Text></View>
           )}
         </View>
 
-        {/* Menu Groups */}
-        <Text style={styles.groupLabel}>Finans</Text>
-        <View style={styles.group}>
-          <MenuRow
-            icon="💳" label="Kredi Kartları"
-            sub="Limit ve borç takibi"
-            onPress={() => {}}
-          />
-          <View style={styles.divider} />
-          <MenuRow
-            icon="🏦" label="Hesaplar"
-            sub="Banka hesapları"
-            onPress={() => {}}
-          />
-          <View style={styles.divider} />
-          <MenuRow
-            icon="📈" label="Yatırımlar"
-            sub="Portföy takibi"
-            onPress={() => {}}
-          />
-          <View style={styles.divider} />
-          <MenuRow
-            icon="🔄" label="Tekrarlayan İşlemler"
-            onPress={() => {}}
-          />
+        {/* Kart özeti */}
+        {!loading && cards.length > 0 && (
+          <View style={s.cardSummary}>
+            <View style={s.cardSumItem}>
+              <Text style={s.cardSumVal}>{fmt(totalDebt)}</Text>
+              <Text style={s.cardSumLabel}>Toplam Borç</Text>
+            </View>
+            <View style={s.divV} />
+            <View style={s.cardSumItem}>
+              <Text style={[s.cardSumVal, { color: Colors.green }]}>{fmt(totalLimit - totalDebt)}</Text>
+              <Text style={s.cardSumLabel}>Kullanılabilir</Text>
+            </View>
+            <View style={s.divV} />
+            <View style={s.cardSumItem}>
+              <Text style={s.cardSumVal}>{cards.length}</Text>
+              <Text style={s.cardSumLabel}>Kart</Text>
+            </View>
+          </View>
+        )}
+
+        <Text style={s.groupLabel}>Finans</Text>
+        <View style={s.group}>
+          <MenuRow icon="💳" label="Kredi Kartları" sub={`${cards.length} kart · ${fmt(totalDebt)} borç`}
+            onPress={() => Alert.alert('Yakında', 'Kart detay ekranı yapılıyor')} />
+          <View style={s.sep} />
+          <MenuRow icon="🏦" label="Hesaplar" sub="Banka hesapları"
+            onPress={() => Alert.alert('Yakında', 'Hesap ekranı yapılıyor')} />
+          <View style={s.sep} />
+          <MenuRow icon="📈" label="Yatırımlar" sub="Portföy takibi"
+            onPress={() => Alert.alert('Yakında', 'Yatırım ekranı yapılıyor')} />
+          <View style={s.sep} />
+          <MenuRow icon="🔄" label="Tekrarlayan İşlemler"
+            onPress={() => Alert.alert('Yakında', 'Tekrarlayan işlemler ekranı yapılıyor')} />
         </View>
 
-        <Text style={styles.groupLabel}>Kurumsal</Text>
-        <View style={styles.group}>
-          <MenuRow
-            icon="🏢" label="Tedarikçiler"
-            onPress={() => {}}
-          />
-          <View style={styles.divider} />
-          <MenuRow
-            icon="🏗️" label="Varlıklar"
-            sub="Demirbaş ve araçlar"
-            onPress={() => {}}
-          />
-          <View style={styles.divider} />
-          <MenuRow
-            icon="📄" label="Faturalar"
-            onPress={() => {}}
-          />
+        <Text style={s.groupLabel}>Kurumsal</Text>
+        <View style={s.group}>
+          <MenuRow icon="🏢" label="Tedarikçiler"
+            onPress={() => Alert.alert('Yakında', 'Tedarikçi ekranı yapılıyor')} />
+          <View style={s.sep} />
+          <MenuRow icon="🏗️" label="Varlıklar" sub="Demirbaş ve araçlar"
+            onPress={() => Alert.alert('Yakında', 'Varlık ekranı yapılıyor')} />
+          <View style={s.sep} />
+          <MenuRow icon="📄" label="Faturalar"
+            onPress={() => Alert.alert('Yakında', 'Fatura ekranı yapılıyor')} />
         </View>
 
-        <Text style={styles.groupLabel}>Ayarlar</Text>
-        <View style={styles.group}>
-          <MenuRow
-            icon="👤" label="Profil Yönetimi"
-            sub={`${user?.profiles?.length ?? 0} profil`}
-            onPress={() => {}}
-          />
-          <View style={styles.divider} />
-          <MenuRow
-            icon="🤖" label="Telegram Botu"
-            sub="İşlem girişi için bağla"
-            onPress={() => {}}
-          />
-          <View style={styles.divider} />
-          <MenuRow
-            icon="📤" label="Dışa Aktar"
-            sub="Excel / PDF"
-            onPress={() => {}}
-          />
+        <Text style={s.groupLabel}>Ayarlar</Text>
+        <View style={s.group}>
+          <MenuRow icon="🤖" label="Telegram Botu" sub="İşlem girişi için bağla"
+            onPress={() => Alert.alert('Yakında', 'Telegram bağlantı ekranı yapılıyor')} />
+          <View style={s.sep} />
+          <MenuRow icon="📤" label="Dışa Aktar" sub="Excel / PDF"
+            onPress={() => Alert.alert('Yakında', 'Dışa aktarım yapılıyor')} />
         </View>
 
-        <View style={styles.group}>
-          <MenuRow
-            icon="🚪" label="Çıkış Yap"
-            onPress={handleLogout}
-            danger
-          />
+        <View style={s.group}>
+          <MenuRow icon="🚪" label="Çıkış Yap" onPress={handleLogout} danger />
         </View>
 
         <View style={{ height: 40 }} />
@@ -159,78 +142,46 @@ export default function MoreScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  header: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
+  header: { paddingHorizontal: 16, paddingTop: 8 },
   title: { fontSize: 24, fontWeight: '800', color: Colors.textPrimary },
   profileCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginTop: 16,
-    backgroundColor: Colors.bgCard,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 12,
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 16, marginTop: 16,
+    backgroundColor: Colors.bgCard, borderRadius: 16,
+    padding: 16, borderWidth: 1, borderColor: Colors.border, gap: 12,
   },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 20, fontWeight: '700', color: Colors.white },
-  profileInfo: { flex: 1 },
   profileName: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
   profileEmail: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
-  premiumBadge: {
-    backgroundColor: Colors.primary,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  proBadge: { backgroundColor: Colors.primary, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  proText: { fontSize: 11, fontWeight: '800', color: Colors.white },
+  cardSummary: {
+    flexDirection: 'row', marginHorizontal: 16, marginTop: 12,
+    backgroundColor: Colors.bgCard, borderRadius: 14,
+    borderWidth: 1, borderColor: Colors.border, padding: 16,
   },
-  premiumText: { fontSize: 11, fontWeight: '800', color: Colors.white },
+  cardSumItem: { flex: 1, alignItems: 'center' },
+  cardSumVal: { fontSize: 16, fontWeight: '800', color: Colors.textPrimary },
+  cardSumLabel: { fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
+  divV: { width: 1, backgroundColor: Colors.border },
   groupLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    paddingHorizontal: 16,
-    marginTop: 24,
-    marginBottom: 8,
+    fontSize: 12, fontWeight: '700', color: Colors.textMuted,
+    textTransform: 'uppercase', letterSpacing: 1,
+    paddingHorizontal: 16, marginTop: 24, marginBottom: 8,
   },
   group: {
-    marginHorizontal: 16,
-    backgroundColor: Colors.bgCard,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: 'hidden',
+    marginHorizontal: 16, backgroundColor: Colors.bgCard,
+    borderRadius: 16, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden',
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 14,
-  },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
   rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: Colors.bgInput,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  iconBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.bgInput, alignItems: 'center', justifyContent: 'center' },
   rowIcon: { fontSize: 18 },
-  rowText: { gap: 1 },
   rowLabel: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
   rowSub: { fontSize: 12, color: Colors.textSecondary },
   chevron: { fontSize: 20, color: Colors.textMuted },
-  divider: { height: 1, backgroundColor: Colors.border, marginLeft: 62 },
+  sep: { height: 1, backgroundColor: Colors.border, marginLeft: 62 },
 });

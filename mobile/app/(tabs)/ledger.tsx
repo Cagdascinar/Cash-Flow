@@ -1,13 +1,11 @@
 import {
-  View, Text, FlatList, StyleSheet,
-  TextInput, TouchableOpacity, ActivityIndicator,
-  RefreshControl, Alert,
+  View, Text, FlatList, StyleSheet, TextInput,
+  TouchableOpacity, ActivityIndicator, RefreshControl, Alert,
 } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/Colors';
 import { api } from '../../services/api';
-import { useAuthStore } from '../../stores/authStore';
 import { TransactionItem } from '../../components/TransactionItem';
 
 const FILTERS = [
@@ -17,41 +15,39 @@ const FILTERS = [
 ] as const;
 
 export default function LedgerScreen() {
-  const { activeProfile } = useAuthStore();
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [all, setAll]         = useState<any[]>([]);
   const [filtered, setFiltered] = useState<any[]>([]);
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'hepsi' | 'gelir' | 'gider'>('hepsi');
+  const [search, setSearch]   = useState('');
+  const [filter, setFilter]   = useState<'hepsi' | 'gelir' | 'gider'>('hepsi');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async (showRefresh = false) => {
-    if (!activeProfile) return;
     if (showRefresh) setRefreshing(true); else setLoading(true);
     try {
-      const data = await api.transactions.list(activeProfile.id) as any;
-      setTransactions(data.transactions ?? []);
+      const data = await api.transactions.list();
+      setAll(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.log('ledger error', e);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeProfile]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    let list = transactions;
+    let list = all;
     if (filter !== 'hepsi') list = list.filter((t) => t.type === filter);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
-        (t) =>
-          t.description?.toLowerCase().includes(q) ||
-          t.category?.toLowerCase().includes(q)
+        (t) => t.description?.toLowerCase().includes(q) || t.category?.toLowerCase().includes(q)
       );
     }
     setFiltered(list);
-  }, [transactions, filter, search]);
+  }, [all, filter, search]);
 
   async function handleDelete(id: number) {
     Alert.alert('İşlemi Sil', 'Bu işlemi silmek istediğinize emin misiniz?', [
@@ -61,10 +57,8 @@ export default function LedgerScreen() {
         onPress: async () => {
           try {
             await api.transactions.delete(id);
-            setTransactions((prev) => prev.filter((t) => t.id !== id));
-          } catch (e: any) {
-            Alert.alert('Hata', e.message);
-          }
+            setAll((prev) => prev.filter((t) => t.id !== id));
+          } catch (e: any) { Alert.alert('Hata', e.message); }
         },
       },
     ]);
@@ -72,9 +66,7 @@ export default function LedgerScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={styles.title}>İşlemler</Text>
-      </View>
+      <View style={styles.header}><Text style={styles.title}>İşlemler</Text></View>
 
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>
@@ -104,35 +96,24 @@ export default function LedgerScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-        </View>
+        <View style={styles.center}><ActivityIndicator size="large" color={Colors.primary} /></View>
       ) : (
         <FlatList
           data={filtered}
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => (
-            <TransactionItem
-              item={item}
-              onDelete={handleDelete}
-            />
+            <TransactionItem item={item} onDelete={handleDelete} />
           )}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ItemSeparatorComponent={() => <View style={styles.sep} />}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => load(true)}
-              tintColor={Colors.primary}
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={Colors.primary} />
           }
           ListEmptyComponent={
             <View style={styles.empty}>
               <Text style={styles.emptyIcon}>📭</Text>
-              <Text style={styles.emptyText}>
-                {search ? 'Sonuç bulunamadı' : 'Henüz işlem yok'}
-              </Text>
+              <Text style={styles.emptyText}>{search ? 'Sonuç bulunamadı' : 'Henüz işlem yok'}</Text>
             </View>
           }
         />
@@ -147,49 +128,23 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: '800', color: Colors.textPrimary },
   searchRow: { paddingHorizontal: 16, paddingVertical: 8 },
   searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.bgInput,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 8,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: Colors.bgInput, borderRadius: 12,
+    paddingHorizontal: 12, borderWidth: 1, borderColor: Colors.border, gap: 8,
   },
   searchIcon: { fontSize: 16 },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: Colors.textPrimary,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 8,
-    marginBottom: 8,
-  },
+  searchInput: { flex: 1, paddingVertical: 12, fontSize: 15, color: Colors.textPrimary },
+  filterRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 8 },
   filterBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: Colors.bgInput,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20,
+    backgroundColor: Colors.bgInput, borderWidth: 1, borderColor: Colors.border,
   },
-  filterActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
+  filterActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   filterText: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
   filterTextActive: { color: Colors.white },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { paddingBottom: 24 },
-  separator: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginHorizontal: 16,
-  },
+  sep: { height: 1, backgroundColor: Colors.border, marginHorizontal: 16 },
   empty: { alignItems: 'center', paddingVertical: 48 },
   emptyIcon: { fontSize: 40, marginBottom: 8 },
   emptyText: { fontSize: 14, color: Colors.textSecondary },

@@ -14,6 +14,13 @@ type Period = 'ay' | 'yil' | 'tum';
 const PERIOD_LABELS: Record<Period, string> = { ay: 'Bu Ay', yil: 'Bu Yıl', tum: 'Tümü' };
 const PERIODS: Period[] = ['ay', 'yil', 'tum'];
 
+function fmtShort(n: number) {
+  if (!n || isNaN(n) || !isFinite(n)) return '—';
+  if (n >= 1000000) return `₺${(n / 1000000).toFixed(1)}M`;
+  if (n >= 1000) return `₺${(n / 1000).toFixed(1)}B`;
+  return `₺${Math.round(n)}`;
+}
+
 export default function DashboardScreen() {
   const { user, activeProfile } = useAuthStore();
   const [summary, setSummary] = useState<any>(null);
@@ -23,32 +30,27 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async (showRefresh = false) => {
-    if (!activeProfile) return;
-    if (showRefresh) setRefreshing(true);
-    else setLoading(true);
+    if (showRefresh) setRefreshing(true); else setLoading(true);
     try {
       const now = new Date();
-      const params: Record<string, string> = {};
-      if (period === 'ay') {
-        params.year = String(now.getFullYear());
-        params.month = String(now.getMonth() + 1);
-      } else if (period === 'yil') {
-        params.year = String(now.getFullYear());
-      }
+      const periodParam = period === 'ay' ? 'month' : period === 'yil' ? 'year' : 'all';
+      const year  = now.getFullYear();
+      const month = now.getMonth() + 1;
 
       const [sumData, txData] = await Promise.all([
-        api.summary(activeProfile.id, params.year ? Number(params.year) : undefined, params.month ? Number(params.month) : undefined),
-        api.transactions.list(activeProfile.id, { limit: '10', ...params }),
+        api.summary(year, month, periodParam),
+        api.transactions.list(),
       ]);
       setSummary(sumData);
-      setRecent((txData as any).transactions ?? []);
-    } catch {
-      // silent fail — show cached data
+      // Son 10 işlem
+      setRecent(Array.isArray(txData) ? txData.slice(0, 10) : []);
+    } catch (e) {
+      console.log('load error', e);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeProfile, period]);
+  }, [period]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -67,23 +69,19 @@ export default function DashboardScreen() {
     );
   }
 
-  const income = summary?.income ?? 0;
-  const expense = summary?.expense ?? 0;
-  const balance = income - expense;
+  const income  = summary?.gelir   ?? 0;
+  const expense = summary?.gider   ?? 0;
+  const balance = summary?.net     ?? (income - expense);
+  const txCount = recent.length;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => load(true)}
-            tintColor={Colors.primary}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={Colors.primary} />
         }
       >
-        {/* Header */}
         <View style={styles.topBar}>
           <View>
             <Text style={styles.greeting}>Merhaba, {user?.username} 👋</Text>
@@ -91,7 +89,6 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Balance Card */}
         <BalanceCard
           balance={balance}
           income={income}
@@ -100,28 +97,26 @@ export default function DashboardScreen() {
           onPeriodChange={cyclePeriod}
         />
 
-        {/* Quick Stats */}
         {summary && (
           <View style={styles.statsRow}>
             <StatCard
-              label="Tasarruf Oranı"
-              value={income > 0 ? `%${Math.round(((income - expense) / income) * 100)}` : '—'}
+              label="Kullanılabilir"
+              value={fmtShort(summary.kullanilabilir_nakit ?? balance)}
               color={balance >= 0 ? Colors.green : Colors.red}
             />
             <StatCard
-              label="İşlem Sayısı"
-              value={String(summary.transaction_count ?? 0)}
-              color={Colors.primary}
+              label="Kart Borcu"
+              value={fmtShort(summary.kart_borcu ?? 0)}
+              color={Colors.yellow}
             />
             <StatCard
-              label="Günlük Ort."
-              value={fmtShort(expense / 30)}
-              color={Colors.yellow}
+              label="İşlem"
+              value={String(txCount)}
+              color={Colors.primary}
             />
           </View>
         )}
 
-        {/* Recent Transactions */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Son İşlemler</Text>
@@ -154,12 +149,6 @@ function StatCard({ label, value, color }: { label: string; value: string; color
   );
 }
 
-function fmtShort(n: number) {
-  if (isNaN(n) || !isFinite(n)) return '—';
-  if (n >= 1000) return `₺${(n / 1000).toFixed(1)}B`;
-  return `₺${Math.round(n)}`;
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -172,17 +161,11 @@ const styles = StyleSheet.create({
   },
   greeting: { fontSize: 20, fontWeight: '700', color: Colors.textPrimary },
   profileName: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
-  statsRow: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginTop: 12,
-    gap: 8,
-  },
+  statsRow: { flexDirection: 'row', marginHorizontal: 16, marginTop: 12, gap: 8 },
   section: { marginTop: 24, paddingBottom: 24 },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: 16,
     marginBottom: 8,
   },
@@ -211,6 +194,6 @@ const statStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  value: { fontSize: 18, fontWeight: '800' },
-  label: { fontSize: 11, color: Colors.textSecondary, textAlign: 'center' },
+  value: { fontSize: 16, fontWeight: '800' },
+  label: { fontSize: 10, color: Colors.textSecondary, textAlign: 'center' },
 });
