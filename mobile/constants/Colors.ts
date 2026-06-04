@@ -1,16 +1,35 @@
+// Web uygulamasıyla birebir eşleştirilmiş renk sistemi
 export const Colors = {
-  bg: '#0D0D14',
-  bgCard: '#16161F',
-  bgInput: '#1E1E2A',
-  border: '#2A2A38',
-  primary: '#7C6FE0',
-  primaryLight: '#9D93E8',
-  green: '#00C896',
-  red: '#FF4757',
-  yellow: '#FFB347',
-  textPrimary: '#F0F0F5',
-  textSecondary: '#8888A0',
-  textMuted: '#55556A',
-  white: '#FFFFFF',
-  tabBar: '#10101A',
+  // Arka planlar
+  bg:      '#0b0e11',   // --bg
+  bgCard:  '#1e2026',   // --bg2
+  bgInput: '#2b2f36',   // --bg3
+  bgAlt:   '#363c45',   // --bg4
+
+  // Sınırlar
+  border:  '#2b2f36',   // --border
+  border2: '#363c45',   // --border2
+
+  // Ana renkler
+  green:   '#0ecb81',   // --g  (gelir)
+  red:     '#f6465d',   // --r  (gider)
+  yellow:  '#f0b90b',   // --y  (uyarı / kart borcu)
+  blue:    '#007aff',   // iOS mavi (butonlar, linkler)
+  purple:  '#af52de',   // --p
+
+  // Yazı
+  textPrimary:   '#eaecef',  // --txt
+  textSecondary: '#848e9c',  // --txt2
+  textMuted:     '#4b5563',
+
+  // Hero kart degradesi
+  heroBg: ['#050e22', '#0d1f3c', '#1a3a6b', '#0f2244'] as const,
+
+  // Tab bar
+  tabBar: '#131720',
+
+  white: '#ffffff',
+
+  // Kısayollar
+  primary: '#007aff',  // iOS blue = web'deki buton rengi
 };

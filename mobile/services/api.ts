@@ -30,6 +30,8 @@ export const api = {
       if (data.token) await setToken(data.token);
       return data;
     },
+    register: (username: string, email: string, password: string) =>
+      req<any>('/register', { method: 'POST', body: JSON.stringify({ username, email, password }) }),
     me:     () => req<any>('/api/mobile/me'),
     logout: async () => {
       try { await req('/api/mobile/logout', { method: 'POST' }); } catch {}

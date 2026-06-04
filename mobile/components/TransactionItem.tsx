@@ -2,110 +2,87 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Colors } from '../constants/Colors';
 
 interface Transaction {
-  id: number;
-  type: 'gelir' | 'gider';
-  amount: number;
-  category: string;
-  description: string;
-  date: string;
+  id: number; type: 'gelir' | 'gider';
+  amount: number; category: string;
+  description?: string; date: string;
 }
+interface Props { item: Transaction; onPress?: (item: Transaction) => void; onDelete?: (id: number) => void; }
 
-interface Props {
-  item: Transaction;
-  onPress?: (item: Transaction) => void;
-  onDelete?: (id: number) => void;
-}
-
-const CATEGORY_ICONS: Record<string, string> = {
-  'Maaş': '💼',
-  'Serbest Meslek': '💻',
-  'Kira Geliri': '🏠',
-  'Yatırım Getirisi': '📈',
-  'Market': '🛒',
-  'Fatura': '⚡',
-  'Ulaşım': '🚗',
-  'Sağlık': '❤️',
-  'Eğlence': '🎬',
-  'Yemek/Restoran': '🍔',
-  'Kira': '🏠',
-  'Eğitim': '📚',
-  'Giyim': '👕',
-  'default': '💰',
+const CAT_ICONS: Record<string, string> = {
+  'Maaş':'💼','Serbest Meslek':'💻','Kira Geliri':'🏠',
+  'Yatırım Geliri / Satış':'📈','Yatırım / Temettü':'💹',
+  'Hediye / İkramiye':'🎁','Diğer Gelir':'💰',
+  'Kira / Mortgage':'🏠','Market / Gıda':'🛒','Faturalar':'⚡',
+  'Ulaşım':'🚗','Yemek / Restoran':'🍔','Eğlence':'🎬',
+  'Sağlık':'❤️','Giyim':'👕','Eğitim':'📚',
+  'Abonelikler':'📱','Elektronik':'💡','Sigorta':'🛡️',
+  'Vergi / Harç':'🧾','Kredi Kartı Ödemesi':'💳',
+  'Yatırım Fonu':'📊','Hisse Senedi':'📉',
+  'Döviz Alımı':'💵','Altın Alımı':'🥇',
+  'Hesaplar Arası Transfer':'🔄','Diğer Gider':'💸',
 };
 
 function fmt(n: number) {
-  return new Intl.NumberFormat('tr-TR', {
-    style: 'currency',
-    currency: 'TRY',
-    minimumFractionDigits: 2,
-  }).format(n);
+  return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2 }).format(n);
 }
 
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
 }
 
 export function TransactionItem({ item, onPress, onDelete }: Props) {
   const isIncome = item.type === 'gelir';
-  const icon = CATEGORY_ICONS[item.category] ?? CATEGORY_ICONS.default;
+  const icon = CAT_ICONS[item.category] ?? (isIncome ? '💰' : '💸');
 
   return (
     <TouchableOpacity
-      style={styles.item}
+      style={s.item}
       onPress={() => onPress?.(item)}
       activeOpacity={0.7}
     >
-      <View style={styles.iconBox}>
-        <Text style={styles.iconText}>{icon}</Text>
+      {/* İkon */}
+      <View style={[s.iconBox, isIncome ? s.iconGreen : s.iconRed]}>
+        <Text style={s.iconTxt}>{icon}</Text>
       </View>
 
-      <View style={styles.info}>
-        <Text style={styles.desc} numberOfLines={1}>{item.description || item.category}</Text>
-        <Text style={styles.meta}>{item.category} · {formatDate(item.date)}</Text>
+      {/* Bilgi */}
+      <View style={s.info}>
+        <Text style={s.cat} numberOfLines={1}>{item.category}</Text>
+        <Text style={s.desc} numberOfLines={1}>
+          {item.description ? item.description : fmtDate(item.date)}
+        </Text>
       </View>
 
-      <Text style={[styles.amount, { color: isIncome ? Colors.green : Colors.red }]}>
+      {/* Tutar */}
+      <Text style={[s.amount, { color: isIncome ? Colors.green : Colors.red }]}>
         {isIncome ? '+' : '-'}{fmt(item.amount)}
       </Text>
     </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    gap: 12,
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 10, paddingHorizontal: 14, gap: 11,
+    backgroundColor: Colors.bgCard,
   },
   iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: Colors.bgInput,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 40, height: 40, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
   },
-  iconText: {
-    fontSize: 20,
+  iconGreen: {
+    backgroundColor: 'rgba(34,197,94,.12)',
+    borderWidth: 1, borderColor: 'rgba(34,197,94,.2)',
   },
-  info: {
-    flex: 1,
-    gap: 3,
+  iconRed: {
+    backgroundColor: 'rgba(239,68,68,.12)',
+    borderWidth: 1, borderColor: 'rgba(239,68,68,.2)',
   },
-  desc: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-  },
-  meta: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  amount: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
+  iconTxt: { fontSize: 18 },
+  info: { flex: 1, minWidth: 0 },
+  cat: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary, letterSpacing: -0.1 },
+  desc: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  amount: { fontSize: 15, fontWeight: '800', flexShrink: 0, letterSpacing: -0.3 },
 });
