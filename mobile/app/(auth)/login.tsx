@@ -6,7 +6,7 @@ import {
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
-import { api } from '../../services/api';
+import { auth } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 
 export default function LoginScreen() {
@@ -23,8 +23,7 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      await api.auth.login(username.trim(), password);
-      const me = await api.auth.me() as any;
+      const me = await auth.login(username.trim(), password);
       setUser(me);
     } catch (e: any) {
       Alert.alert('Giriş Başarısız', e.message ?? 'Bir hata oluştu');

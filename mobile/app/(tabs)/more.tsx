@@ -4,40 +4,43 @@ import {
 } from 'react-native';
 import { useState, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/Colors';
-import { api } from '../../services/api';
+import { cards as cardsApi, auth } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 
-interface MenuItemProps {
+function Row({ icon, label, sub, onPress, danger, badge }: {
   icon: string; label: string; sub?: string;
-  onPress: () => void; danger?: boolean;
-}
-
-function MenuRow({ icon, label, sub, onPress, danger }: MenuItemProps) {
+  onPress: () => void; danger?: boolean; badge?: string;
+}) {
   return (
     <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={0.7}>
       <View style={s.rowLeft}>
-        <View style={[s.iconBox, danger && { backgroundColor: '#2A1018' }]}>
-          <Text style={s.rowIcon}>{icon}</Text>
+        <View style={[s.ico, danger && { backgroundColor: '#2A1018' }]}>
+          <Text style={s.icoTxt}>{icon}</Text>
         </View>
         <View>
           <Text style={[s.rowLabel, danger && { color: Colors.red }]}>{label}</Text>
           {sub && <Text style={s.rowSub}>{sub}</Text>}
         </View>
       </View>
-      <Text style={s.chevron}>›</Text>
+      <View style={s.rowRight}>
+        {badge && <View style={s.badge}><Text style={s.badgeTxt}>{badge}</Text></View>}
+        <Text style={s.chevron}>›</Text>
+      </View>
     </TouchableOpacity>
   );
 }
 
 export default function MoreScreen() {
   const { user, logout } = useAuthStore();
-  const [cards, setCards]   = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const [cardsList, setCards]   = useState<any[]>([]);
+  const [loading,   setLoading] = useState(true);
 
   useEffect(() => {
-    api.cards.list()
-      .then((d: any) => setCards(d.cards ?? d ?? []))
+    cardsApi.list()
+      .then(d => setCards(Array.isArray(d) ? d : []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -45,95 +48,100 @@ export default function MoreScreen() {
   async function handleLogout() {
     Alert.alert('Çıkış', 'Oturumu kapatmak istiyor musunuz?', [
       { text: 'İptal', style: 'cancel' },
-      {
-        text: 'Çıkış Yap', style: 'destructive',
-        onPress: async () => { await api.auth.logout(); logout(); },
-      },
+      { text: 'Çıkış Yap', style: 'destructive', onPress: async () => {
+        await auth.logout();
+        logout();
+      }},
     ]);
   }
 
-  const totalDebt  = cards.reduce((s, c) => s + (c.used_ ?? 0), 0);
-  const totalLimit = cards.reduce((s, c) => s + (c.limit_ ?? 0), 0);
   const fmt = (n: number) =>
     new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 0 }).format(n);
+
+  const totalDebt  = cardsList.reduce((s, c) => s + (c.used_  ?? 0), 0);
+  const totalLimit = cardsList.reduce((s, c) => s + (c.limit_ ?? 0), 0);
+
+  const soon = () => Alert.alert('Yakında', 'Bu özellik yakında eklenecek');
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={s.header}><Text style={s.title}>Daha Fazla</Text></View>
 
-        {/* Profil kartı */}
+        {/* Profil */}
         <View style={s.profileCard}>
           <View style={s.avatar}>
-            <Text style={s.avatarText}>{user?.username?.charAt(0).toUpperCase() ?? '?'}</Text>
+            <Text style={s.avatarTxt}>{user?.username?.charAt(0).toUpperCase() ?? '?'}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={s.profileName}>{user?.username}</Text>
-            <Text style={s.profileEmail}>{user?.email}</Text>
+            <Text style={s.username}>{user?.username}</Text>
+            <Text style={s.email}>{user?.email}</Text>
           </View>
-          {user?.is_premium && (
-            <View style={s.proBadge}><Text style={s.proText}>PRO</Text></View>
-          )}
+          {user?.is_premium
+            ? <View style={s.proBadge}><Text style={s.proTxt}>PRO</Text></View>
+            : <View style={s.trialBadge}><Text style={s.trialTxt}>Deneme</Text></View>
+          }
         </View>
 
         {/* Kart özeti */}
-        {!loading && cards.length > 0 && (
-          <View style={s.cardSummary}>
-            <View style={s.cardSumItem}>
-              <Text style={s.cardSumVal}>{fmt(totalDebt)}</Text>
-              <Text style={s.cardSumLabel}>Toplam Borç</Text>
+        {!loading && cardsList.length > 0 && (
+          <TouchableOpacity style={s.cardSummary} onPress={() => router.push('/cards' as any)}>
+            <View style={s.csItem}>
+              <Text style={[s.csVal, { color: Colors.red }]}>{fmt(totalDebt)}</Text>
+              <Text style={s.csLabel}>Toplam Borç</Text>
             </View>
             <View style={s.divV} />
-            <View style={s.cardSumItem}>
-              <Text style={[s.cardSumVal, { color: Colors.green }]}>{fmt(totalLimit - totalDebt)}</Text>
-              <Text style={s.cardSumLabel}>Kullanılabilir</Text>
+            <View style={s.csItem}>
+              <Text style={[s.csVal, { color: Colors.green }]}>{fmt(totalLimit - totalDebt)}</Text>
+              <Text style={s.csLabel}>Kullanılabilir</Text>
             </View>
             <View style={s.divV} />
-            <View style={s.cardSumItem}>
-              <Text style={s.cardSumVal}>{cards.length}</Text>
-              <Text style={s.cardSumLabel}>Kart</Text>
+            <View style={s.csItem}>
+              <Text style={s.csVal}>{cardsList.length}</Text>
+              <Text style={s.csLabel}>Kart</Text>
             </View>
-          </View>
+            <Text style={s.csChevron}>›</Text>
+          </TouchableOpacity>
         )}
 
         <Text style={s.groupLabel}>Finans</Text>
         <View style={s.group}>
-          <MenuRow icon="💳" label="Kredi Kartları" sub={`${cards.length} kart · ${fmt(totalDebt)} borç`}
-            onPress={() => Alert.alert('Yakında', 'Kart detay ekranı yapılıyor')} />
+          <Row icon="💳" label="Kredi Kartları"
+            sub={cardsList.length > 0 ? `${cardsList.length} kart · ${fmt(totalDebt)} borç` : 'Kart yok'}
+            onPress={() => router.push('/cards' as any)}
+            badge={cardsList.length > 0 ? String(cardsList.length) : undefined}
+          />
           <View style={s.sep} />
-          <MenuRow icon="🏦" label="Hesaplar" sub="Banka hesapları"
-            onPress={() => Alert.alert('Yakında', 'Hesap ekranı yapılıyor')} />
+          <Row icon="🏦" label="Hesaplar" sub="Banka hesapları ve bakiyeler"
+            onPress={() => router.push('/accounts' as any)} />
           <View style={s.sep} />
-          <MenuRow icon="📈" label="Yatırımlar" sub="Portföy takibi"
-            onPress={() => Alert.alert('Yakında', 'Yatırım ekranı yapılıyor')} />
+          <Row icon="📈" label="Yatırımlar" sub="Portföy takibi"
+            onPress={soon} />
           <View style={s.sep} />
-          <MenuRow icon="🔄" label="Tekrarlayan İşlemler"
-            onPress={() => Alert.alert('Yakında', 'Tekrarlayan işlemler ekranı yapılıyor')} />
+          <Row icon="🔄" label="Tekrarlayan İşlemler" sub="Otomatik gider ve gelirler"
+            onPress={soon} />
         </View>
 
         <Text style={s.groupLabel}>Kurumsal</Text>
         <View style={s.group}>
-          <MenuRow icon="🏢" label="Tedarikçiler"
-            onPress={() => Alert.alert('Yakında', 'Tedarikçi ekranı yapılıyor')} />
+          <Row icon="🏢" label="Tedarikçiler"        onPress={soon} />
           <View style={s.sep} />
-          <MenuRow icon="🏗️" label="Varlıklar" sub="Demirbaş ve araçlar"
-            onPress={() => Alert.alert('Yakında', 'Varlık ekranı yapılıyor')} />
+          <Row icon="🏗️" label="Varlıklar" sub="Demirbaş ve araçlar" onPress={soon} />
           <View style={s.sep} />
-          <MenuRow icon="📄" label="Faturalar"
-            onPress={() => Alert.alert('Yakında', 'Fatura ekranı yapılıyor')} />
+          <Row icon="📄" label="Faturalar"            onPress={soon} />
         </View>
 
-        <Text style={s.groupLabel}>Ayarlar</Text>
+        <Text style={s.groupLabel}>Araçlar</Text>
         <View style={s.group}>
-          <MenuRow icon="🤖" label="Telegram Botu" sub="İşlem girişi için bağla"
-            onPress={() => Alert.alert('Yakında', 'Telegram bağlantı ekranı yapılıyor')} />
+          <Row icon="🤖" label="Telegram Botu" sub="Mesajla işlem gir"  onPress={soon} />
           <View style={s.sep} />
-          <MenuRow icon="📤" label="Dışa Aktar" sub="Excel / PDF"
-            onPress={() => Alert.alert('Yakında', 'Dışa aktarım yapılıyor')} />
+          <Row icon="📤" label="Dışa Aktar"    sub="Excel / PDF"        onPress={soon} />
+          <View style={s.sep} />
+          <Row icon="📥" label="İçe Aktar"     sub="Banka ekstresi CSV" onPress={soon} />
         </View>
 
         <View style={s.group}>
-          <MenuRow icon="🚪" label="Çıkış Yap" onPress={handleLogout} danger />
+          <Row icon="🚪" label="Çıkış Yap" onPress={handleLogout} danger />
         </View>
 
         <View style={{ height: 40 }} />
@@ -143,45 +151,35 @@ export default function MoreScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.bg },
-  header: { paddingHorizontal: 16, paddingTop: 8 },
-  title: { fontSize: 24, fontWeight: '800', color: Colors.textPrimary },
-  profileCard: {
-    flexDirection: 'row', alignItems: 'center',
-    marginHorizontal: 16, marginTop: 16,
-    backgroundColor: Colors.bgCard, borderRadius: 16,
-    padding: 16, borderWidth: 1, borderColor: Colors.border, gap: 12,
-  },
-  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 20, fontWeight: '700', color: Colors.white },
-  profileName: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
-  profileEmail: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
-  proBadge: { backgroundColor: Colors.primary, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  proText: { fontSize: 11, fontWeight: '800', color: Colors.white },
-  cardSummary: {
-    flexDirection: 'row', marginHorizontal: 16, marginTop: 12,
-    backgroundColor: Colors.bgCard, borderRadius: 14,
-    borderWidth: 1, borderColor: Colors.border, padding: 16,
-  },
-  cardSumItem: { flex: 1, alignItems: 'center' },
-  cardSumVal: { fontSize: 16, fontWeight: '800', color: Colors.textPrimary },
-  cardSumLabel: { fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
-  divV: { width: 1, backgroundColor: Colors.border },
-  groupLabel: {
-    fontSize: 12, fontWeight: '700', color: Colors.textMuted,
-    textTransform: 'uppercase', letterSpacing: 1,
-    paddingHorizontal: 16, marginTop: 24, marginBottom: 8,
-  },
-  group: {
-    marginHorizontal: 16, backgroundColor: Colors.bgCard,
-    borderRadius: 16, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden',
-  },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
-  rowLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.bgInput, alignItems: 'center', justifyContent: 'center' },
-  rowIcon: { fontSize: 18 },
-  rowLabel: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
-  rowSub: { fontSize: 12, color: Colors.textSecondary },
-  chevron: { fontSize: 20, color: Colors.textMuted },
-  sep: { height: 1, backgroundColor: Colors.border, marginLeft: 62 },
+  container:   { flex: 1, backgroundColor: Colors.bg },
+  header:      { paddingHorizontal: 16, paddingTop: 8 },
+  title:       { fontSize: 24, fontWeight: '800', color: Colors.textPrimary },
+  profileCard: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 16, backgroundColor: Colors.bgCard, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: Colors.border, gap: 12 },
+  avatar:      { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.blue, alignItems: 'center', justifyContent: 'center' },
+  avatarTxt:   { fontSize: 20, fontWeight: '700', color: Colors.white },
+  username:    { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
+  email:       { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  proBadge:    { backgroundColor: Colors.blue,  borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  proTxt:      { fontSize: 11, fontWeight: '800', color: Colors.white },
+  trialBadge:  { backgroundColor: Colors.bgInput, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  trialTxt:    { fontSize: 11, fontWeight: '600', color: Colors.textSecondary },
+  cardSummary: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 12, backgroundColor: Colors.bgCard, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, padding: 14 },
+  csItem:      { flex: 1, alignItems: 'center' },
+  csVal:       { fontSize: 15, fontWeight: '800', color: Colors.textPrimary },
+  csLabel:     { fontSize: 10, color: Colors.textSecondary, marginTop: 2 },
+  divV:        { width: 1, height: 32, backgroundColor: Colors.border },
+  csChevron:   { fontSize: 20, color: Colors.textMuted, marginLeft: 4 },
+  groupLabel:  { fontSize: 11, fontWeight: '700', color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 1.2, paddingHorizontal: 16, marginTop: 24, marginBottom: 8 },
+  group:       { marginHorizontal: 16, backgroundColor: Colors.bgCard, borderRadius: 16, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' },
+  row:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
+  rowLeft:     { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  ico:         { width: 36, height: 36, borderRadius: 10, backgroundColor: Colors.bgInput, alignItems: 'center', justifyContent: 'center' },
+  icoTxt:      { fontSize: 18 },
+  rowLabel:    { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
+  rowSub:      { fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
+  rowRight:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  badge:       { backgroundColor: Colors.blue, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 },
+  badgeTxt:    { fontSize: 11, fontWeight: '700', color: Colors.white },
+  chevron:     { fontSize: 20, color: Colors.textMuted },
+  sep:         { height: 1, backgroundColor: Colors.border, marginLeft: 62 },
 });

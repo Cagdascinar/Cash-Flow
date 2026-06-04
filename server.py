@@ -1096,6 +1096,41 @@ def mobile_login():
         ],
     })
 
+@app.route("/api/mobile/register", methods=["POST"])
+@limiter.limit("5 per hour")
+def mobile_register():
+    data     = request.get_json(silent=True) or {}
+    username = data.get("username", "").strip().lower()
+    email    = data.get("email",    "").strip().lower()
+    password = data.get("password", "")
+    ptype    = data.get("profile_type", "sahis")
+    if ptype not in ("sahis", "sirket"): ptype = "sahis"
+    if not username or not email or not password:
+        return jsonify({"ok": False, "error": "Kullanıcı adı, email ve şifre zorunlu"}), 400
+    if not username.replace("_","").replace("-","").isalnum() or len(username) > 40:
+        return jsonify({"ok": False, "error": "Kullanıcı adı sadece harf/rakam/_ içerebilir (max 40)"}), 400
+    if "@" not in email or "." not in email.split("@")[-1]:
+        return jsonify({"ok": False, "error": "Geçerli bir email adresi girin"}), 400
+    if len(password) < 8:
+        return jsonify({"ok": False, "error": "Şifre en az 8 karakter olmalı"}), 400
+    vtok = secrets.token_urlsafe(32)
+    prof_name = "Şirket" if ptype == "sirket" else "Şahıs"
+    try:
+        with pg_connect() as con:
+            cur = con.execute(
+                "INSERT INTO users (username,display_name,password_hash,email,email_verified,verify_token,created_at) VALUES (?,?,?,?,0,?,?)",
+                (username, username, generate_password_hash(password), email, vtok, datetime.now().isoformat())
+            )
+            uid = cur.lastrowid
+            con.execute(
+                "INSERT INTO profiles (user_id,name,type,created_at) VALUES (?,?,?,?)",
+                (uid, prof_name, ptype, datetime.now().isoformat())
+            )
+    except Exception:
+        return jsonify({"ok": False, "error": "Bu kullanıcı adı veya email zaten kullanımda"}), 409
+    send_verify_email(email, username, vtok)
+    return jsonify({"ok": True, "message": "Kayıt başarılı. Email adresinizi doğrulayın."})
+
 @app.route("/api/mobile/logout", methods=["POST"])
 def mobile_logout():
     token = request.headers.get("X-Mobile-Token", "").strip()
