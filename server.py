@@ -1003,6 +1003,85 @@ def logout():
     session.clear()
     return redirect("/login")
 
+# ── Mobil uygulama JSON API ──────────────────────────────────────────────────
+
+@app.route("/api/mobile/login", methods=["POST"])
+@limiter.limit("20 per minute")
+def mobile_login():
+    data     = request.get_json(silent=True) or {}
+    username = data.get("username", "").strip().lower()
+    password = data.get("password", "")
+    if not username or not password:
+        return jsonify({"ok": False, "error": "Kullanıcı adı ve şifre gerekli"}), 400
+    remaining = _is_locked_out(username)
+    if remaining > 0:
+        mins = remaining // 60 + 1
+        return jsonify({"ok": False, "error": f"Çok fazla hatalı deneme. {mins} dakika sonra tekrar deneyin."}), 429
+    with pg_connect() as con:
+        row = con.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+    if not (row and check_password_hash(row["password_hash"], password)):
+        _record_failed_login(username)
+        return jsonify({"ok": False, "error": "Kullanıcı adı veya şifre hatalı"}), 401
+    if not row["email_verified"]:
+        return jsonify({"ok": False, "error": "E-posta adresiniz doğrulanmamış"}), 403
+    _clear_login_attempts(username)
+    session.permanent  = True
+    session["user_id"] = row["id"]
+    session["username"] = row["username"]
+    session["display"]  = row["display_name"]
+    with pg_connect() as con2:
+        prof = con2.execute(
+            "SELECT * FROM profiles WHERE user_id=? ORDER BY id LIMIT 1", (row["id"],)
+        ).fetchone()
+        profiles = con2.execute(
+            "SELECT * FROM profiles WHERE user_id=? ORDER BY id", (row["id"],)
+        ).fetchall()
+        if prof:
+            session["profile_id"]   = prof["id"]
+            session["profile_name"] = prof["name"]
+            session["profile_type"] = prof["type"]
+    sub = get_sub_status(row["id"])
+    return jsonify({
+        "ok":         True,
+        "id":         row["id"],
+        "username":   row["username"],
+        "email":      row["email"],
+        "is_premium": sub.get("active", False),
+        "active_profile_id": prof["id"] if prof else None,
+        "profiles": [
+            {"id": p["id"], "name": p["name"], "type": p["type"]}
+            for p in profiles
+        ],
+    })
+
+@app.route("/api/mobile/logout", methods=["POST"])
+def mobile_logout():
+    session.clear()
+    return jsonify({"ok": True})
+
+@app.route("/api/mobile/me")
+@login_required
+def mobile_me():
+    uid = session["user_id"]
+    with pg_connect() as con:
+        row      = con.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+        profiles = con.execute(
+            "SELECT * FROM profiles WHERE user_id=? ORDER BY id", (uid,)
+        ).fetchall()
+    sub = get_sub_status(uid)
+    return jsonify({
+        "ok":         True,
+        "id":         uid,
+        "username":   row["username"] if row else session.get("username"),
+        "email":      row["email"] if row else "",
+        "is_premium": sub.get("active", False),
+        "active_profile_id": session.get("profile_id"),
+        "profiles": [
+            {"id": p["id"], "name": p["name"], "type": p["type"]}
+            for p in profiles
+        ],
+    })
+
 @app.route("/api/me")
 @login_required
 def api_me():
@@ -4416,15 +4495,19 @@ def today_summary():
     # Credit cards
     cards = db.execute("SELECT * FROM cards WHERE profile_id=? ORDER BY bank_name", (pid,)).fetchall()
     card_list = []
-    total_limit = total_used = 0
+    total_avail_sum = 0   # Toplam: sadece pozitif avail'lar toplanır
+    total_limit_sum = 0
+    total_used_sum  = 0
     for c in cards:
         lim  = float(c["limit_"] or 0)
         used = float(c["used_"]  or 0)
-        avail = round(lim - used, 2) if lim > 0 else None
-        # Sadece limiti tanımlı kartlar toplama dahil edilir
         if lim > 0:
-            total_limit += lim
-            total_used  += min(used, lim)  # limitin üstüne çıkamazız
+            avail = round(max(0.0, lim - used), 2)   # negatif olmaz
+            total_avail_sum += avail
+            total_limit_sum += lim
+            total_used_sum  += used
+        else:
+            avail = None   # limitsiz kart — N/A
         card_list.append({
             "id":        c["id"],
             "bank":      c["bank_name"],
@@ -4433,9 +4516,10 @@ def today_summary():
             "limit":     lim,
             "used":      used,
             "avail":     avail,
+            "over_limit": lim > 0 and used > lim,   # limit aşıldı mı?
             "due_day":   c["due_day"],
             "min_pct":   c["min_pct"],
-            "pct":       round(used/lim*100) if lim else 0,
+            "pct":       round(min(used, lim) / lim * 100) if lim else 0,
         })
 
     # Banka hesapları + güncel bakiyeler — tek JOIN sorgusu (N+1 giderildi)
@@ -4493,9 +4577,9 @@ def today_summary():
         "gider_list":  gider_list,
         "cards":       card_list,
         "accounts":    account_list,
-        "total_limit": round(total_limit, 2),
-        "total_used":  round(total_used, 2),
-        "total_avail": round(total_limit - total_used, 2),
+        "total_limit": round(total_limit_sum, 2),
+        "total_used":  round(total_used_sum, 2),
+        "total_avail": round(total_avail_sum, 2),  # sadece pozitif avail toplamı
         "nakit_bakiye": round(sum(
             a["balance"] for a in account_list
             if a["type"] in ("vadesiz","vadeli","tasarruf")
