@@ -27,8 +27,7 @@
     },
     "plugins": [
       "expo-router",
-      "expo-status-bar",
-      "react-native-webview"
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true
