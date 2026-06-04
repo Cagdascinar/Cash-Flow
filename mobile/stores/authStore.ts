@@ -51,8 +51,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   hydrate: async () => {
     try {
-      const cached = await AsyncStorage.getItem('cached_user');
-      if (cached) {
+      const [cached, token] = await Promise.all([
+        AsyncStorage.getItem('cached_user'),
+        AsyncStorage.getItem('mobile_auth_token'),
+      ]);
+      if (cached && token) {
         const user = JSON.parse(cached) as User;
         const activeProfile = user.profiles?.find(
           (p) => p.id === user.active_profile_id

@@ -1,20 +1,29 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://your-railway-url.up.railway.app';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://web-production-ba700.up.railway.app';
+const TOKEN_KEY = 'mobile_auth_token';
 
-async function request<T>(
-  path: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers ?? {}),
-    },
-    credentials: 'include',
-    ...options,
-  });
+export async function getToken(): Promise<string | null> {
+  return AsyncStorage.getItem(TOKEN_KEY);
+}
 
+export async function setToken(token: string): Promise<void> {
+  return AsyncStorage.setItem(TOKEN_KEY, token);
+}
+
+export async function clearToken(): Promise<void> {
+  return AsyncStorage.removeItem(TOKEN_KEY);
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = await getToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> ?? {}),
+  };
+  if (token) headers['X-Mobile-Token'] = token;
+
+  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
   const data = await res.json();
   if (!res.ok || data.ok === false) {
     throw new Error(data.error ?? `HTTP ${res.status}`);
@@ -22,70 +31,52 @@ async function request<T>(
   return data as T;
 }
 
-// Auth
 export const api = {
   auth: {
-    login: (username: string, password: string) =>
-      request('/api/mobile/login', {
+    login: async (username: string, password: string) => {
+      const data = await request<any>('/api/mobile/login', {
         method: 'POST',
         body: JSON.stringify({ username, password }),
-      }),
-    register: (username: string, email: string, password: string) =>
-      request('/register', {
-        method: 'POST',
-        body: JSON.stringify({ username, email, password }),
-      }),
-    me: () => request('/api/mobile/me'),
-    logout: () => request('/api/mobile/logout', { method: 'POST' }),
+      });
+      if (data.token) await setToken(data.token);
+      return data;
+    },
+    me: () => request<any>('/api/mobile/me'),
+    logout: async () => {
+      await request('/api/mobile/logout', { method: 'POST' });
+      await clearToken();
+    },
   },
 
   summary: (profileId: number, year?: number, month?: number) => {
-    const params = new URLSearchParams({ profile_id: String(profileId) });
-    if (year) params.set('year', String(year));
-    if (month) params.set('month', String(month));
-    return request(`/api/summary?${params}`);
+    const p = new URLSearchParams({ profile_id: String(profileId) });
+    if (year)  p.set('year',  String(year));
+    if (month) p.set('month', String(month));
+    return request<any>(`/api/summary?${p}`);
   },
 
   transactions: {
     list: (profileId: number, params?: Record<string, string>) => {
       const p = new URLSearchParams({ profile_id: String(profileId), ...params });
-      return request(`/api/transactions?${p}`);
+      return request<any>(`/api/transactions?${p}`);
     },
     create: (payload: Record<string, unknown>) =>
-      request('/api/transactions', { method: 'POST', body: JSON.stringify(payload) }),
+      request<any>('/api/transactions', { method: 'POST', body: JSON.stringify(payload) }),
     update: (id: number, payload: Record<string, unknown>) =>
-      request(`/api/transactions/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+      request<any>(`/api/transactions/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
     delete: (id: number) =>
-      request(`/api/transactions/${id}`, { method: 'DELETE' }),
+      request<any>(`/api/transactions/${id}`, { method: 'DELETE' }),
   },
 
-  cards: {
-    list: (profileId: number) =>
-      request(`/api/cards?profile_id=${profileId}`),
-  },
-
-  accounts: {
-    list: (profileId: number) =>
-      request(`/api/accounts?profile_id=${profileId}`),
-  },
-
-  budgets: {
-    save: (payload: Record<string, unknown>) =>
-      request('/api/budgets', { method: 'POST', body: JSON.stringify(payload) }),
-  },
-
+  cards:    { list: (pid: number) => request<any>(`/api/cards?profile_id=${pid}`) },
+  accounts: { list: (pid: number) => request<any>(`/api/accounts?profile_id=${pid}`) },
   goals: {
-    list: (profileId: number) => request(`/api/goals?profile_id=${profileId}`),
-    create: (payload: Record<string, unknown>) =>
-      request('/api/goals', { method: 'POST', body: JSON.stringify(payload) }),
-    delete: (id: number) => request(`/api/goals/${id}`, { method: 'DELETE' }),
+    list:   (pid: number) => request<any>(`/api/goals?profile_id=${pid}`),
+    create: (p: Record<string, unknown>) => request<any>('/api/goals', { method: 'POST', body: JSON.stringify(p) }),
+    delete: (id: number) => request<any>(`/api/goals/${id}`, { method: 'DELETE' }),
   },
-
-  insights: (profileId: number) =>
-    request(`/api/insights?profile_id=${profileId}`),
-
-  categories: () => request('/api/categories'),
-
-  today: (profileId: number) =>
-    request(`/api/today?profile_id=${profileId}`),
+  budgets:  { save: (p: Record<string, unknown>) => request<any>('/api/budgets', { method: 'POST', body: JSON.stringify(p) }) },
+  insights: (pid: number) => request<any>(`/api/insights?profile_id=${pid}`),
+  today:    (pid: number) => request<any>(`/api/today?profile_id=${pid}`),
+  categories: () => request<any>('/api/categories'),
 };

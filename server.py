@@ -1005,6 +1005,50 @@ def logout():
 
 # ── Mobil uygulama JSON API ──────────────────────────────────────────────────
 
+def _ensure_mobile_tokens_table():
+    """Uygulama başlarken mobile_tokens tablosunu oluştur."""
+    with pg_connect() as con:
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS mobile_tokens (
+                id         SERIAL PRIMARY KEY,
+                user_id    INTEGER NOT NULL,
+                token      TEXT NOT NULL UNIQUE,
+                profile_id INTEGER,
+                created_at TEXT NOT NULL,
+                last_used  TEXT
+            )
+        """)
+
+_ensure_mobile_tokens_table()
+
+@app.before_request
+def inject_mobile_session():
+    """X-Mobile-Token header varsa token'ı doğrula ve session'a yükle."""
+    token = request.headers.get("X-Mobile-Token", "").strip()
+    if not token or session.get("user_id"):
+        return
+    with pg_connect() as con:
+        row = con.execute(
+            "SELECT mt.*, u.username, u.display_name, p.name as pname, p.type as ptype "
+            "FROM mobile_tokens mt "
+            "JOIN users u ON u.id = mt.user_id "
+            "LEFT JOIN profiles p ON p.id = mt.profile_id "
+            "WHERE mt.token = %s",
+            (token,)
+        ).fetchone()
+    if row:
+        session["user_id"]      = row["user_id"]
+        session["username"]     = row["username"]
+        session["display"]      = row["display_name"]
+        session["profile_id"]   = row["profile_id"]
+        session["profile_name"] = row["pname"]
+        session["profile_type"] = row["ptype"]
+        with pg_connect() as con2:
+            con2.execute(
+                "UPDATE mobile_tokens SET last_used=%s WHERE token=%s",
+                (datetime.now().isoformat(), token)
+            )
+
 @app.route("/api/mobile/login", methods=["POST"])
 @limiter.limit("20 per minute")
 def mobile_login():
@@ -1025,10 +1069,6 @@ def mobile_login():
     if not row["email_verified"]:
         return jsonify({"ok": False, "error": "E-posta adresiniz doğrulanmamış"}), 403
     _clear_login_attempts(username)
-    session.permanent  = True
-    session["user_id"] = row["id"]
-    session["username"] = row["username"]
-    session["display"]  = row["display_name"]
     with pg_connect() as con2:
         prof = con2.execute(
             "SELECT * FROM profiles WHERE user_id=? ORDER BY id LIMIT 1", (row["id"],)
@@ -1036,13 +1076,15 @@ def mobile_login():
         profiles = con2.execute(
             "SELECT * FROM profiles WHERE user_id=? ORDER BY id", (row["id"],)
         ).fetchall()
-        if prof:
-            session["profile_id"]   = prof["id"]
-            session["profile_name"] = prof["name"]
-            session["profile_type"] = prof["type"]
+        token = secrets.token_urlsafe(40)
+        con2.execute(
+            "INSERT INTO mobile_tokens (user_id, token, profile_id, created_at) VALUES (?,?,?,?)",
+            (row["id"], token, prof["id"] if prof else None, datetime.now().isoformat())
+        )
     sub = get_sub_status(row["id"])
     return jsonify({
         "ok":         True,
+        "token":      token,
         "id":         row["id"],
         "username":   row["username"],
         "email":      row["email"],
@@ -1056,6 +1098,10 @@ def mobile_login():
 
 @app.route("/api/mobile/logout", methods=["POST"])
 def mobile_logout():
+    token = request.headers.get("X-Mobile-Token", "").strip()
+    if token:
+        with pg_connect() as con:
+            con.execute("DELETE FROM mobile_tokens WHERE token=%s", (token,))
     session.clear()
     return jsonify({"ok": True})
 
