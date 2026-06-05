@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -39,6 +39,16 @@ export default function CardsScreen() {
     try { setList(await cardsApi.list() as any[]); } catch {}
     finally { setLoad(false); setRef(false); }
   }, []);
+
+  async function delCard(id: number) {
+    Alert.alert('Kartı Sil', 'Bu kartı silmek istiyor musunuz?', [
+      { text: 'İptal', style: 'cancel' },
+      { text: 'Sil', style: 'destructive', onPress: async () => {
+        try { await cardsApi.delete(id); setList(p => p.filter(c => c.id !== id)); }
+        catch (e: any) { Alert.alert('Hata', e.message); }
+      }},
+    ]);
+  }
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -86,12 +96,20 @@ export default function CardsScreen() {
                 </View>
                 <Bar used={c.used_ ?? 0} limit={c.limit_ ?? 0} />
                 <View style={s.footer}>
-                  {[['Ekstre', c.statement_day], ['Son Ödeme', c.due_day], ['Asgari', money(Math.round((c.used_ ?? 0) * ((c.min_pct ?? 25) / 100)))]].map(([lbl, val]) => (
+                  {[['Ekstre', String(c.statement_day)], ['Son Ödeme', String(c.due_day)], ['Asgari', money(Math.round((c.used_ ?? 0) * ((c.min_pct ?? 25) / 100)))]].map(([lbl, val]) => (
                     <View key={lbl as string} style={{ flex: 1, alignItems: 'center' }}>
                       <Text style={s.fLbl}>{lbl}</Text>
                       <Text style={s.fVal}>{val}</Text>
                     </View>
                   ))}
+                </View>
+                <View style={s.actions}>
+                  <TouchableOpacity style={s.payBtn} onPress={() => router.push({ pathname: '/pay-card' as any, params: { id: c.id, bank: c.bank_name, name: c.card_name || '', used: String(c.used_ ?? 0), min: String(Math.round((c.used_ ?? 0) * ((c.min_pct ?? 25) / 100))) } })}>
+                    <Text style={s.payTxt}>💳 Ödeme Yap</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.delBtn} onPress={() => delCard(c.id)}>
+                    <Text style={s.delTxt}>🗑️ Sil</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             ))
@@ -123,6 +141,11 @@ const s = StyleSheet.create({
   footer:  { flexDirection: 'row', marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: C.border },
   fLbl:    { fontSize: 11, color: C.muted },
   fVal:    { fontSize: 14, fontWeight: '700', color: C.txt, marginTop: 2 },
+  actions: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  payBtn:  { flex: 1, backgroundColor: C.green, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
+  payTxt:  { fontSize: 13, fontWeight: '700', color: C.white },
+  delBtn:  { flex: 1, backgroundColor: C.input, borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: C.border },
+  delTxt:  { fontSize: 13, fontWeight: '700', color: C.red },
   empty:   { alignItems: 'center', paddingVertical: 48 },
   emptyTxt:{ fontSize: 16, fontWeight: '600', color: C.txt, marginTop: 12 },
   emptySub:{ fontSize: 13, color: C.txt2, marginTop: 4 },

@@ -150,7 +150,17 @@ export const misc = {
   insights:       () => req<any>('/api/insights'),
   notifications:  () => req<any>('/api/notifications'),
   rates:          () => req<any>('/api/rates'),
+  transfer:       (d: Record<string, unknown>) =>
+    req<any>('/api/transfers', { method: 'POST', body: JSON.stringify(d) }),
+  today:          () => req<any>('/api/today'),
   telegramStatus: () => req<any>('/api/telegram/status'),
   telegramLinkCode: () => req<any>('/api/telegram/link-code', { method: 'POST' }),
   telegramUnlink: () => req<any>('/api/telegram/unlink', { method: 'DELETE' }),
+  todos:          (date?: string) => req<any>(`/api/todos${date ? `?date=${date}` : ''}`),
+  addTodo:        (d: Record<string, unknown>) =>
+    req<any>('/api/todos', { method: 'POST', body: JSON.stringify(d) }),
+  updateTodo:     (id: number, d: Record<string, unknown>) =>
+    req<any>(`/api/todos/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  deleteTodo:     (id: number) =>
+    req<any>(`/api/todos/${id}`, { method: 'DELETE' }),
 };

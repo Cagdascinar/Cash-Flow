@@ -7,10 +7,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { C, money } from '../../constants/Colors';
 import { transactions } from '../../services/api';
 import { TransactionItem, type Tx } from '../../components/TransactionItem';
+import { useRouter } from 'expo-router';
 
 type Filter = 'hepsi' | 'gelir' | 'gider';
 
 export default function LedgerScreen() {
+  const router = useRouter();
   const [all,        setAll]     = useState<Tx[]>([]);
   const [filtered,   setFilt]    = useState<Tx[]>([]);
   const [search,     setSearch]  = useState('');
@@ -87,7 +89,7 @@ export default function LedgerScreen() {
         : <FlatList
             data={filtered}
             keyExtractor={i => String(i.id)}
-            renderItem={({ item }) => <TransactionItem item={item} onDelete={del} />}
+            renderItem={({ item }) => <TransactionItem item={item} onDelete={del} onPress={(tx) => router.push({ pathname: '/edit-tx' as any, params: { id: tx.id, type: tx.type, amount: String(tx.amount), category: tx.category, description: tx.description ?? '', date: tx.date } })} />}
             ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: C.border, marginHorizontal: 14 }} />}
             contentContainerStyle={{ paddingBottom: 24 }}
             showsVerticalScrollIndicator={false}

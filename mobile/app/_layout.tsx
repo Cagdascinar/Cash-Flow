@@ -33,6 +33,10 @@ export default function RootLayout() {
         <Stack.Screen name="assets"       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="telegram"     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="settings"     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="edit-tx"      options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="transfer"     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="todos"        options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="pay-card"     options={{ animation: 'slide_from_right' }} />
       </Stack>
     </>
   );
