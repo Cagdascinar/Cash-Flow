@@ -18,6 +18,7 @@ interface AuthState {
   setActiveProfile:  (p: Profile)      => void;
   logout:            ()                => void;
   hydrate:           ()                => Promise<void>;
+  refreshUser:       ()                => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -52,5 +53,17 @@ export const useAuthStore = create<AuthState>((set) => ({
     } finally {
       set({ isLoading: false });
     }
+  },
+
+  refreshUser: async () => {
+    try {
+      const { auth } = await import('../services/api');
+      const u = await auth.me();
+      const ap = u?.profiles?.find((p: Profile) => p.id === u.active_profile_id) ?? u?.profiles?.[0] ?? null;
+      if (u) {
+        AsyncStorage.setItem('cached_user', JSON.stringify(u));
+        set({ user: u, activeProfile: ap });
+      }
+    } catch {}
   },
 }));

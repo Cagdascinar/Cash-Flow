@@ -1,6 +1,6 @@
 import {
   View, Text, FlatList, StyleSheet, TextInput,
-  TouchableOpacity, ActivityIndicator, RefreshControl, Alert,
+  TouchableOpacity, ActivityIndicator, RefreshControl, Alert, ScrollView,
 } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,23 +11,32 @@ import { useRouter } from 'expo-router';
 
 type Filter = 'hepsi' | 'gelir' | 'gider';
 
+const MONTHS = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+
 export default function LedgerScreen() {
   const router = useRouter();
+  const now = new Date();
   const [all,        setAll]     = useState<Tx[]>([]);
   const [filtered,   setFilt]    = useState<Tx[]>([]);
   const [search,     setSearch]  = useState('');
   const [filter,     setFilter]  = useState<Filter>('hepsi');
+  const [selYear,    setSelYear] = useState(now.getFullYear());
+  const [selMonth,   setSelMonth] = useState(now.getMonth() + 1);
   const [loading,    setLoad]    = useState(true);
   const [refreshing, setRef]     = useState(false);
 
   const load = useCallback(async (pull = false) => {
     if (pull) setRef(true); else setLoad(true);
     try {
-      const d = await transactions.list();
+      const params: Record<string, string> = {
+        year: String(selYear),
+        month: String(selMonth),
+      };
+      const d = await transactions.list(params);
       setAll(Array.isArray(d) ? d as Tx[] : []);
     } catch { }
     finally { setLoad(false); setRef(false); }
-  }, []);
+  }, [selYear, selMonth]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -62,6 +71,23 @@ export default function LedgerScreen() {
       <View style={s.header}>
         <Text style={s.title}>İşlemler</Text>
         <Text style={s.count}>{filtered.length} kayıt</Text>
+      </View>
+
+      {/* Ay/Yıl seçici */}
+      <View style={s.dateRow}>
+        <TouchableOpacity onPress={() => {
+          const prev = new Date(selYear, selMonth - 2, 1);
+          setSelYear(prev.getFullYear()); setSelMonth(prev.getMonth() + 1);
+        }}>
+          <Text style={s.dateNav}>‹</Text>
+        </TouchableOpacity>
+        <Text style={s.dateLabel}>{MONTHS[selMonth - 1]} {selYear}</Text>
+        <TouchableOpacity onPress={() => {
+          const next = new Date(selYear, selMonth, 1);
+          setSelYear(next.getFullYear()); setSelMonth(next.getMonth() + 1);
+        }}>
+          <Text style={s.dateNav}>›</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Arama */}
@@ -110,6 +136,9 @@ const s = StyleSheet.create({
   container:   { flex: 1, backgroundColor: C.bg },
   center:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8 },
+  dateRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, paddingVertical: 10 },
+  dateNav:     { fontSize: 24, color: C.blue, paddingHorizontal: 8 },
+  dateLabel:   { fontSize: 15, fontWeight: '700', color: C.txt, minWidth: 100, textAlign: 'center' },
   title:       { fontSize: 24, fontWeight: '800', color: C.txt },
   count:       { fontSize: 13, color: C.txt2 },
   searchWrap:  { paddingHorizontal: 16, paddingVertical: 10 },

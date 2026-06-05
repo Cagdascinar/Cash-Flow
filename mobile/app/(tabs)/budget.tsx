@@ -2,7 +2,7 @@ import { View, Text, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, 
 import { useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { C, money } from '../../constants/Colors';
-import { goals as goalsApi, summary as summaryApi } from '../../services/api';
+import { goals as goalsApi, summary as summaryApi, budgets as budgetsApi } from '../../services/api';
 import { useRouter } from 'expo-router';
 
 function Bar({ v, max, color }: { v: number; max: number; color: string }) {
@@ -34,8 +34,18 @@ export default function BudgetScreen() {
       ]);
       setGoals(Array.isArray(g) ? g : []);
       setSum(s);
-    } finally { setLoad(false); setRef(false); }
+    } catch {} finally { setLoad(false); setRef(false); }
   }, []);
+
+  async function delGoal(id: number, name: string) {
+    Alert.alert('Hedefi Sil', `"${name}" hedefini silmek istiyor musunuz?`, [
+      { text: 'İptal', style: 'cancel' },
+      { text: 'Sil', style: 'destructive', onPress: async () => {
+        try { await goalsApi.delete(id); setGoals(p => p.filter(g => g.id !== id)); }
+        catch (e: any) { Alert.alert('Hata', e.message); }
+      }},
+    ]);
+  }
 
   useEffect(() => { load(); }, [load]);
 
@@ -93,8 +103,11 @@ export default function BudgetScreen() {
                 return (
                   <View key={g.id} style={s.card}>
                     <View style={s.row}>
-                      <Text style={s.cardTit}>{g.name}</Text>
+                      <Text style={[s.cardTit, { flex: 1 }]}>{g.name}</Text>
                       <Text style={[s.pct, { color }]}>%{Math.round(pct)}</Text>
+                      <TouchableOpacity onPress={() => delGoal(g.id, g.name)} style={{ paddingLeft: 10 }}>
+                        <Text style={{ color: C.muted, fontSize: 16 }}>✕</Text>
+                      </TouchableOpacity>
                     </View>
                     <Bar v={reached} max={target} color={color} />
                     <View style={[s.row, { marginTop: 6 }]}>

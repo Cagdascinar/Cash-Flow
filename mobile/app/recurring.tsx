@@ -21,6 +21,7 @@ export default function RecurringScreen() {
   const [modal,   setModal]   = useState(false);
 
   // Form state
+  const [editTarget, setEditTarget] = useState<any>(null);
   const [type,    setType]    = useState<'gider'|'gelir'>('gider');
   const [amount,  setAmount]  = useState('');
   const [desc,    setDesc]    = useState('');
@@ -36,15 +37,36 @@ export default function RecurringScreen() {
 
   useEffect(() => { load(); }, [load]);
 
+  function openEdit(r: any) {
+    setEditTarget(r);
+    setType(r.type);
+    setAmount(String(r.amount));
+    setDesc(r.description ?? '');
+    setCat(r.category);
+    setDay(String(r.day_of_month ?? 1));
+    setModal(true);
+  }
+
+  function openNew() {
+    setEditTarget(null);
+    setType('gider'); setAmount(''); setDesc(''); setCat(GIDER[0]); setDay('1');
+    setModal(true);
+  }
+
   async function save() {
     const amt = parseFloat(amount.replace(',', '.'));
     if (!amt || amt <= 0) { Alert.alert('Hata', 'Geçerli tutar girin'); return; }
     setSaving(true);
     try {
-      await recurringApi.create({ type, amount: amt, description: desc.trim(), category: cat, day_of_month: parseInt(day) || 1 });
+      if (editTarget) {
+        await recurringApi.update(editTarget.id, { type, amount: amt, description: desc.trim(), category: cat, day_of_month: parseInt(day) || 1 });
+        setList(p => p.map(r => r.id === editTarget.id ? { ...r, type, amount: amt, description: desc.trim(), category: cat, day_of_month: parseInt(day) || 1 } : r));
+      } else {
+        await recurringApi.create({ type, amount: amt, description: desc.trim(), category: cat, day_of_month: parseInt(day) || 1 });
+      }
       setModal(false);
       setAmount(''); setDesc('');
-      load();
+      if (!editTarget) load();
     } catch (e: any) { Alert.alert('Hata', e.message); }
     finally { setSaving(false); }
   }
@@ -64,7 +86,7 @@ export default function RecurringScreen() {
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()}><Text style={s.back}>←</Text></TouchableOpacity>
         <Text style={s.title}>Tekrarlayan İşlemler</Text>
-        <TouchableOpacity style={s.addBtn} onPress={() => setModal(true)}>
+        <TouchableOpacity style={s.addBtn} onPress={openNew}>
           <Text style={s.addTxt}>+ Ekle</Text>
         </TouchableOpacity>
       </View>
@@ -88,6 +110,9 @@ export default function RecurringScreen() {
                       <Text style={[s.amount, { color: r.type === 'gelir' ? C.green : C.red }]}>
                         {r.type === 'gelir' ? '+' : '-'}{money(r.amount)}
                       </Text>
+                      <TouchableOpacity onPress={() => openEdit(r)} style={{ padding: 4 }}>
+                        <Text style={{ color: C.blue, fontSize: 16 }}>✎</Text>
+                      </TouchableOpacity>
                       <TouchableOpacity onPress={() => del(r.id)} style={{ padding: 4 }}>
                         <Text style={{ color: C.muted, fontSize: 16 }}>✕</Text>
                       </TouchableOpacity>
@@ -105,7 +130,7 @@ export default function RecurringScreen() {
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={s.modalHeader}>
-                <Text style={s.modalTitle}>Tekrarlayan Ekle</Text>
+                <Text style={s.modalTitle}>{editTarget ? 'Tekrarlayan Düzenle' : 'Tekrarlayan Ekle'}</Text>
                 <TouchableOpacity onPress={() => setModal(false)}><Text style={s.close}>✕</Text></TouchableOpacity>
               </View>
 

@@ -17,6 +17,7 @@ export default function InvoicesScreen() {
   const [ref,     setRef]     = useState(false);
   const [tab,     setTab]     = useState<'bekleyen'|'odendi'>('bekleyen');
   const [modal,   setModal]   = useState(false);
+  const [aging,   setAging]   = useState<any>(null);
 
   // Form
   const [suppId,  setSuppId]  = useState<number | null>(null);
@@ -29,12 +30,14 @@ export default function InvoicesScreen() {
   const load = useCallback(async (pull = false) => {
     if (pull) setRef(true); else setLoading(true);
     try {
-      const [inv, sup] = await Promise.all([
+      const [inv, sup, ag] = await Promise.all([
         misc.supplierInvoices(tab),
         suppApi.list(),
+        tab === 'bekleyen' ? misc.supplierInvoiceAging().catch(() => null) : Promise.resolve(null),
       ]);
       setInvoices(Array.isArray(inv) ? inv : (inv as any).invoices ?? []);
       setSuppliers(Array.isArray(sup) ? sup : []);
+      setAging(ag);
     } catch {}
     finally { setLoading(false); setRef(false); }
   }, [tab]);
@@ -95,6 +98,24 @@ export default function InvoicesScreen() {
         ? <View style={s.center}><ActivityIndicator color={C.blue} /></View>
         : <ScrollView showsVerticalScrollIndicator={false}
             refreshControl={<RefreshControl refreshing={ref} onRefresh={() => load(true)} tintColor={C.blue} />}>
+
+            {/* Aging özeti */}
+            {tab === 'bekleyen' && aging?.buckets && (
+              <View style={s.agingCard}>
+                <Text style={s.agingTitle}>Vade Analizi</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 8 }}>
+                  {(aging.buckets as any[]).map((b: any, i: number) => (
+                    <View key={i} style={{ alignItems: 'center' }}>
+                      <Text style={[s.agingAmt, { color: b.total > 0 ? (i === 0 ? C.green : i === 1 ? C.yellow : C.red) : C.muted }]}>
+                        {b.total > 0 ? money(b.total) : '—'}
+                      </Text>
+                      <Text style={s.agingLbl}>{b.label}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
             {invoices.length === 0
               ? <View style={s.empty}><Text style={s.emptyIco}>📄</Text><Text style={s.emptyTxt}>Fatura yok</Text></View>
               : invoices.map(inv => {
@@ -208,6 +229,10 @@ const s = StyleSheet.create({
   suppBtn:  { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
   suppA:    { backgroundColor: C.blue, borderColor: C.blue },
   suppTxt:  { fontSize: 13, color: C.txt2 },
-  saveBtn:  { backgroundColor: C.blue, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 16, marginBottom: 32 },
-  saveTxt:  { fontSize: 16, fontWeight: '700', color: C.white },
+  saveBtn:   { backgroundColor: C.blue, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 16, marginBottom: 32 },
+  saveTxt:   { fontSize: 16, fontWeight: '700', color: C.white },
+  agingCard: { marginHorizontal: 16, marginTop: 10, backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border },
+  agingTitle: { fontSize: 12, fontWeight: '700', color: C.txt2, textTransform: 'uppercase', letterSpacing: 0.8 },
+  agingAmt:  { fontSize: 14, fontWeight: '800', marginBottom: 2 },
+  agingLbl:  { fontSize: 11, color: C.muted },
 });

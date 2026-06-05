@@ -1,9 +1,9 @@
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useEffect, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C, money } from '../../constants/Colors';
-import { cards as cardsApi, auth } from '../../services/api';
+import { cards as cardsApi, auth, profiles as profilesApi } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 
 function Row({ ico, label, sub, right, onPress, danger }: {
@@ -40,13 +40,24 @@ const r = StyleSheet.create({
 });
 
 export default function MoreScreen() {
-  const { user, logout } = useAuthStore();
+  const { user, activeProfile, setUser, logout } = useAuthStore();
   const router = useRouter();
-  const [cards, setCList] = useState<any[]>([]);
+  const [cards,     setCList]    = useState<any[]>([]);
+  const [switching, setSwitching] = useState<number | null>(null);
 
   useEffect(() => {
     cardsApi.list().then(d => setCList(Array.isArray(d) ? d : [])).catch(() => {});
   }, []);
+
+  async function switchProfile(id: number) {
+    setSwitching(id);
+    try {
+      await profilesApi.switch(id);
+      const u = await auth.me();
+      setUser(u);
+    } catch (e: any) { Alert.alert('Hata', (e as any).message); }
+    finally { setSwitching(null); }
+  }
 
   const debt  = cards.reduce((s, c) => s + (c.used_ ?? 0), 0);
   const limit = cards.reduce((s, c) => s + (c.limit_ ?? 0), 0);
@@ -59,16 +70,40 @@ export default function MoreScreen() {
         <View style={s.header}><Text style={s.title}>Daha Fazla</Text></View>
 
         {/* Profil */}
-        <View style={s.profile}>
+        <TouchableOpacity style={s.profile} onPress={() => go('/profiles')}>
           <View style={s.avatar}><Text style={s.avatarTxt}>{user?.username?.[0]?.toUpperCase() ?? '?'}</Text></View>
           <View style={{ flex: 1 }}>
             <Text style={s.username}>{user?.username}</Text>
-            <Text style={s.email}>{user?.email}</Text>
+            <Text style={s.email}>{activeProfile?.name ?? user?.email}</Text>
           </View>
           <View style={user?.is_premium ? s.proBadge : s.trialBadge}>
             <Text style={user?.is_premium ? s.proTxt : s.trialTxt}>{user?.is_premium ? '✨ PRO' : 'Deneme'}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
+
+        {/* Profil geçişi */}
+        {(user?.profiles?.length ?? 0) > 1 && (
+          <View style={s.profileSwitch}>
+            <Text style={s.switchLabel}>Profil Geçişi</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              {(user?.profiles ?? []).map(p => {
+                const isActive = p.id === user?.active_profile_id;
+                return (
+                  <TouchableOpacity
+                    key={p.id}
+                    style={[s.pChip, isActive && s.pChipActive]}
+                    onPress={() => !isActive && switchProfile(p.id)}
+                    disabled={isActive || switching === p.id}
+                  >
+                    {switching === p.id
+                      ? <ActivityIndicator size="small" color={isActive ? C.white : C.blue} />
+                      : <Text style={[s.pChipTxt, isActive && { color: C.white }]}>{p.name}</Text>}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
 
         {/* Kart özeti */}
         {cards.length > 0 && (
@@ -137,7 +172,9 @@ export default function MoreScreen() {
           <View style={s.sep} />
           <Row ico="🤖" label="Telegram Botu" sub="Mesajla işlem gir" onPress={() => go('/telegram')} />
           <View style={s.sep} />
-          <Row ico="⚙️" label="Ayarlar" sub="Hesap ve profil" onPress={() => go('/settings')} />
+          <Row ico="🧠" label="AI Analiz" sub="Harcama önerileri ve uyarılar" onPress={() => go('/insights')} />
+          <View style={s.sep} />
+          <Row ico="⚙️" label="Ayarlar" sub="Hesap, profil ve dışa aktarma" onPress={() => go('/settings')} />
         </View>
 
         <View style={[s.group, { marginTop: 16 }]}>
@@ -168,7 +205,12 @@ const s = StyleSheet.create({
   proTxt:      { fontSize: 11, fontWeight: '800', color: C.white },
   trialBadge:  { backgroundColor: C.input, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   trialTxt:    { fontSize: 11, fontWeight: '600', color: C.txt2 },
-  cardBanner:  { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 12, backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 14 },
+  profileSwitch: { marginHorizontal: 16, marginTop: 10 },
+  switchLabel:   { fontSize: 11, fontWeight: '700', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
+  pChip:         { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
+  pChipActive:   { backgroundColor: C.blue, borderColor: C.blue },
+  pChipTxt:      { fontSize: 13, fontWeight: '600', color: C.txt2 },
+  cardBanner:    { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 12, backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 14 },
   cbItem:      { flex: 1, alignItems: 'center' },
   cbVal:       { fontSize: 14, fontWeight: '800', color: C.txt },
   cbLbl:       { fontSize: 10, color: C.txt2, marginTop: 2 },

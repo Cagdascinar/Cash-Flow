@@ -10,8 +10,8 @@ import { C, money } from '../constants/Colors';
 import { investments as invApi } from '../services/api';
 
 const TYPES = [
-  { key: 'hisse', label: '📉 Hisse Senedi' },
-  { key: 'fon',   label: '📊 Yatırım Fonu' },
+  { key: 'hisse', label: '📉 Hisse' },
+  { key: 'fon',   label: '📊 Fon' },
   { key: 'doviz', label: '💵 Döviz' },
   { key: 'altin', label: '🥇 Altın' },
 ];
@@ -23,6 +23,7 @@ export default function InvestmentsScreen() {
   const [ref,     setRef]     = useState(false);
   const [modal,   setModal]   = useState(false);
 
+  // Ekle formu
   const [name,    setName]    = useState('');
   const [ticker,  setTicker]  = useState('');
   const [type,    setType]    = useState('hisse');
@@ -31,16 +32,49 @@ export default function InvestmentsScreen() {
   const [date,    setDate]    = useState(new Date().toISOString().split('T')[0]);
   const [saving,  setSaving]  = useState(false);
 
+  // TEFAS arama
+  const [tefasKod, setTefasKod] = useState('');
+  const [tefasRes, setTefasRes] = useState<any>(null);
+  const [tefasLoad, setTefasLoad] = useState(false);
+
+  // Gelir kayıt modali
+  const [incomeModal, setIncomeModal]   = useState(false);
+  const [incomeTarget, setIncomeTarget] = useState<any>(null);
+  const [incomeAmt,    setIncomeAmt]    = useState('');
+  const [incomeDate,   setIncomeDate]   = useState(new Date().toISOString().split('T')[0]);
+  const [incomeNote,   setIncomeNote]   = useState('');
+  const [savingIncome, setSavingIncome] = useState(false);
+
   const load = useCallback(async (pull = false) => {
     if (pull) setRef(true); else setLoading(true);
     try {
-      const d = await invApi.list();
-      setList(Array.isArray(d) ? d : []);
+      const [d, val] = await Promise.all([invApi.list(), invApi.value().catch(() => null)]);
+      const valMap: Record<number, number> = {};
+      if (val?.investments) {
+        (val.investments as any[]).forEach((v: any) => { valMap[v.id] = v.current_value; });
+      }
+      const merged = (Array.isArray(d) ? d : []).map((i: any) => ({
+        ...i,
+        current_value: valMap[i.id] ?? i.current_value ?? (i.quantity * i.buy_price),
+      }));
+      setList(merged);
     } catch {}
     finally { setLoading(false); setRef(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  async function searchTefas() {
+    if (!tefasKod.trim()) return;
+    setTefasLoad(true); setTefasRes(null);
+    try {
+      const d = await invApi.tefas(tefasKod.trim().toUpperCase());
+      setTefasRes(d);
+      if (d?.name) { setName(d.name); setType('fon'); }
+      if (d?.price) setPrice(String(d.price));
+    } catch { Alert.alert('Hata', 'Fon bulunamadı'); }
+    finally { setTefasLoad(false); }
+  }
 
   async function save() {
     const q = parseFloat(qty.replace(',', '.'));
@@ -50,26 +84,31 @@ export default function InvestmentsScreen() {
     try {
       await invApi.create({ name: name.trim(), symbol: ticker.trim().toUpperCase(), itype: type, quantity: q, buy_price: p, buy_date: date });
       setModal(false);
-      setName(''); setTicker(''); setQty(''); setPrice('');
+      setName(''); setTicker(''); setQty(''); setPrice(''); setTefasKod(''); setTefasRes(null);
       load();
     } catch (e: any) { Alert.alert('Hata', e.message); }
     finally { setSaving(false); }
   }
 
-  async function del(id: number) {
+  async function sellOrDelete(id: number) {
     Alert.alert('İşlem', 'Ne yapmak istiyorsunuz?', [
       { text: 'İptal', style: 'cancel' },
       { text: '💰 Sat', onPress: () => {
-        Alert.prompt('Satış Fiyatı', 'Birim satış fiyatını girin (₺)', async (val) => {
+        Alert.prompt('Satış Fiyatı', 'Birim satış fiyatı (₺)', async (val) => {
           if (!val) return;
-          const price = parseFloat(val.replace(',', '.'));
-          if (!price || price <= 0) { Alert.alert('Hata', 'Geçerli fiyat girin'); return; }
+          const sp = parseFloat(val.replace(',', '.'));
+          if (!sp || sp <= 0) { Alert.alert('Hata', 'Geçerli fiyat girin'); return; }
           try {
-            await invApi.sell(id, { sell_price: price, sell_date: new Date().toISOString().split('T')[0] });
+            await invApi.sell(id, { sell_price: sp, sell_date: new Date().toISOString().split('T')[0] });
             Alert.alert('✅ Satış Yapıldı');
             load();
           } catch (e: any) { Alert.alert('Hata', e.message); }
         });
+      }},
+      { text: '💵 Gelir Kaydet', onPress: () => {
+        const inv = list.find(i => i.id === id);
+        setIncomeTarget(inv); setIncomeAmt(''); setIncomeNote('');
+        setIncomeModal(true);
       }},
       { text: '🗑️ Sil', style: 'destructive', onPress: async () => {
         try { await invApi.delete(id); setList(p => p.filter(i => i.id !== id)); }
@@ -78,7 +117,19 @@ export default function InvestmentsScreen() {
     ]);
   }
 
-  const totalValue = list.reduce((s, i) => s + ((i.current_value ?? (i.quantity * i.buy_price)) || 0), 0);
+  async function saveIncome() {
+    const amt = parseFloat(incomeAmt.replace(',', '.'));
+    if (!amt || amt <= 0) { Alert.alert('Hata', 'Geçerli tutar girin'); return; }
+    setSavingIncome(true);
+    try {
+      await invApi.bookIncome(incomeTarget.id, { amount: amt, date: incomeDate, note: incomeNote.trim() });
+      setIncomeModal(false);
+      Alert.alert('✅ Gelir kaydedildi');
+    } catch (e: any) { Alert.alert('Hata', e.message); }
+    finally { setSavingIncome(false); }
+  }
+
+  const totalValue = list.reduce((s, i) => s + (i.current_value ?? 0), 0);
   const totalCost  = list.reduce((s, i) => s + (i.quantity * i.buy_price), 0);
   const pnl        = totalValue - totalCost;
 
@@ -106,6 +157,11 @@ export default function InvestmentsScreen() {
                   </View>
                   <View style={s.sumDiv} />
                   <View style={s.sumItem}>
+                    <Text style={s.sumLbl}>Maliyet</Text>
+                    <Text style={s.sumVal}>{money(totalCost)}</Text>
+                  </View>
+                  <View style={s.sumDiv} />
+                  <View style={s.sumItem}>
                     <Text style={s.sumLbl}>Kar / Zarar</Text>
                     <Text style={[s.sumVal, { color: pnl >= 0 ? C.green : C.red }]}>
                       {pnl >= 0 ? '+' : ''}{money(pnl)}
@@ -123,13 +179,13 @@ export default function InvestmentsScreen() {
                   const gain       = currentVal - cost;
                   const pct        = cost > 0 ? ((gain / cost) * 100) : 0;
                   return (
-                    <View key={inv.id} style={s.card}>
+                    <TouchableOpacity key={inv.id} style={s.card} onLongPress={() => sellOrDelete(inv.id)} onPress={() => sellOrDelete(inv.id)}>
                       <View style={s.cardTop}>
-                        <View>
+                        <View style={{ flex: 1 }}>
                           <Text style={s.invName}>{inv.name} {inv.ticker ? `(${inv.ticker})` : ''}</Text>
-                          <Text style={s.invType}>{inv.inv_type} · {inv.quantity} adet</Text>
+                          <Text style={s.invType}>{inv.inv_type ?? inv.itype} · {inv.quantity} adet</Text>
                         </View>
-                        <TouchableOpacity onPress={() => del(inv.id)}><Text style={{ color: C.muted }}>✕</Text></TouchableOpacity>
+                        <Text style={{ color: C.muted, fontSize: 20, paddingLeft: 8 }}>⋯</Text>
                       </View>
                       <View style={s.cardBot}>
                         <View>
@@ -147,7 +203,7 @@ export default function InvestmentsScreen() {
                           </Text>
                         </View>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   );
                 })
             }
@@ -155,13 +211,35 @@ export default function InvestmentsScreen() {
           </ScrollView>
       }
 
+      {/* Yatırım Ekle Modal */}
       <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={s.modal} edges={['top']}>
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={s.mHeader}>
                 <Text style={s.mTitle}>Yatırım Ekle</Text>
-                <TouchableOpacity onPress={() => setModal(false)}><Text style={s.close}>✕</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => { setModal(false); setTefasRes(null); setTefasKod(''); }}><Text style={s.close}>✕</Text></TouchableOpacity>
+              </View>
+
+              {/* TEFAS Arama */}
+              <View style={s.mField}>
+                <Text style={s.mLbl}>TEFAS Fon Kodu ile Ara</Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TextInput
+                    style={[s.mInput, { flex: 1 }]} value={tefasKod} onChangeText={setTefasKod}
+                    placeholder="YAB, TI2..." placeholderTextColor={C.muted}
+                    autoCapitalize="characters"
+                  />
+                  <TouchableOpacity style={s.searchBtn} onPress={searchTefas} disabled={tefasLoad}>
+                    {tefasLoad ? <ActivityIndicator color={C.white} size="small" /> : <Text style={s.searchTxt}>Ara</Text>}
+                  </TouchableOpacity>
+                </View>
+                {tefasRes && (
+                  <View style={s.tefasResult}>
+                    <Text style={s.tefasName}>{tefasRes.name}</Text>
+                    {tefasRes.price && <Text style={s.tefasPrice}>Güncel Fiyat: ₺{tefasRes.price}</Text>}
+                  </View>
+                )}
               </View>
 
               {[
@@ -195,6 +273,28 @@ export default function InvestmentsScreen() {
           </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
+
+      {/* Gelir Kayıt Modal */}
+      <Modal visible={incomeModal} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={s.modal} edges={['top']}>
+          <View style={s.mHeader}>
+            <Text style={s.mTitle}>Gelir Kaydet</Text>
+            <TouchableOpacity onPress={() => setIncomeModal(false)}><Text style={s.close}>✕</Text></TouchableOpacity>
+          </View>
+          <View style={{ padding: 16 }}>
+            {incomeTarget && <Text style={{ fontSize: 14, color: C.txt2, marginBottom: 16 }}>{incomeTarget.name} için temettü / kira / faiz geliri</Text>}
+            <Text style={s.mLbl}>Tutar (₺)</Text>
+            <TextInput style={[s.mInput, { marginBottom: 14 }]} value={incomeAmt} onChangeText={setIncomeAmt} placeholder="0,00" placeholderTextColor={C.muted} keyboardType="decimal-pad" />
+            <Text style={s.mLbl}>Tarih</Text>
+            <TextInput style={[s.mInput, { marginBottom: 14 }]} value={incomeDate} onChangeText={setIncomeDate} placeholder="YYYY-MM-DD" placeholderTextColor={C.muted} />
+            <Text style={s.mLbl}>Not</Text>
+            <TextInput style={[s.mInput, { marginBottom: 24 }]} value={incomeNote} onChangeText={setIncomeNote} placeholder="Temettü, kira..." placeholderTextColor={C.muted} />
+            <TouchableOpacity style={[s.saveBtn, savingIncome && { opacity: 0.6 }]} onPress={saveIncome} disabled={savingIncome}>
+              {savingIncome ? <ActivityIndicator color={C.white} /> : <Text style={s.saveTxt}>💵 Geliri Kaydet</Text>}
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -210,11 +310,11 @@ const s = StyleSheet.create({
   summaryCard: { margin: 16, backgroundColor: C.hero, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(99,160,255,.15)' },
   sumRow:      { flexDirection: 'row', alignItems: 'center' },
   sumItem:     { flex: 1, alignItems: 'center' },
-  sumLbl:      { fontSize: 12, color: 'rgba(255,255,255,.45)', marginBottom: 4 },
-  sumVal:      { fontSize: 18, fontWeight: '800' },
-  sumDiv:      { width: 1, height: 36, backgroundColor: 'rgba(255,255,255,.1)', marginHorizontal: 16 },
+  sumLbl:      { fontSize: 11, color: 'rgba(255,255,255,.45)', marginBottom: 4 },
+  sumVal:      { fontSize: 15, fontWeight: '800', color: C.txt },
+  sumDiv:      { width: 1, height: 36, backgroundColor: 'rgba(255,255,255,.1)', marginHorizontal: 8 },
   card:        { marginHorizontal: 16, marginBottom: 10, backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border },
-  cardTop:     { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  cardTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
   invName:     { fontSize: 15, fontWeight: '700', color: C.txt },
   invType:     { fontSize: 12, color: C.txt2, marginTop: 2 },
   cardBot:     { flexDirection: 'row', justifyContent: 'space-between' },
@@ -236,4 +336,9 @@ const s = StyleSheet.create({
   typeTxt:     { fontSize: 13, color: C.txt2 },
   saveBtn:     { margin: 16, marginTop: 24, marginBottom: 32, backgroundColor: C.blue, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
   saveTxt:     { fontSize: 16, fontWeight: '700', color: C.white },
+  searchBtn:   { backgroundColor: C.blue, borderRadius: 12, paddingHorizontal: 16, justifyContent: 'center' },
+  searchTxt:   { fontSize: 14, fontWeight: '700', color: C.white },
+  tefasResult: { backgroundColor: C.input, borderRadius: 10, padding: 12, marginTop: 8 },
+  tefasName:   { fontSize: 13, fontWeight: '600', color: C.txt },
+  tefasPrice:  { fontSize: 12, color: C.green, marginTop: 4 },
 });

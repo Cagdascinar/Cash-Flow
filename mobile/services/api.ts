@@ -100,6 +100,8 @@ export const investments = {
     req<any>(`/api/investments/${id}/sell`, { method: 'POST', body: JSON.stringify(d) }),
   bookIncome: (id: number, d: Record<string, unknown>) =>
     req<any>(`/api/investments/${id}/book-income`, { method: 'POST', body: JSON.stringify(d) }),
+  value: () => req<any>('/api/investments/value'),
+  tefas: (kod: string) => req<any>(`/api/tefas/${kod}`),
 };
 
 // ─── Tekrarlayan ─────────────────────────────────────────────────────────────
@@ -107,6 +109,8 @@ export const recurring = {
   list:   () => req<any[]>('/api/recurring'),
   create: (d: Record<string, unknown>) =>
     req<any>('/api/recurring', { method: 'POST', body: JSON.stringify(d) }),
+  update: (id: number, d: Record<string, unknown>) =>
+    req<any>(`/api/recurring/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
   delete: (id: number) => req<any>(`/api/recurring/${id}`, { method: 'DELETE' }),
   apply:  () => req<any>('/api/recurring/apply', { method: 'POST' }),
 };
@@ -126,6 +130,9 @@ export const budgets = {
 // ─── Profiller ───────────────────────────────────────────────────────────────
 export const profiles = {
   list:   () => req<any[]>('/api/profiles'),
+  create: (d: Record<string, unknown>) =>
+    req<any>('/api/profiles', { method: 'POST', body: JSON.stringify(d) }),
+  delete: (id: number) => req<any>(`/api/profiles/${id}`, { method: 'DELETE' }),
   switch: (id: number) =>
     req<any>(`/api/profiles/${id}/switch`, { method: 'POST' }),
 };
@@ -147,7 +154,21 @@ export const assets = {
     req<any>('/api/assets', { method: 'POST', body: JSON.stringify(d) }),
   update: (id: number, d: Record<string, unknown>) =>
     req<any>(`/api/assets/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
-  delete: (id: number) => req<any>(`/api/assets/${id}`, { method: 'DELETE' }),
+  delete:         (id: number) => req<any>(`/api/assets/${id}`, { method: 'DELETE' }),
+  maintenance:    (id: number) => req<any[]>(`/api/assets/${id}/maintenance`),
+  addMaintenance: (id: number, d: Record<string, unknown>) =>
+    req<any>(`/api/assets/${id}/maintenance`, { method: 'POST', body: JSON.stringify(d) }),
+  delMaintenance: (mid: number) =>
+    req<any>(`/api/assets/maintenance/${mid}`, { method: 'DELETE' }),
+};
+
+// ─── Hesap Yönetimi ──────────────────────────────────────────────────────────
+export const me = {
+  update:         (d: Record<string, unknown>) =>
+    req<any>('/api/me/update', { method: 'POST', body: JSON.stringify(d) }),
+  changePassword: (d: Record<string, unknown>) =>
+    req<any>('/api/me/password', { method: 'POST', body: JSON.stringify(d) }),
+  delete:         () => req<any>('/api/me/delete', { method: 'POST' }),
 };
 
 // ─── Diğer ───────────────────────────────────────────────────────────────────
@@ -178,4 +199,8 @@ export const misc = {
     req<any>(`/api/supplier-invoices/${id}/pay`, { method: 'POST' }),
   deleteSupplierInvoice: (id: number) =>
     req<any>(`/api/supplier-invoices/${id}`, { method: 'DELETE' }),
+  supplierInvoiceAging: () => req<any>('/api/supplier-invoices/aging'),
+  exportExcel: () => `${BASE_URL}/api/export/excel`,
+  exportPdf:   () => `${BASE_URL}/api/export/pdf`,
+  motivation:  () => req<any>('/api/motivation'),
 };
