@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -18,6 +18,16 @@ export default function AccountsScreen() {
     try { setList(await accountsApi.list() as any[]); } catch {}
     finally { setLoad(false); setRef(false); }
   }, []);
+
+  async function del(id: number) {
+    Alert.alert('Hesabı Sil', 'Bu hesabı silmek istiyor musunuz?', [
+      { text: 'İptal', style: 'cancel' },
+      { text: 'Sil', style: 'destructive', onPress: async () => {
+        try { await accountsApi.delete(id); setList(p => p.filter(a => a.id !== id)); }
+        catch (e: any) { Alert.alert('Hata', e.message); }
+      }},
+    ]);
+  }
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -60,10 +70,13 @@ export default function AccountsScreen() {
                     <Text style={s.name}>{a.name}</Text>
                     <Text style={s.bank}>{a.bank} · {TYPE_LBL[a.type] ?? a.type}</Text>
                   </View>
-                  <View style={{ alignItems: 'flex-end' }}>
+                  <View style={{ alignItems: 'flex-end', gap: 2 }}>
                     <Text style={[s.bal, { color }]}>{money(Math.abs(bal))}</Text>
                     {isD && <Text style={{ fontSize: 11, color: C.red }}>Borç</Text>}
                     {a.available != null && <Text style={{ fontSize: 11, color: C.green }}>Kalan: {money(a.available)}</Text>}
+                    <TouchableOpacity onPress={() => del(a.id)}>
+                      <Text style={{ fontSize: 12, color: C.muted }}>🗑️ Sil</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               );

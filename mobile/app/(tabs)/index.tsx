@@ -1,8 +1,9 @@
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { C } from '../../constants/Colors';
-import { summary as summaryApi, transactions } from '../../services/api';
+import { useRouter } from 'expo-router';
+import { C, money, fmtDate } from '../../constants/Colors';
+import { summary as summaryApi, transactions, misc } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 import { BalanceCard } from '../../components/BalanceCard';
 import { TransactionItem, type Tx } from '../../components/TransactionItem';
@@ -12,26 +13,29 @@ const PERIOD_MAP: Record<Period, string> = { ay: 'month', yil: 'year', tum: 'all
 
 export default function Dashboard() {
   const { user, activeProfile } = useAuthStore();
-  const [sum,        setSum]    = useState<any>(null);
-  const [recent,     setRecent] = useState<Tx[]>([]);
-  const [period,     setPeriod] = useState<Period>('ay');
-  const [loading,    setLoad]   = useState(true);
-  const [refreshing, setRef]    = useState(false);
+  const router = useRouter();
+  const [sum,        setSum]      = useState<any>(null);
+  const [recent,     setRecent]   = useState<Tx[]>([]);
+  const [today,      setToday]    = useState<any>(null);
+  const [reminders,  setReminders]= useState<any[]>([]);
+  const [period,     setPeriod]   = useState<Period>('ay');
+  const [loading,    setLoad]     = useState(true);
+  const [refreshing, setRef]      = useState(false);
 
   const load = useCallback(async (pull = false) => {
     if (pull) setRef(true); else setLoad(true);
     try {
       const now = new Date();
-      const [s, tx] = await Promise.all([
-        summaryApi.get(
-          PERIOD_MAP[period],
-          now.getFullYear(),
-          period === 'ay' ? now.getMonth() + 1 : undefined,
-        ),
+      const [s, tx, tod, rem] = await Promise.all([
+        summaryApi.get(PERIOD_MAP[period], now.getFullYear(), period === 'ay' ? now.getMonth() + 1 : undefined),
         transactions.list(),
+        misc.today().catch(() => null),
+        misc.reminders().catch(() => []),
       ]);
       setSum(s);
-      setRecent(Array.isArray(tx) ? (tx as Tx[]).slice(0, 10) : []);
+      setRecent(Array.isArray(tx) ? (tx as Tx[]).slice(0, 8) : []);
+      setToday(tod);
+      setReminders(Array.isArray(rem) ? rem.slice(0, 5) : []);
     } catch (e) {
       console.warn('dashboard load error', e);
     } finally { setLoad(false); setRef(false); }
@@ -45,40 +49,77 @@ export default function Dashboard() {
     </SafeAreaView>
   );
 
+  const gelir = sum?.gelir ?? 0;
+  const gider = sum?.gider ?? 0;
+  const net   = sum?.net   ?? 0;
+
+  const todayGelir: any[] = today?.gelir ?? [];
+  const todayGider: any[] = today?.gider ?? [];
+
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={C.blue} />}
       >
-        {/* Başlık */}
         <View style={s.header}>
           <View>
             <Text style={s.greeting}>Merhaba, {user?.username} 👋</Text>
             <Text style={s.profile}>{activeProfile?.name}</Text>
           </View>
+          <TouchableOpacity onPress={() => router.push('/todos' as any)} style={s.todoBtn}>
+            <Text style={s.todoBtnTxt}>✅ Görevler</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Bakiye kartı */}
         <BalanceCard
-          gelir={sum?.gelir ?? 0}
-          gider={sum?.gider ?? 0}
-          net={sum?.net   ?? 0}
-          kullanilabilir={sum?.kullanilabilir_nakit ?? (sum?.net ?? 0)}
+          gelir={gelir} gider={gider} net={net}
+          kullanilabilir={sum?.kullanilabilir_nakit ?? net}
           kartBorcu={sum?.kart_borcu ?? 0}
           period={period}
           onPeriod={setPeriod}
         />
 
+        {/* Hatırlatıcılar */}
+        {reminders.length > 0 && (
+          <View style={s.section}>
+            <Text style={s.sTitle}>🔔 Hatırlatıcılar</Text>
+            <View style={s.remList}>
+              {reminders.map((r: any, i: number) => (
+                <View key={i} style={[s.remItem, i < reminders.length - 1 && s.remBorder]}>
+                  <Text style={s.remIco}>{r.type === 'card' ? '💳' : r.type === 'recurring' ? '🔄' : '📌'}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.remName}>{r.name ?? r.description}</Text>
+                    {r.due_date && <Text style={s.remDate}>{fmtDate(r.due_date)}</Text>}
+                  </View>
+                  {r.amount && <Text style={[s.remAmt, { color: C.red }]}>{money(r.amount)}</Text>}
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Bugünün işlemleri */}
+        {(todayGelir.length > 0 || todayGider.length > 0) && (
+          <View style={s.section}>
+            <Text style={s.sTitle}>📅 Bugün</Text>
+            {[...todayGelir, ...todayGider].map((tx: any) => (
+              <View key={tx.id} style={s.todayTx}>
+                <TransactionItem item={tx} onPress={(t) => router.push({ pathname: '/edit-tx' as any, params: { id: t.id, type: t.type, amount: String(t.amount), category: t.category, description: t.description ?? '', date: t.date } })} />
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* Son işlemler */}
         <View style={s.section}>
-          <Text style={s.sectionTitle}>Son İşlemler</Text>
+          <Text style={s.sTitle}>Son İşlemler</Text>
           {recent.length === 0
             ? <View style={s.empty}><Text style={s.emptyIco}>📭</Text><Text style={s.emptyTxt}>Henüz işlem yok</Text></View>
             : <View style={s.list}>
                 {recent.map((tx, i) => (
                   <View key={tx.id}>
-                    <TransactionItem item={tx} />
+                    <TransactionItem item={tx} onPress={(t) => router.push({ pathname: '/edit-tx' as any, params: { id: t.id, type: t.type, amount: String(t.amount), category: t.category, description: t.description ?? '', date: t.date } })} />
                     {i < recent.length - 1 && <View style={s.sep} />}
                   </View>
                 ))}
@@ -91,16 +132,26 @@ export default function Dashboard() {
 }
 
 const s = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: C.bg },
-  center:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:       { paddingHorizontal: 16, paddingVertical: 16 },
-  greeting:     { fontSize: 20, fontWeight: '700', color: C.txt },
-  profile:      { fontSize: 13, color: C.txt2, marginTop: 2 },
-  section:      { marginTop: 24, paddingHorizontal: 16, paddingBottom: 24 },
-  sectionTitle: { fontSize: 12, fontWeight: '700', color: C.txt2, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
-  list:         { backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
-  sep:          { height: 1, backgroundColor: C.border, marginHorizontal: 14 },
-  empty:        { alignItems: 'center', paddingVertical: 32 },
-  emptyIco:     { fontSize: 40, marginBottom: 8 },
-  emptyTxt:     { fontSize: 14, color: C.txt2 },
+  container:   { flex: 1, backgroundColor: C.bg },
+  center:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
+  greeting:    { fontSize: 20, fontWeight: '700', color: C.txt },
+  profile:     { fontSize: 13, color: C.txt2, marginTop: 2 },
+  todoBtn:     { backgroundColor: C.card, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: C.border },
+  todoBtnTxt:  { fontSize: 12, fontWeight: '600', color: C.txt2 },
+  section:     { marginTop: 20, paddingHorizontal: 16 },
+  sTitle:      { fontSize: 12, fontWeight: '700', color: C.txt2, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
+  remList:     { backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
+  remItem:     { flexDirection: 'row', alignItems: 'center', padding: 12, gap: 10 },
+  remBorder:   { borderBottomWidth: 1, borderBottomColor: C.border },
+  remIco:      { fontSize: 18 },
+  remName:     { fontSize: 14, fontWeight: '600', color: C.txt },
+  remDate:     { fontSize: 12, color: C.txt2, marginTop: 2 },
+  remAmt:      { fontSize: 14, fontWeight: '700' },
+  todayTx:     { backgroundColor: C.card, borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
+  list:        { backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: 'hidden', paddingBottom: 4 },
+  sep:         { height: 1, backgroundColor: C.border, marginHorizontal: 14 },
+  empty:       { alignItems: 'center', paddingVertical: 32, backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border },
+  emptyIco:    { fontSize: 40, marginBottom: 8 },
+  emptyTxt:    { fontSize: 14, color: C.txt2 },
 });

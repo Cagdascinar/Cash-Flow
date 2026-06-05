@@ -163,4 +163,12 @@ export const misc = {
     req<any>(`/api/todos/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
   deleteTodo:     (id: number) =>
     req<any>(`/api/todos/${id}`, { method: 'DELETE' }),
+  supplierInvoices: (status = 'bekleyen') =>
+    req<any>(`/api/supplier-invoices?status=${status}`),
+  addSupplierInvoice: (d: Record<string, unknown>) =>
+    req<any>('/api/supplier-invoices', { method: 'POST', body: JSON.stringify(d) }),
+  paySupplierInvoice: (id: number) =>
+    req<any>(`/api/supplier-invoices/${id}/pay`, { method: 'POST' }),
+  deleteSupplierInvoice: (id: number) =>
+    req<any>(`/api/supplier-invoices/${id}`, { method: 'DELETE' }),
 };

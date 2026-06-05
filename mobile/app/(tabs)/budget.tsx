@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { C, money } from '../../constants/Colors';
 import { goals as goalsApi, summary as summaryApi } from '../../services/api';
+import { useRouter } from 'expo-router';
 
 function Bar({ v, max, color }: { v: number; max: number; color: string }) {
   return (
@@ -17,6 +18,7 @@ const b = StyleSheet.create({
 });
 
 export default function BudgetScreen() {
+  const router = useRouter();
   const [goals,  setGoals]  = useState<any[]>([]);
   const [sum,    setSum]    = useState<any>(null);
   const [loading, setLoad]  = useState(true);
@@ -52,7 +54,17 @@ export default function BudgetScreen() {
       <ScrollView showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={ref} onRefresh={() => load(true)} tintColor={C.blue} />}>
 
-        <View style={s.header}><Text style={s.title}>Bütçe & Hedefler</Text></View>
+        <View style={s.header}>
+          <Text style={s.title}>Bütçe & Hedefler</Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity style={s.hBtn} onPress={() => router.push('/add-goal' as any)}>
+              <Text style={s.hBtnTxt}>+ Hedef</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.hBtn, { backgroundColor: C.card }]} onPress={() => router.push('/set-budget' as any)}>
+              <Text style={[s.hBtnTxt, { color: C.txt }]}>⚙️ Limit</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {/* Bu ay özeti */}
         {sum && (
@@ -128,8 +140,10 @@ export default function BudgetScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
   center:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:    { paddingHorizontal: 16, paddingTop: 8 },
-  title:     { fontSize: 24, fontWeight: '800', color: C.txt },
+  header:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8 },
+  title:     { fontSize: 22, fontWeight: '800', color: C.txt },
+  hBtn:      { backgroundColor: C.blue, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
+  hBtnTxt:   { fontSize: 13, fontWeight: '700', color: C.white },
   monthCard: { margin: 16, backgroundColor: C.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: C.border },
   row:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   monthLbl:  { fontSize: 13, color: C.txt2, fontWeight: '600' },

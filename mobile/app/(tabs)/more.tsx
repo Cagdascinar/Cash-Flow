@@ -110,7 +110,9 @@ export default function MoreScreen() {
 
         <Text style={s.grp}>Kurumsal</Text>
         <View style={s.group}>
-          <Row ico="🏢" label="Tedarikçiler" sub="Tedarikçi ve fatura yönetimi" onPress={() => go('/suppliers')} />
+          <Row ico="🏢" label="Tedarikçiler" sub="Tedarikçi yönetimi" onPress={() => go('/suppliers')} />
+          <View style={s.sep} />
+          <Row ico="📄" label="Tedarikçi Faturaları" sub="Fatura takibi ve ödeme" onPress={() => go('/invoices')} />
           <View style={s.sep} />
           <Row ico="🏗️" label="Varlıklar" sub="Demirbaş ve araçlar" onPress={() => go('/assets')} />
         </View>

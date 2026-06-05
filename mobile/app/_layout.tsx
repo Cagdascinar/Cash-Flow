@@ -37,6 +37,9 @@ export default function RootLayout() {
         <Stack.Screen name="transfer"     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="todos"        options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="pay-card"     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="add-goal"     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="set-budget"   options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="invoices"     options={{ animation: 'slide_from_right' }} />
       </Stack>
     </>
   );
