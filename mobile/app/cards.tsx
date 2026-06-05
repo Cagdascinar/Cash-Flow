@@ -56,6 +56,9 @@ export default function CardsScreen() {
         <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()}><Text style={s.back}>←</Text></TouchableOpacity>
           <Text style={s.title}>Kredi Kartları</Text>
+          <TouchableOpacity style={s.addBtn} onPress={() => router.push('/add-card' as any)}>
+            <Text style={s.addTxt}>+ Ekle</Text>
+          </TouchableOpacity>
         </View>
 
         {list.length > 0 && (
@@ -104,7 +107,9 @@ const s = StyleSheet.create({
   center:  { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, gap: 12 },
   back:    { fontSize: 24, color: C.txt },
-  title:   { fontSize: 22, fontWeight: '800', color: C.txt },
+  title:   { fontSize: 22, fontWeight: '800', color: C.txt, flex: 1 },
+  addBtn:  { backgroundColor: C.blue, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
+  addTxt:  { fontSize: 14, fontWeight: '700', color: C.white },
   row3:    { flexDirection: 'row', marginHorizontal: 16, marginBottom: 12, gap: 8 },
   box:     { flex: 1, backgroundColor: C.card, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center' },
   boxVal:  { fontSize: 13, fontWeight: '800' },

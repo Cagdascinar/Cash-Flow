@@ -35,6 +35,9 @@ export default function AccountsScreen() {
         <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()}><Text style={s.back}>←</Text></TouchableOpacity>
           <Text style={s.title}>Hesaplar</Text>
+          <TouchableOpacity style={s.addBtn} onPress={() => router.push('/add-account' as any)}>
+            <Text style={s.addTxt}>+ Ekle</Text>
+          </TouchableOpacity>
         </View>
 
         {list.length > 0 && (
@@ -77,7 +80,9 @@ const s = StyleSheet.create({
   center:   { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, gap: 12 },
   back:     { fontSize: 24, color: C.txt },
-  title:    { fontSize: 22, fontWeight: '800', color: C.txt },
+  title:    { fontSize: 22, fontWeight: '800', color: C.txt, flex: 1 },
+  addBtn:   { backgroundColor: C.blue, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
+  addTxt:   { fontSize: 14, fontWeight: '700', color: C.white },
   totalCard:{ margin: 16, backgroundColor: '#0d1f3c', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: 'rgba(99,160,255,.15)', alignItems: 'center' },
   totalLbl: { fontSize: 13, color: 'rgba(255,255,255,.45)' },
   totalVal: { fontSize: 30, fontWeight: '900', marginTop: 4, letterSpacing: -1 },

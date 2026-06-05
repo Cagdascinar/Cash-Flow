@@ -25,7 +25,6 @@ export default function RecurringScreen() {
   const [amount,  setAmount]  = useState('');
   const [desc,    setDesc]    = useState('');
   const [cat,     setCat]     = useState(GIDER[0]);
-  const [freq,    setFreq]    = useState('monthly');
   const [day,     setDay]     = useState('1');
   const [saving,  setSaving]  = useState(false);
 
@@ -42,7 +41,7 @@ export default function RecurringScreen() {
     if (!amt || amt <= 0) { Alert.alert('Hata', 'Geçerli tutar girin'); return; }
     setSaving(true);
     try {
-      await recurringApi.create({ type, amount: amt, description: desc.trim(), category: cat, frequency: freq, day_of_month: parseInt(day) || 1, active: 1 });
+      await recurringApi.create({ type, amount: amt, description: desc.trim(), category: cat, day_of_month: parseInt(day) || 1 });
       setModal(false);
       setAmount(''); setDesc('');
       load();
@@ -130,14 +129,8 @@ export default function RecurringScreen() {
               </View>
 
               <View style={s.mField}>
-                <Text style={s.mLbl}>Sıklık</Text>
-                <View style={s.freqRow}>
-                  {FREQ.map(f => (
-                    <TouchableOpacity key={f.key} style={[s.freqBtn, freq === f.key && s.freqA]} onPress={() => setFreq(f.key)}>
-                      <Text style={[s.freqTxt, freq === f.key && { color: C.white, fontWeight: '600' }]}>{f.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <Text style={s.mLbl}>Ödeme Günü (1-31)</Text>
+                <TextInput style={s.mInput} value={day} onChangeText={setDay} placeholder="1" placeholderTextColor={C.muted} keyboardType="number-pad" />
               </View>
 
               <View style={s.mField}>

@@ -9,7 +9,12 @@ import { useRouter } from 'expo-router';
 import { C, money } from '../constants/Colors';
 import { investments as invApi } from '../services/api';
 
-const TYPES = ['Hisse Senedi','Fon','Kripto','Döviz','Altın','Gümüş','Tahvil','Diğer'];
+const TYPES = [
+  { key: 'hisse', label: '📉 Hisse Senedi' },
+  { key: 'fon',   label: '📊 Yatırım Fonu' },
+  { key: 'doviz', label: '💵 Döviz' },
+  { key: 'altin', label: '🥇 Altın' },
+];
 
 export default function InvestmentsScreen() {
   const router = useRouter();
@@ -20,7 +25,7 @@ export default function InvestmentsScreen() {
 
   const [name,    setName]    = useState('');
   const [ticker,  setTicker]  = useState('');
-  const [type,    setType]    = useState(TYPES[0]);
+  const [type,    setType]    = useState('hisse');
   const [qty,     setQty]     = useState('');
   const [price,   setPrice]   = useState('');
   const [date,    setDate]    = useState(new Date().toISOString().split('T')[0]);
@@ -43,7 +48,7 @@ export default function InvestmentsScreen() {
     if (!name.trim() || !q || !p) { Alert.alert('Hata', 'İsim, miktar ve fiyat gerekli'); return; }
     setSaving(true);
     try {
-      await invApi.create({ name: name.trim(), ticker: ticker.trim(), inv_type: type, quantity: q, buy_price: p, buy_date: date });
+      await invApi.create({ name: name.trim(), symbol: ticker.trim().toUpperCase(), itype: type, quantity: q, buy_price: p, buy_date: date });
       setModal(false);
       setName(''); setTicker(''); setQty(''); setPrice('');
       load();
@@ -164,8 +169,8 @@ export default function InvestmentsScreen() {
                 <Text style={s.mLbl}>Yatırım Tipi</Text>
                 <View style={s.typeGrid}>
                   {TYPES.map(t => (
-                    <TouchableOpacity key={t} style={[s.typeBtn, type === t && s.typeA]} onPress={() => setType(t)}>
-                      <Text style={[s.typeTxt, type === t && { color: C.white }]}>{t}</Text>
+                    <TouchableOpacity key={t.key} style={[s.typeBtn, type === t.key && s.typeA]} onPress={() => setType(t.key)}>
+                      <Text style={[s.typeTxt, type === t.key && { color: C.white }]}>{t.label}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
