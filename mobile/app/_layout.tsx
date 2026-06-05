@@ -1,10 +1,7 @@
 import { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import * as SplashScreen from 'expo-splash-screen';
 import { useAuthStore } from '../stores/authStore';
-
-SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const { user, isLoading, hydrate } = useAuthStore();
@@ -15,7 +12,6 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (isLoading) return;
-    SplashScreen.hideAsync();
     const inAuth = segments[0] === '(auth)';
     if (!user && !inAuth) router.replace('/(auth)/login');
     if ( user &&  inAuth) router.replace('/(tabs)');
