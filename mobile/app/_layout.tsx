@@ -39,7 +39,10 @@ export default function RootLayout() {
         <Stack.Screen name="pay-card"     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="add-goal"     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="set-budget"   options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="invoices"     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="invoices"       options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="rates"          options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="card-report"    options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="notifications"  options={{ animation: 'slide_from_right' }} />
       </Stack>
     </>
   );

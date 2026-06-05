@@ -69,13 +69,16 @@ export const transactions = {
 
 // ─── Kredi Kartları ─────────────────────────────────────────────────────────
 export const cards = {
-  list:   ()                               => req<any[]>('/api/cards'),
-  create: (d: Record<string, unknown>)     => req<any>('/api/cards',     { method: 'POST', body: JSON.stringify(d) }),
-  update: (id: number, d: Record<string, unknown>) =>
+  list:             ()                               => req<any[]>('/api/cards'),
+  create:           (d: Record<string, unknown>)     => req<any>('/api/cards',     { method: 'POST', body: JSON.stringify(d) }),
+  update:           (id: number, d: Record<string, unknown>) =>
     req<any>(`/api/cards/${id}`,   { method: 'PUT',  body: JSON.stringify(d) }),
-  delete: (id: number)                     => req<any>(`/api/cards/${id}`, { method: 'DELETE' }),
-  pay:    (id: number, d: Record<string, unknown>) =>
+  delete:           (id: number)                     => req<any>(`/api/cards/${id}`, { method: 'DELETE' }),
+  pay:              (id: number, d: Record<string, unknown>) =>
     req<any>(`/api/cards/${id}/pay`, { method: 'POST', body: JSON.stringify(d) }),
+  dailyReport:      ()                               => req<any>('/api/cards/daily-report'),
+  addDailyBalance:  (id: number, balance: number)    =>
+    req<any>('/api/cards/daily-balance', { method: 'POST', body: JSON.stringify({ card_id: id, balance }) }),
 };
 
 // ─── Hesaplar ────────────────────────────────────────────────────────────────
@@ -89,10 +92,14 @@ export const accounts = {
 
 // ─── Yatırımlar ──────────────────────────────────────────────────────────────
 export const investments = {
-  list:   () => req<any[]>('/api/investments'),
-  create: (d: Record<string, unknown>) =>
+  list:       () => req<any[]>('/api/investments'),
+  create:     (d: Record<string, unknown>) =>
     req<any>('/api/investments', { method: 'POST', body: JSON.stringify(d) }),
-  delete: (id: number) => req<any>(`/api/investments/${id}`, { method: 'DELETE' }),
+  delete:     (id: number) => req<any>(`/api/investments/${id}`, { method: 'DELETE' }),
+  sell:       (id: number, d: Record<string, unknown>) =>
+    req<any>(`/api/investments/${id}/sell`, { method: 'POST', body: JSON.stringify(d) }),
+  bookIncome: (id: number, d: Record<string, unknown>) =>
+    req<any>(`/api/investments/${id}/book-income`, { method: 'POST', body: JSON.stringify(d) }),
 };
 
 // ─── Tekrarlayan ─────────────────────────────────────────────────────────────

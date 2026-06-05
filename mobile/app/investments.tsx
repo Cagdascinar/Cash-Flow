@@ -57,9 +57,21 @@ export default function InvestmentsScreen() {
   }
 
   async function del(id: number) {
-    Alert.alert('Sil', 'Bu yatırımı silmek istiyor musunuz?', [
+    Alert.alert('İşlem', 'Ne yapmak istiyorsunuz?', [
       { text: 'İptal', style: 'cancel' },
-      { text: 'Sil', style: 'destructive', onPress: async () => {
+      { text: '💰 Sat', onPress: () => {
+        Alert.prompt('Satış Fiyatı', 'Birim satış fiyatını girin (₺)', async (val) => {
+          if (!val) return;
+          const price = parseFloat(val.replace(',', '.'));
+          if (!price || price <= 0) { Alert.alert('Hata', 'Geçerli fiyat girin'); return; }
+          try {
+            await invApi.sell(id, { sell_price: price, sell_date: new Date().toISOString().split('T')[0] });
+            Alert.alert('✅ Satış Yapıldı');
+            load();
+          } catch (e: any) { Alert.alert('Hata', e.message); }
+        });
+      }},
+      { text: '🗑️ Sil', style: 'destructive', onPress: async () => {
         try { await invApi.delete(id); setList(p => p.filter(i => i.id !== id)); }
         catch (e: any) { Alert.alert('Hata', e.message); }
       }},

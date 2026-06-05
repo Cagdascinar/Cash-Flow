@@ -124,8 +124,17 @@ export default function MoreScreen() {
           <Row ico="✅" label="Yapılacaklar" sub="Günlük görev listesi" onPress={() => go('/todos')} />
         </View>
 
+        <Text style={s.grp}>Piyasa</Text>
+        <View style={s.group}>
+          <Row ico="💱" label="Canlı Kurlar" sub="USD, EUR, Altın ve daha fazlası" onPress={() => go('/rates')} />
+          <View style={s.sep} />
+          <Row ico="📊" label="Günlük Kart Raporu" sub="Kart bakiyesi takibi" onPress={() => go('/card-report')} />
+        </View>
+
         <Text style={s.grp}>Araçlar</Text>
         <View style={s.group}>
+          <Row ico="🔔" label="Bildirimler" onPress={() => go('/notifications')} />
+          <View style={s.sep} />
           <Row ico="🤖" label="Telegram Botu" sub="Mesajla işlem gir" onPress={() => go('/telegram')} />
           <View style={s.sep} />
           <Row ico="⚙️" label="Ayarlar" sub="Hesap ve profil" onPress={() => go('/settings')} />
