@@ -43,6 +43,8 @@ export default function RootLayout() {
         <Stack.Screen name="rates"          options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="card-report"    options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="notifications"  options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="profiles"       options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="insights"       options={{ animation: 'slide_from_right' }} />
       </Stack>
     </>
   );

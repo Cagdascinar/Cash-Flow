@@ -6,6 +6,7 @@ import { C, money, fmtDate } from '../../constants/Colors';
 import { summary as summaryApi, transactions, misc } from '../../services/api';
 import { useAuthStore } from '../../stores/authStore';
 import { BalanceCard } from '../../components/BalanceCard';
+import { WelcomeHero } from '../../components/WelcomeHero';
 import { TransactionItem, type Tx } from '../../components/TransactionItem';
 
 type Period = 'ay' | 'yil' | 'tum';
@@ -18,6 +19,7 @@ export default function Dashboard() {
   const [recent,     setRecent]   = useState<Tx[]>([]);
   const [today,      setToday]    = useState<any>(null);
   const [reminders,  setReminders]= useState<any[]>([]);
+  const [quote,      setQuote]    = useState<string | undefined>(undefined);
   const [period,     setPeriod]   = useState<Period>('ay');
   const [loading,    setLoad]     = useState(true);
   const [refreshing, setRef]      = useState(false);
@@ -26,16 +28,18 @@ export default function Dashboard() {
     if (pull) setRef(true); else setLoad(true);
     try {
       const now = new Date();
-      const [s, tx, tod, rem] = await Promise.all([
+      const [s, tx, tod, rem, mot] = await Promise.all([
         summaryApi.get(PERIOD_MAP[period], now.getFullYear(), period === 'ay' ? now.getMonth() + 1 : undefined),
         transactions.list(),
         misc.today().catch(() => null),
         misc.reminders().catch(() => []),
+        misc.motivation().catch(() => null),
       ]);
       setSum(s);
       setRecent(Array.isArray(tx) ? (tx as Tx[]).slice(0, 8) : []);
       setToday(tod);
       setReminders(Array.isArray(rem) ? rem.slice(0, 5) : []);
+      setQuote(mot?.quote ?? mot?.message ?? undefined);
     } catch (e) {
       console.warn('dashboard load error', e);
     } finally { setLoad(false); setRef(false); }
@@ -62,15 +66,13 @@ export default function Dashboard() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={C.blue} />}
       >
-        <View style={s.header}>
-          <View>
-            <Text style={s.greeting}>Merhaba, {user?.username} 👋</Text>
-            <Text style={s.profile}>{activeProfile?.name}</Text>
-          </View>
-          <TouchableOpacity onPress={() => router.push('/todos' as any)} style={s.todoBtn}>
-            <Text style={s.todoBtnTxt}>✅ Görevler</Text>
-          </TouchableOpacity>
-        </View>
+        <WelcomeHero
+          username={user?.username ?? ''}
+          profileName={activeProfile?.name}
+          isPremium={user?.is_premium}
+          quote={quote}
+          onAvatarPress={() => router.push('/profiles' as any)}
+        />
 
         <BalanceCard
           gelir={gelir} gider={gider} net={net}
@@ -79,6 +81,22 @@ export default function Dashboard() {
           period={period}
           onPeriod={setPeriod}
         />
+
+        {/* Kısa linkler */}
+        <View style={[s.section, { flexDirection: 'row', gap: 8, marginTop: 16 }]}>
+          <TouchableOpacity style={s.quickBtn} onPress={() => router.push('/todos' as any)}>
+            <Text style={s.quickIco}>✅</Text><Text style={s.quickTxt}>Görevler</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.quickBtn} onPress={() => router.push('/insights' as any)}>
+            <Text style={s.quickIco}>🧠</Text><Text style={s.quickTxt}>AI Analiz</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.quickBtn} onPress={() => router.push('/rates' as any)}>
+            <Text style={s.quickIco}>💱</Text><Text style={s.quickTxt}>Kurlar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.quickBtn} onPress={() => router.push('/transfer' as any)}>
+            <Text style={s.quickIco}>🔄</Text><Text style={s.quickTxt}>Transfer</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Hatırlatıcılar */}
         {reminders.length > 0 && (
@@ -134,11 +152,6 @@ export default function Dashboard() {
 const s = StyleSheet.create({
   container:   { flex: 1, backgroundColor: C.bg },
   center:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
-  greeting:    { fontSize: 20, fontWeight: '700', color: C.txt },
-  profile:     { fontSize: 13, color: C.txt2, marginTop: 2 },
-  todoBtn:     { backgroundColor: C.card, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: C.border },
-  todoBtnTxt:  { fontSize: 12, fontWeight: '600', color: C.txt2 },
   section:     { marginTop: 20, paddingHorizontal: 16 },
   sTitle:      { fontSize: 12, fontWeight: '700', color: C.txt2, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
   remList:     { backgroundColor: C.card, borderRadius: 14, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
@@ -154,4 +167,7 @@ const s = StyleSheet.create({
   empty:       { alignItems: 'center', paddingVertical: 32, backgroundColor: C.card, borderRadius: 16, borderWidth: 1, borderColor: C.border },
   emptyIco:    { fontSize: 40, marginBottom: 8 },
   emptyTxt:    { fontSize: 14, color: C.txt2 },
+  quickBtn:    { flex: 1, backgroundColor: C.card, borderRadius: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center', paddingVertical: 10, gap: 4 },
+  quickIco:    { fontSize: 20 },
+  quickTxt:    { fontSize: 10, fontWeight: '600', color: C.txt2 },
 });

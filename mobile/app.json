@@ -1,25 +1,67 @@
 {
   "expo": {
-    "name": "Kirpi",
+    "name": "Kirpi Finans",
     "slug": "kirpi",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "kirpi",
     "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0b0e11"
+    },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.kirpi.cashflow"
+      "bundleIdentifier": "com.kirpi.cashflow",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false
+        }
+      }
     },
     "android": {
       "package": "com.kirpi.cashflow",
+      "versionCode": 1,
+      "minSdkVersion": 24,
+      "compileSdkVersion": 35,
+      "targetSdkVersion": 35,
+      "edgeToEdgeLayoutEnabled": true,
+      "permissions": [],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#0D0D14",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "web-production-ba700.up.railway.app",
+              "pathPrefix": "/"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
+      "softwareKeyboardLayoutMode": "pan",
+      "predictiveBackGestureEnabled": true,
+      "allowBackup": false
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -27,7 +69,16 @@
     },
     "plugins": [
       "expo-router",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0b0e11",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -36,7 +87,9 @@
       "router": {},
       "eas": {
         "projectId": "b4167111-f36b-4678-ae58-54afbde5ddb0"
-      }
+      },
+      "privacyPolicyUrl": "https://web-production-ba700.up.railway.app/gizlilik",
+      "termsUrl": "https://web-production-ba700.up.railway.app/kullanim-kosullari"
     }
   }
 }

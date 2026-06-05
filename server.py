@@ -1023,8 +1023,9 @@ _ensure_mobile_tokens_table()
 
 @app.before_request
 def inject_mobile_session():
-    """X-Mobile-Token header varsa token'ı doğrula ve session'a yükle."""
-    token = request.headers.get("X-Mobile-Token", "").strip()
+    """X-Mobile-Token header veya ?mobile_token= query param varsa doğrula ve session'a yükle."""
+    token = (request.headers.get("X-Mobile-Token", "")
+             or request.args.get("mobile_token", "")).strip()
     if not token or session.get("user_id"):
         return
     with pg_connect() as con:

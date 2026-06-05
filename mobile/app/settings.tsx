@@ -174,6 +174,27 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* Yasal */}
+        <View style={s.section}>
+          <Text style={s.sLabel}>Yasal</Text>
+          <View style={s.card}>
+            <TouchableOpacity style={s.linkRow} onPress={() => Linking.openURL('https://web-production-ba700.up.railway.app/gizlilik')}>
+              <Text style={s.linkTxt}>🔒 Gizlilik Politikası</Text>
+              <Text style={s.chevron}>›</Text>
+            </TouchableOpacity>
+            <View style={s.div} />
+            <TouchableOpacity style={s.linkRow} onPress={() => Linking.openURL('https://web-production-ba700.up.railway.app/kullanim-kosullari')}>
+              <Text style={s.linkTxt}>📃 Kullanım Koşulları</Text>
+              <Text style={s.chevron}>›</Text>
+            </TouchableOpacity>
+            <View style={s.div} />
+            <TouchableOpacity style={s.linkRow} onPress={() => Linking.openURL('https://web-production-ba700.up.railway.app/kvkk')}>
+              <Text style={s.linkTxt}>📋 KVKK Aydınlatma Metni</Text>
+              <Text style={s.chevron}>›</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Hesap sil */}
         <View style={s.section}>
           <View style={s.card}>
