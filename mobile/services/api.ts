@@ -123,11 +123,34 @@ export const profiles = {
     req<any>(`/api/profiles/${id}/switch`, { method: 'POST' }),
 };
 
+// ─── Tedarikçiler ────────────────────────────────────────────────────────────
+export const suppliers = {
+  list:   () => req<any[]>('/api/suppliers'),
+  create: (d: Record<string, unknown>) =>
+    req<any>('/api/suppliers', { method: 'POST', body: JSON.stringify(d) }),
+  update: (id: number, d: Record<string, unknown>) =>
+    req<any>(`/api/suppliers/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  delete: (id: number) => req<any>(`/api/suppliers/${id}`, { method: 'DELETE' }),
+};
+
+// ─── Varlıklar ───────────────────────────────────────────────────────────────
+export const assets = {
+  list:   () => req<any[]>('/api/assets'),
+  create: (d: Record<string, unknown>) =>
+    req<any>('/api/assets', { method: 'POST', body: JSON.stringify(d) }),
+  update: (id: number, d: Record<string, unknown>) =>
+    req<any>(`/api/assets/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  delete: (id: number) => req<any>(`/api/assets/${id}`, { method: 'DELETE' }),
+};
+
 // ─── Diğer ───────────────────────────────────────────────────────────────────
 export const misc = {
-  categories: () => req<any>('/api/categories'),
-  reminders:  () => req<any>('/api/reminders'),
-  insights:   () => req<any>('/api/insights'),
-  notifications: () => req<any>('/api/notifications'),
-  rates:      () => req<any>('/api/rates'),
+  categories:     () => req<any>('/api/categories'),
+  reminders:      () => req<any>('/api/reminders'),
+  insights:       () => req<any>('/api/insights'),
+  notifications:  () => req<any>('/api/notifications'),
+  rates:          () => req<any>('/api/rates'),
+  telegramStatus: () => req<any>('/api/telegram/status'),
+  telegramLinkCode: () => req<any>('/api/telegram/link-code', { method: 'POST' }),
+  telegramUnlink: () => req<any>('/api/telegram/unlink', { method: 'DELETE' }),
 };

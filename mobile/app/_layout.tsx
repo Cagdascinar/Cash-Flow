@@ -23,9 +23,16 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="cards"    options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="accounts" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="tx-detail" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="cards"        options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="add-card"     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="accounts"     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="add-account"  options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="investments"  options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="recurring"    options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="suppliers"    options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="assets"       options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="telegram"     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="settings"     options={{ animation: 'slide_from_right' }} />
       </Stack>
     </>
   );
