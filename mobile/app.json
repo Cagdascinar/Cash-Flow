@@ -14,56 +14,18 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.kirpi.cashflow",
-      "infoPlist": {
-        "NSAppTransportSecurity": {
-          "NSAllowsArbitraryLoads": false
-        }
-      }
+      "bundleIdentifier": "com.kirpi.cashflow"
     },
     "android": {
       "package": "com.kirpi.cashflow",
       "versionCode": 2,
-      "minSdkVersion": 24,
-      "compileSdkVersion": 35,
-      "targetSdkVersion": 35,
-      "permissions": [],
-      "blockedPermissions": [
-        "android.permission.RECORD_AUDIO",
-        "android.permission.READ_CONTACTS",
-        "android.permission.WRITE_CONTACTS",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.CAMERA",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION"
-      ],
       "adaptiveIcon": {
         "backgroundColor": "#0D0D14",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "autoVerify": true,
-          "data": [
-            {
-              "scheme": "https",
-              "host": "web-production-ba700.up.railway.app",
-              "pathPrefix": "/"
-            }
-          ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
-        }
-      ],
-      "softwareKeyboardLayoutMode": "pan",
-      "predictiveBackGestureEnabled": true,
-      "allowBackup": false
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -80,9 +42,7 @@
       "router": {},
       "eas": {
         "projectId": "b4167111-f36b-4678-ae58-54afbde5ddb0"
-      },
-      "privacyPolicyUrl": "https://web-production-ba700.up.railway.app/gizlilik",
-      "termsUrl": "https://web-production-ba700.up.railway.app/kullanim-kosullari"
+      }
     }
   }
 }
