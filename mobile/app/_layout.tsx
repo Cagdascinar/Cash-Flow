@@ -1,9 +1,45 @@
-import { useEffect } from 'react';
+import React, { useEffect, Component } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { View, Text, ScrollView } from 'react-native';
 import { useAuthStore } from '../stores/authStore';
 
-export default function RootLayout() {
+// ── Error Boundary ──────────────────────────────────────────────────────────
+class ErrorBoundary extends Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <View style={{ flex: 1, backgroundColor: '#0b0e11', padding: 20, paddingTop: 60 }}>
+          <Text style={{ color: '#f6465d', fontSize: 18, fontWeight: '700', marginBottom: 12 }}>
+            🔴 Uygulama Hatası
+          </Text>
+          <ScrollView>
+            <Text style={{ color: '#eaecef', fontSize: 13, fontFamily: 'monospace', marginBottom: 8 }}>
+              {this.state.error?.message}
+            </Text>
+            <Text style={{ color: '#848e9c', fontSize: 11, fontFamily: 'monospace' }}>
+              {this.state.error?.stack}
+            </Text>
+          </ScrollView>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ── Root Layout ─────────────────────────────────────────────────────────────
+function RootLayoutNav() {
   const { user, isLoading, hydrate } = useAuthStore();
   const router   = useRouter();
   const segments = useSegments();
@@ -47,5 +83,13 @@ export default function RootLayout() {
         <Stack.Screen name="insights"       options={{ animation: 'slide_from_right' }} />
       </Stack>
     </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ErrorBoundary>
+      <RootLayoutNav />
+    </ErrorBoundary>
   );
 }
