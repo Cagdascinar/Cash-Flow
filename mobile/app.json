@@ -33,15 +33,7 @@
     },
     "plugins": [
       "expo-router",
-      "expo-status-bar",
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "newArchEnabled": false
-          }
-        }
-      ]
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true

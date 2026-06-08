@@ -1,7 +1,7 @@
 import React, { useEffect, Component } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text, ScrollView } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { useAuthStore } from '../stores/authStore';
 
 // ── Error Boundary ──────────────────────────────────────────────────────────
@@ -13,23 +13,17 @@ class ErrorBoundary extends Component<
     super(props);
     this.state = { error: null };
   }
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
+  static getDerivedStateFromError(error: Error) { return { error }; }
   render() {
     if (this.state.error) {
       return (
         <View style={{ flex: 1, backgroundColor: '#0b0e11', padding: 20, paddingTop: 60 }}>
           <Text style={{ color: '#f6465d', fontSize: 18, fontWeight: '700', marginBottom: 12 }}>
-            🔴 Uygulama Hatası
+            🔴 Hata
           </Text>
           <ScrollView>
-            <Text style={{ color: '#eaecef', fontSize: 13, fontFamily: 'monospace', marginBottom: 8 }}>
-              {this.state.error?.message}
-            </Text>
-            <Text style={{ color: '#848e9c', fontSize: 11, fontFamily: 'monospace' }}>
-              {this.state.error?.stack}
-            </Text>
+            <Text style={{ color: '#eaecef', fontSize: 13 }}>{this.state.error?.message}</Text>
+            <Text style={{ color: '#848e9c', fontSize: 11, marginTop: 8 }}>{this.state.error?.stack}</Text>
           </ScrollView>
         </View>
       );
@@ -41,17 +35,31 @@ class ErrorBoundary extends Component<
 // ── Root Layout ─────────────────────────────────────────────────────────────
 function RootLayoutNav() {
   const { user, isLoading, hydrate } = useAuthStore();
-  const router   = useRouter();
-  const segments = useSegments();
+  const router    = useRouter();
+  const segments  = useSegments();
+  const navState  = useRootNavigationState();
 
   useEffect(() => { hydrate(); }, []);
 
   useEffect(() => {
     if (isLoading) return;
-    const inAuth = segments[0] === '(auth)';
-    if (!user && !inAuth) router.replace('/(auth)/login');
-    if ( user &&  inAuth) router.replace('/(tabs)');
-  }, [user, isLoading, segments]);
+    if (!navState?.key) return; // wait for navigator to be ready
+    try {
+      const inAuth = segments[0] === '(auth)';
+      if (!user && !inAuth) router.replace('/(auth)/login');
+      if ( user &&  inAuth) router.replace('/(tabs)');
+    } catch (e) {
+      console.error('nav error', e);
+    }
+  }, [user, isLoading, segments, navState?.key]);
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0b0e11', alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color="#007aff" />
+      </View>
+    );
+  }
 
   return (
     <>
