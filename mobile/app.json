@@ -19,6 +19,7 @@
     "android": {
       "package": "com.kirpi.cashflow",
       "versionCode": 2,
+      "newArchEnabled": false,
       "adaptiveIcon": {
         "backgroundColor": "#0D0D14",
         "foregroundImage": "./assets/android-icon-foreground.png",
