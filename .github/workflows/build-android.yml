@@ -36,29 +36,17 @@ jobs:
         working-directory: mobile/android
         run: chmod +x gradlew
 
-      - name: Enable JS bundle in debug APK
-        working-directory: mobile/android
-        run: echo "bundleInDebug=true" >> gradle.properties
-
-      - name: Debug autolinking node command
-        working-directory: mobile
-        run: |
-          echo "=== Testing autolinking node command ==="
-          node -e "require('expo-modules-autolinking').resolveAsync({searchPaths:['./node_modules'], platform:'android'})" 2>&1 | head -80 || true
-          echo "=== Checking gesture-handler expo config ==="
-          cat node_modules/react-native-gesture-handler/expo-module.config.json 2>/dev/null | head -30 || echo "No expo-module.config.json"
-
       - name: Build Debug APK
         working-directory: mobile/android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
-          ./gradlew assembleDebug --no-daemon --info 2>&1 | tee /tmp/gradle-build.log
+          ./gradlew assembleDebug -PbundleInDebug=true --no-daemon --stacktrace 2>&1 | tee /tmp/gradle-build.log
           BUILD_EXIT=${PIPESTATUS[0]}
           if [ $BUILD_EXIT -ne 0 ]; then
-            echo "=== GRADLE FAILED - node/autolinking errors ==="
-            grep -i "node\|autolinking\|Error\|error\|exception\|Cannot\|failed\|FAILED" /tmp/gradle-build.log | grep -v "^>" | tail -100
+            echo "=== GRADLE FAILED - Last 150 lines ==="
+            tail -150 /tmp/gradle-build.log
             exit $BUILD_EXIT
           fi
 
