@@ -2,14 +2,11 @@ name: Build Android APK
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'mobile/**'
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,17 +15,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: mobile/package-lock.json
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
 
       - name: Install dependencies
         working-directory: mobile
@@ -36,21 +28,20 @@ jobs:
 
       - name: Expo Prebuild
         working-directory: mobile
-        run: npx expo prebuild --platform android --clean --no-install
+        env:
+          EXPO_PUBLIC_API_URL: https://web-production-ba700.up.railway.app
+        run: npx expo prebuild --platform android --clean
 
-      - name: Generate debug keystore
+      - name: Make gradlew executable
         working-directory: mobile/android
-        run: |
-          keytool -genkeypair -v \
-            -keystore app/debug.keystore \
-            -alias androiddebugkey \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=Android Debug,O=Android,C=US" \
-            -storepass android -keypass android
+        run: chmod +x gradlew
 
-      - name: Build APK
+      - name: Build Debug APK
         working-directory: mobile/android
-        run: ./gradlew assembleDebug --no-daemon 2>&1
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          JAVA_HOME: ${{ env.JAVA_HOME }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -58,3 +49,14 @@ jobs:
           name: kirpi-finans-debug
           path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
+
+      - name: Show APK info
+        run: |
+          APK=mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if [ -f "$APK" ]; then
+            echo "APK built successfully!"
+            ls -lh "$APK"
+          else
+            echo "APK not found"
+            find mobile/android -name "*.apk" 2>/dev/null
+          fi
