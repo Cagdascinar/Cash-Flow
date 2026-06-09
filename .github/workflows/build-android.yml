@@ -36,13 +36,28 @@ jobs:
         working-directory: mobile/android
         run: chmod +x gradlew
 
-      - name: Build Debug APK
+      - name: Generate release keystore
+        working-directory: mobile/android
+        run: |
+          keytool -genkeypair -v \
+            -keystore app/release.keystore \
+            -alias kirpi \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Kirpi Finans,O=Kirpi,C=TR" \
+            -storepass kirpi123 -keypass kirpi123
+
+      - name: Build Release APK
         working-directory: mobile/android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
-          ./gradlew assembleDebug -PbundleInDebug=true --no-daemon --stacktrace 2>&1 | tee /tmp/gradle-build.log
+          ./gradlew assembleRelease --no-daemon --stacktrace \
+            -Pandroid.injected.signing.store.file=$(pwd)/app/release.keystore \
+            -Pandroid.injected.signing.store.password=kirpi123 \
+            -Pandroid.injected.signing.key.alias=kirpi \
+            -Pandroid.injected.signing.key.password=kirpi123 \
+            2>&1 | tee /tmp/gradle-build.log
           BUILD_EXIT=${PIPESTATUS[0]}
           if [ $BUILD_EXIT -ne 0 ]; then
             echo "=== GRADLE FAILED - Last 150 lines ==="
@@ -61,13 +76,13 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: kirpi-finans-debug
-          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          name: kirpi-finans-release
+          path: mobile/android/app/build/outputs/apk/release/app-release.apk
           retention-days: 7
 
       - name: Show APK info
         run: |
-          APK=mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          APK=mobile/android/app/build/outputs/apk/release/app-release.apk
           if [ -f "$APK" ]; then
             echo "APK built successfully!"
             ls -lh "$APK"
