@@ -43,7 +43,7 @@ export default function Dashboard() {
     } catch (e) {
       console.warn('dashboard load error', e);
     } finally { setLoad(false); setRef(false); }
-  }, [period]);
+  }, [period, activeProfile?.id]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -69,6 +69,7 @@ export default function Dashboard() {
         <WelcomeHero
           username={user?.username ?? ''}
           profileName={activeProfile?.name}
+          profileType={activeProfile?.type}
           isPremium={user?.is_premium}
           quote={quote}
           onAvatarPress={() => router.push('/profiles' as any)}

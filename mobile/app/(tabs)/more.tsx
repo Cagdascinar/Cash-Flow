@@ -143,14 +143,18 @@ export default function MoreScreen() {
           <Row ico="🔄" label="Tekrarlayan İşlemler" sub="Otomatik gider ve gelirler" onPress={() => go('/recurring')} />
         </View>
 
-        <Text style={s.grp}>Kurumsal</Text>
-        <View style={s.group}>
-          <Row ico="🏢" label="Tedarikçiler" sub="Tedarikçi yönetimi" onPress={() => go('/suppliers')} />
-          <View style={s.sep} />
-          <Row ico="📄" label="Tedarikçi Faturaları" sub="Fatura takibi ve ödeme" onPress={() => go('/invoices')} />
-          <View style={s.sep} />
-          <Row ico="🏗️" label="Varlıklar" sub="Demirbaş ve araçlar" onPress={() => go('/assets')} />
-        </View>
+        {activeProfile?.type === 'sirket' && (
+          <>
+            <Text style={s.grp}>Kurumsal</Text>
+            <View style={s.group}>
+              <Row ico="🏢" label="Tedarikçiler" sub="Tedarikçi yönetimi" onPress={() => go('/suppliers')} />
+              <View style={s.sep} />
+              <Row ico="📄" label="Tedarikçi Faturaları" sub="Fatura takibi ve ödeme" onPress={() => go('/invoices')} />
+              <View style={s.sep} />
+              <Row ico="🏗️" label="Varlıklar" sub="Demirbaş ve araçlar" onPress={() => go('/assets')} />
+            </View>
+          </>
+        )}
 
         <Text style={s.grp}>Hızlı İşlemler</Text>
         <View style={s.group}>
