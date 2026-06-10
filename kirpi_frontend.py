@@ -2862,6 +2862,13 @@ body{top:0!important}
     <button onclick="exportExcel()" style="background:rgba(255,255,255,.25);border:1.5px solid rgba(255,255,255,.4);border-radius:10px;color:#fff;padding:8px 14px;font-size:.8rem;font-weight:700;cursor:pointer" class="tappable">📥 Excel</button>
   </div>
 
+  <!-- Tedarikçi Listesi -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt2)">Tedarikçiler (Cari Hesaplar)</div>
+    <button class="btn btn-ghost tappable" onclick="openSupplierAddModal()" style="padding:5px 12px;font-size:.8rem">＋ Ekle</button>
+  </div>
+  <div id="supplier-list" style="margin-bottom:16px"></div>
+
   <div class="aging-grid">
     <div class="aging-card green tappable"><div class="ac-lbl">0–30 Gün</div><div class="ac-val" id="ag-0-30">₺0</div><div class="ac-cnt" id="ag-0-30-cnt">0 fatura</div></div>
     <div class="aging-card yellow tappable"><div class="ac-lbl">31–60 Gün</div><div class="ac-val" id="ag-31-60">₺0</div><div class="ac-cnt" id="ag-31-60-cnt">0 fatura</div></div>
@@ -2869,6 +2876,11 @@ body{top:0!important}
     <div class="aging-card red tappable"><div class="ac-lbl">90+ Gün</div><div class="ac-val" id="ag-90plus">₺0</div><div class="ac-cnt" id="ag-90plus-cnt">0 fatura</div></div>
   </div>
 
+  <!-- Fatura sekmeleri -->
+  <div style="display:flex;gap:8px;margin-bottom:14px">
+    <button class="btn tappable" id="sup-tab-type-alis" onclick="setSupInvType('alis')" style="flex:1;background:var(--b);color:#fff;border:none;font-size:.8rem">Alış Faturaları</button>
+    <button class="btn btn-ghost tappable" id="sup-tab-type-satis" onclick="setSupInvType('satis')" style="flex:1;font-size:.8rem">Satış Faturaları</button>
+  </div>
   <div style="display:flex;gap:8px;margin-bottom:14px">
     <button class="btn tappable" id="sup-tab-pending" onclick="setSupTab('pending')" style="flex:1;background:var(--b);color:#fff;border:none">Bekleyenler</button>
     <button class="btn btn-ghost tappable" id="sup-tab-paid" onclick="setSupTab('paid')" style="flex:1">Ödenmiş</button>
@@ -2921,13 +2933,97 @@ body{top:0!important}
 </div>
 
 <!-- ── MODALS ──────────────────────────────────────────────────── -->
+<!-- Tedarikçi Ekle Modalı -->
+<div id="mod-supplier" class="mod-backdrop" style="display:none" onclick="if(event.target===this)closeMod('mod-supplier')">
+  <div class="mod-sheet">
+    <div class="mod-handle"></div>
+    <div class="mod-title">Tedarikçi Ekle</div>
+    <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt2);margin-bottom:10px">Cari Hesap Bilgileri</div>
+    <div class="mod-field">
+      <div class="mod-label">Ünvan *</div>
+      <input class="mod-input" id="sup-unvan" placeholder="ABC Ticaret Limited Şirketi">
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Kısa Kod / Sicil</div>
+      <input class="mod-input" id="sup-kisaKod" placeholder="ABC-001">
+    </div>
+    <div class="mod-row">
+      <div class="mod-field">
+        <div class="mod-label">VKN / TCKN</div>
+        <input class="mod-input" type="text" inputmode="numeric" id="sup-vkn" placeholder="1234567890" maxlength="11">
+      </div>
+      <div class="mod-field">
+        <div class="mod-label">Vergi Dairesi</div>
+        <select class="mod-input" id="sup-vergiDairesi">
+          <option value="">Seçin...</option>
+          <option>Büyük Mükellefler VD</option>
+          <option>Ankara VD</option>
+          <option>İstanbul VD</option>
+          <option>İzmir VD</option>
+          <option>Bursa VD</option>
+          <option>Adana VD</option>
+          <option>Antalya VD</option>
+          <option>Konya VD</option>
+          <option>Kocaeli VD</option>
+          <option>Mersin VD</option>
+          <option>Gaziantep VD</option>
+          <option>Şanlıurfa VD</option>
+          <option>Diyarbakır VD</option>
+          <option>Samsun VD</option>
+          <option>Trabzon VD</option>
+          <option>Erzurum VD</option>
+          <option>Malatya VD</option>
+          <option>Kayseri VD</option>
+          <option>Eskişehir VD</option>
+          <option>Denizli VD</option>
+          <option>Diğer</option>
+        </select>
+      </div>
+    </div>
+    <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt2);margin:14px 0 10px">İletişim Bilgileri</div>
+    <div class="mod-field">
+      <div class="mod-label">Yetkili / Muhatap</div>
+      <input class="mod-input" id="sup-yetkili" placeholder="Ahmet Yılmaz">
+    </div>
+    <div class="mod-row">
+      <div class="mod-field">
+        <div class="mod-label">E-posta</div>
+        <input class="mod-input" type="email" id="sup-email" placeholder="info@abc.com">
+      </div>
+      <div class="mod-field">
+        <div class="mod-label">Telefon</div>
+        <input class="mod-input" type="tel" id="sup-phone" placeholder="0532 000 0000">
+      </div>
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Adres</div>
+      <input class="mod-input" id="sup-address" placeholder="Açık adres...">
+    </div>
+    <div class="mod-actions">
+      <button class="mod-btn cancel" onclick="closeMod('mod-supplier')">İptal</button>
+      <button class="mod-btn primary" onclick="saveSupplier()">🏢 Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tedarikçi Faturası Ekle Modalı -->
 <div id="mod-sup-inv" class="mod-backdrop" style="display:none" onclick="if(event.target===this)closeMod('mod-sup-inv')">
   <div class="mod-sheet">
     <div class="mod-handle"></div>
     <div class="mod-title" id="mod-sup-inv-title">Tedarikçi Faturası</div>
+    <!-- Fatura Tipi -->
     <div class="mod-field">
-      <div class="mod-label">Tedarikçi Adı / Ticari Ünvan</div>
-      <input class="mod-input" id="sup-inv-name" placeholder="ABC Ticaret Ltd. Şti.">
+      <div class="mod-label">Fatura Tipi</div>
+      <div style="display:flex;gap:8px">
+        <button id="sup-inv-type-alis" class="btn tappable" onclick="setInvTypeBtn('alis')" style="flex:1;background:var(--b);color:#fff;border:none;font-size:.85rem">📥 Alış</button>
+        <button id="sup-inv-type-satis" class="btn btn-ghost tappable" onclick="setInvTypeBtn('satis')" style="flex:1;font-size:.85rem">📤 Satış</button>
+      </div>
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Tedarikçi</div>
+      <select class="mod-input" id="sup-inv-supplier-sel">
+        <option value="">Tedarikçi seçin...</option>
+      </select>
     </div>
     <div class="mod-row">
       <div class="mod-field">
@@ -2960,6 +3056,33 @@ body{top:0!important}
     <div class="mod-actions">
       <button class="mod-btn cancel" onclick="closeMod('mod-sup-inv')">İptal</button>
       <button class="mod-btn primary" id="sup-inv-save-btn" onclick="saveSupInv()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fatura Ödeme Modalı -->
+<div id="mod-pay-sup" class="mod-backdrop" style="display:none" onclick="if(event.target===this)closeMod('mod-pay-sup')">
+  <div class="mod-sheet">
+    <div class="mod-handle"></div>
+    <div class="mod-title">Faturayı Öde</div>
+    <div id="mod-pay-sup-info" style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:.88rem;color:var(--txt)"></div>
+    <div class="mod-field">
+      <div class="mod-label">Ödeme Yöntemi</div>
+      <div style="display:flex;gap:8px">
+        <button id="pay-mth-havale" class="btn tappable" onclick="setPayMethod('havale')" style="flex:1;background:var(--b);color:#fff;border:none;font-size:.78rem">🏦 Havale/EFT</button>
+        <button id="pay-mth-kart" class="btn btn-ghost tappable" onclick="setPayMethod('kart')" style="flex:1;font-size:.78rem">💳 Kart</button>
+        <button id="pay-mth-nakit" class="btn btn-ghost tappable" onclick="setPayMethod('nakit')" style="flex:1;font-size:.78rem">💵 Nakit</button>
+      </div>
+    </div>
+    <div class="mod-field" id="pay-account-field">
+      <div class="mod-label">Hesap</div>
+      <select class="mod-input" id="pay-account-sel">
+        <option value="">Hesap seçin...</option>
+      </select>
+    </div>
+    <div class="mod-actions">
+      <button class="mod-btn cancel" onclick="closeMod('mod-pay-sup')">İptal</button>
+      <button class="mod-btn primary" onclick="confirmPaySup()">✓ Öde</button>
     </div>
   </div>
 </div>
@@ -6797,9 +6920,12 @@ function escHtml(s){
 var _supTab = 'pending';
 var _editingSupInvId = null;
 
+var _supInvType = 'alis';
+
 function initSupplierPage(){
   loadSupAging();
   loadSupFloatGain();
+  loadSupplierList();
   loadSupInvList();
 }
 
@@ -6814,6 +6940,87 @@ function setSupTab(tab){
     'flex:1;background:var(--b);color:#fff;border:none' :
     'flex:1;background:transparent;border:1px solid var(--border2);color:var(--txt)';
   loadSupInvList();
+}
+
+function setSupInvType(type){
+  _supInvType = type;
+  var ta = document.getElementById('sup-tab-type-alis');
+  var ts = document.getElementById('sup-tab-type-satis');
+  var activeStyle = 'flex:1;background:var(--b);color:#fff;border:none;font-size:.8rem';
+  var ghostStyle  = 'flex:1;background:transparent;border:1px solid var(--border2);color:var(--txt);font-size:.8rem';
+  if(ta) ta.style.cssText = type==='alis' ? activeStyle : ghostStyle;
+  if(ts) ts.style.cssText = type==='satis' ? activeStyle : ghostStyle;
+  loadSupInvList();
+}
+
+function setInvTypeBtn(type){
+  _supInvType = type;
+  var ba = document.getElementById('sup-inv-type-alis');
+  var bs = document.getElementById('sup-inv-type-satis');
+  var activeStyle = 'flex:1;background:var(--b);color:#fff;border:none;font-size:.85rem';
+  var ghostStyle  = 'flex:1;background:transparent;border:1px solid var(--border2);color:var(--txt);font-size:.85rem';
+  if(ba) ba.style.cssText = type==='alis' ? activeStyle : ghostStyle;
+  if(bs) bs.style.cssText = type==='satis' ? activeStyle : ghostStyle;
+}
+
+// ── Tedarikçi CRUD ──────────────────────────────────────────────────────────
+function loadSupplierList(){
+  xhr('/api/suppliers', null, function(items){
+    var el = document.getElementById('supplier-list');
+    if(!el) return;
+    window._supplierData = {};
+    if(!items || !items.length){
+      el.innerHTML = '<div style="font-size:.8rem;color:var(--txt2);padding:8px 0 4px">Henüz tedarikçi eklenmedi.</div>';
+      return;
+    }
+    items.forEach(function(s){ window._supplierData[s.id] = s; });
+    el.innerHTML = items.map(function(s){
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:7px">' +
+        '<div style="font-size:1.2rem;flex-shrink:0">🏢</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:.88rem;font-weight:700;color:var(--txt)">' + escHtml(s.name) + '</div>' +
+          (s.tax_no ? '<div style="font-size:.72rem;color:var(--txt2)">VKN: ' + escHtml(s.tax_no) + (s.vergi_dairesi ? ' · ' + escHtml(s.vergi_dairesi) : '') + '</div>' : '') +
+          (s.contact_name ? '<div style="font-size:.72rem;color:var(--txt2)">👤 ' + escHtml(s.contact_name) + '</div>' : '') +
+        '</div>' +
+        '<button onclick="delSupplier(' + s.id + ')" style="background:none;border:none;font-size:1rem;cursor:pointer;color:var(--txt2);padding:4px 6px;border-radius:8px">🗑</button>' +
+        '</div>';
+    }).join('');
+  });
+}
+
+function openSupplierAddModal(){
+  ['sup-unvan','sup-kisaKod','sup-vkn','sup-yetkili','sup-email','sup-phone','sup-address'].forEach(function(id){
+    var el = document.getElementById(id); if(el) el.value = '';
+  });
+  var vd = document.getElementById('sup-vergiDairesi'); if(vd) vd.value = '';
+  document.getElementById('mod-supplier').style.display = 'flex';
+}
+
+function saveSupplier(){
+  var name = document.getElementById('sup-unvan').value.trim();
+  if(!name){ showToast('Ünvan zorunlu','#ef4444'); return; }
+  var body = {
+    name: name,
+    unvan: document.getElementById('sup-kisaKod').value.trim(),
+    vkn: document.getElementById('sup-vkn').value.trim(),
+    vergi_dairesi: document.getElementById('sup-vergiDairesi').value,
+    contact_name: document.getElementById('sup-yetkili').value.trim(),
+    email: document.getElementById('sup-email').value.trim(),
+    phone: document.getElementById('sup-phone').value.trim(),
+    address: document.getElementById('sup-address').value.trim()
+  };
+  xhr('/api/suppliers', body, function(r){
+    if(r.ok){ closeMod('mod-supplier'); toast('Tedarikçi kaydedildi'); loadSupplierList(); }
+  });
+}
+
+function delSupplier(id){
+  var s = window._supplierData && window._supplierData[id];
+  var name = s ? s.name : 'bu tedarikçi';
+  if(!confirm(name + ' silinsin mi?')) return;
+  xhr('/api/suppliers/' + id, null, function(r){
+    if(r.ok){ toast('Tedarikçi silindi'); loadSupplierList(); }
+  }, false, true);
 }
 
 function loadSupAging(){
@@ -6848,13 +7055,20 @@ function loadSupInvList(){
   xhr('/api/supplier-invoices?status='+status, null, function(items){
     var el = document.getElementById('sup-inv-list');
     if(!el) return;
-    if(!items || !items.length){
+    window._supInvData = {};
+    // Filter by invoice type
+    var filtered = (items||[]).filter(function(inv){
+      var t = inv.invoice_type || 'alis';
+      return t === _supInvType;
+    });
+    if(!filtered.length){
       el.innerHTML = '<div style="text-align:center;padding:28px 16px;color:var(--txt2);font-size:.85rem">🏭 '+
         (status==='bekliyor' ? 'Bekleyen fatura yok' : 'Ödenmiş fatura yok')+'</div>';
+      items.forEach(function(inv){ window._supInvData[inv.id] = inv; });
       return;
     }
     var today = new Date().toISOString().slice(0,10);
-    el.innerHTML = items.map(function(inv){
+    el.innerHTML = filtered.map(function(inv){
       var overdue = inv.status==='bekliyor' && inv.due_date < today;
       var daysText = '';
       if(inv.status==='bekliyor'){
@@ -6865,13 +7079,17 @@ function loadSupInvList(){
         else if(diff === 0) daysText = '<span style="color:var(--y)">Bugün son gün!</span>';
         else daysText = '<span style="color:var(--txt2)">'+diff+' gün kaldı</span>';
       } else {
-        daysText = '<span style="color:var(--g)">✓ Ödendi '+(inv.paid_date||'')+'</span>';
+        var payInfo = inv.payment_method ? ' · '+payMethodLabel(inv.payment_method)+(inv.payment_account_name ? ' ('+inv.payment_account_name+')' : '') : '';
+        daysText = '<span style="color:var(--g)">✓ Ödendi '+(inv.paid_date||'')+escHtml(payInfo)+'</span>';
       }
       var dotColor = overdue ? 'var(--r)' : (inv.status==='odendi' ? 'var(--g)' : 'var(--y)');
+      var typeBadge = (inv.invoice_type||'alis') === 'alis'
+        ? '<span style="font-size:.6rem;background:rgba(0,122,255,.12);color:var(--b);border-radius:4px;padding:1px 5px;font-weight:700;margin-right:4px">ALIŞ</span>'
+        : '<span style="font-size:.6rem;background:rgba(14,203,129,.12);color:var(--g);border-radius:4px;padding:1px 5px;font-weight:700;margin-right:4px">SATIŞ</span>';
       return '<div class="sup-inv-item" style="gap:10px">' +
         '<div class="sup-inv-dot" style="background:'+dotColor+';flex-shrink:0"></div>' +
         '<div class="sup-inv-info tappable" onclick="openPaySupInv('+inv.id+')" style="flex:1;min-width:0">' +
-          '<div class="sup-inv-name">'+escHtml(inv.supplier_name)+'</div>' +
+          '<div class="sup-inv-name">'+typeBadge+escHtml(inv.supplier_name)+'</div>' +
           '<div class="sup-inv-meta">'+(inv.invoice_no ? escHtml(inv.invoice_no)+' &bull; ' : '')+'Vade: '+inv.due_date+'</div>' +
         '</div>' +
         '<div class="sup-inv-right tappable" onclick="openPaySupInv('+inv.id+')" style="text-align:right;flex-shrink:0">' +
@@ -6881,16 +7099,28 @@ function loadSupInvList(){
         '<button onclick="delSupInv('+inv.id+')" style="background:none;border:none;font-size:1rem;cursor:pointer;padding:4px 6px;border-radius:8px;color:var(--txt2);flex-shrink:0;-webkit-tap-highlight-color:transparent" title="Sil">🗑</button>' +
         '</div>';
     }).join('');
-    // Store data for tap handler
-    window._supInvData = {};
     items.forEach(function(inv){ window._supInvData[inv.id] = inv; });
   });
+}
+
+function payMethodLabel(m){
+  if(m==='havale') return 'Havale/EFT';
+  if(m==='kart') return 'Kart';
+  if(m==='nakit') return 'Nakit';
+  return m;
 }
 
 function openSupInvModal(id){
   _editingSupInvId = id || null;
   document.getElementById('mod-sup-inv-title').textContent = id ? 'Faturayı Düzenle' : 'Tedarikçi Faturası';
-  document.getElementById('sup-inv-name').value = '';
+  setInvTypeBtn(_supInvType || 'alis');
+  // Load supplier dropdown
+  xhr('/api/suppliers', null, function(sups){
+    var sel = document.getElementById('sup-inv-supplier-sel');
+    if(!sel) return;
+    sel.innerHTML = '<option value="">Tedarikçi seçin...</option>' +
+      (sups||[]).map(function(s){ return '<option value="'+escHtml(s.name)+'">'+escHtml(s.name)+'</option>'; }).join('');
+  });
   document.getElementById('sup-inv-no').value = '';
   document.getElementById('sup-inv-amount').value = '';
   document.getElementById('sup-inv-date').value = new Date().toISOString().slice(0,10);
@@ -6905,8 +7135,11 @@ function openSupInvModal(id){
 function closeMod(id){ document.getElementById(id).style.display='none'; }
 
 function saveSupInv(){
+  var supSel = document.getElementById('sup-inv-supplier-sel');
+  var supplierName = supSel ? supSel.value : '';
   var body = {
-    supplier_name: document.getElementById('sup-inv-name').value.trim(),
+    supplier_name: supplierName,
+    invoice_type: _supInvType || 'alis',
     invoice_no: document.getElementById('sup-inv-no').value.trim(),
     amount: getNumVal(document.getElementById('sup-inv-amount')),
     invoice_date: document.getElementById('sup-inv-date').value,
@@ -6928,19 +7161,64 @@ function saveSupInv(){
   }
 }
 
-function openPaySupInv(id, el){
+var _payingSupInvId = null;
+var _payMethod = 'havale';
+
+function setPayMethod(m){
+  _payMethod = m;
+  var methods = ['havale','kart','nakit'];
+  methods.forEach(function(k){
+    var btn = document.getElementById('pay-mth-'+k);
+    if(!btn) return;
+    btn.style.cssText = k===m
+      ? 'flex:1;background:var(--b);color:#fff;border:none;font-size:.78rem'
+      : 'flex:1;background:transparent;border:1px solid var(--border2);color:var(--txt);font-size:.78rem';
+  });
+}
+
+function openPaySupInv(id){
   var inv = window._supInvData && window._supInvData[id];
   if(!inv) return;
   if(inv.status === 'odendi'){
-    toast(inv.supplier_name+' zaten ödenmiş'); return;
+    var payInfo = inv.payment_method ? ' · '+payMethodLabel(inv.payment_method)+(inv.payment_account_name?' ('+inv.payment_account_name+')':'') : '';
+    toast(inv.supplier_name+' zaten ödenmiş'+payInfo); return;
   }
-  if(confirm(inv.supplier_name+' — '+fmt(inv.amount)+' ödenmiş olarak işaretlensin mi?')){
-    xhr('/api/supplier-invoices/'+id+'/pay',
-        {paid_date: new Date().toISOString().slice(0,10)},
-        function(r){
-          if(r.ok){ toast('Ödendi olarak işaretlendi'); initSupplierPage(); }
-        });
+  _payingSupInvId = id;
+  _payMethod = 'havale';
+  var infoEl = document.getElementById('mod-pay-sup-info');
+  if(infoEl) infoEl.innerHTML = '<strong>'+escHtml(inv.supplier_name)+'</strong> — <strong>'+fmt(inv.amount)+'</strong><br><span style="font-size:.78rem;color:var(--txt2)">Vade: '+inv.due_date+'</span>';
+  setPayMethod('havale');
+  // Load accounts
+  xhr('/api/accounts', null, function(accs){
+    var sel = document.getElementById('pay-account-sel');
+    if(!sel) return;
+    sel.innerHTML = '<option value="">Hesap seçin...</option>' +
+      (accs||[]).map(function(a){
+        return '<option value="'+a.id+'|'+escHtml(a.name)+'">'+escHtml(a.name)+'</option>';
+      }).join('');
+  });
+  document.getElementById('mod-pay-sup').style.display = 'flex';
+}
+
+function confirmPaySup(){
+  if(!_payingSupInvId) return;
+  var sel = document.getElementById('pay-account-sel');
+  var selVal = sel ? sel.value : '';
+  var accId = null, accName = '';
+  if(selVal){
+    var parts = selVal.split('|');
+    accId = parseInt(parts[0]) || null;
+    accName = parts[1] || '';
   }
+  var body = {
+    paid_date: new Date().toISOString().slice(0,10),
+    payment_method: _payMethod,
+    payment_account_id: accId,
+    payment_account_name: accName
+  };
+  xhr('/api/supplier-invoices/'+_payingSupInvId+'/pay', body, function(r){
+    if(r.ok){ closeMod('mod-pay-sup'); toast('Ödendi olarak işaretlendi'); initSupplierPage(); }
+  });
 }
 
 function delSupInv(id){

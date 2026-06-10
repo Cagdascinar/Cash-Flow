@@ -484,7 +484,13 @@ def init_db():
         ("telegram_pending","tx_date",      "TEXT NOT NULL DEFAULT ''"),
         ("cards",           "card_type",    "TEXT NOT NULL DEFAULT 'kredi'"),
         ("transactions",    "card_id",      "INTEGER DEFAULT NULL"),
-        ("accounts",        "owner",        "TEXT NOT NULL DEFAULT ''"),
+        ("accounts",               "owner",                "TEXT NOT NULL DEFAULT ''"),
+        ("suppliers",              "vergi_dairesi",        "TEXT NOT NULL DEFAULT ''"),
+        ("suppliers",              "unvan",                "TEXT NOT NULL DEFAULT ''"),
+        ("supplier_invoices",      "invoice_type",         "TEXT NOT NULL DEFAULT 'alis'"),
+        ("supplier_invoices",      "payment_method",       "TEXT NOT NULL DEFAULT ''"),
+        ("supplier_invoices",      "payment_account_id",   "INTEGER DEFAULT NULL"),
+        ("supplier_invoices",      "payment_account_name", "TEXT NOT NULL DEFAULT ''"),
     ]
     with pg_connect() as con:
         for stmt in stmts:
@@ -1693,10 +1699,11 @@ def add_supplier():
     if not name: return jsonify({"ok":False,"error":"Tedarikçi adı zorunlu"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO suppliers (user_id,profile_id,name,tax_no,contact,phone,email,address,payment_terms_days,notes,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-        (uid, pid, name, d.get("tax_no",""), d.get("contact",""), d.get("phone",""),
-         d.get("email",""), d.get("address",""), int(d.get("payment_terms_days",30)),
-         d.get("notes",""), datetime.now().isoformat())
+        "INSERT INTO suppliers (user_id,profile_id,name,unvan,tax_no,vergi_dairesi,contact,phone,email,address,payment_terms_days,notes,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (uid, pid, name, d.get("unvan",""), d.get("tax_no","") or d.get("vkn",""),
+         d.get("vergi_dairesi",""), d.get("contact","") or d.get("contact_name",""),
+         d.get("phone",""), d.get("email",""), d.get("address",""),
+         int(d.get("payment_terms_days",30)), d.get("notes",""), datetime.now().isoformat())
     )
     db.commit()
     return jsonify({"ok":True,"id":cur.lastrowid})
@@ -1707,7 +1714,7 @@ def update_supplier(sid):
     pid = get_pid(); db = get_db()
     d = request.get_json(force=True)
     fields, params = [], []
-    for col in ("name","tax_no","contact","phone","email","address","payment_terms_days","notes"):
+    for col in ("name","unvan","tax_no","vergi_dairesi","contact","phone","email","address","payment_terms_days","notes"):
         if col in d:
             fields.append(f"{col}=?")
             params.append(d[col])
@@ -1732,9 +1739,12 @@ def del_supplier(sid):
 def list_supplier_invoices():
     pid = get_pid(); db = get_db()
     status = request.args.get("status","")
-    if status:
+    # normalize aliases: bekleyen=bekliyor, odendi=odendi
+    status_map = {"bekleyen": "bekliyor", "pending": "bekliyor"}
+    status_db = status_map.get(status, status)
+    if status_db:
         rows = db.execute(
-            "SELECT * FROM supplier_invoices WHERE profile_id=? AND status=? ORDER BY due_date", (pid, status)
+            "SELECT * FROM supplier_invoices WHERE profile_id=? AND status=? ORDER BY due_date", (pid, status_db)
         ).fetchall()
     else:
         rows = db.execute(
@@ -1755,11 +1765,11 @@ def add_supplier_invoice():
         return jsonify({"ok":False,"error":"Tedarikçi, tutar ve vade zorunlu"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO supplier_invoices (user_id,profile_id,supplier_id,supplier_name,invoice_no,description,amount,currency,invoice_date,due_date,status,paid_date,reference_rate,notes,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO supplier_invoices (user_id,profile_id,supplier_id,supplier_name,invoice_no,description,amount,currency,invoice_date,due_date,status,paid_date,reference_rate,notes,invoice_type,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (uid, pid, int(d.get("supplier_id",0)), sup_name, d.get("invoice_no",""),
          d.get("description",""), amount, d.get("currency","TRY"), inv_date, due_date,
          "bekliyor", "", float(d.get("reference_rate",50)), d.get("notes",""),
-         datetime.now().isoformat())
+         d.get("invoice_type","alis"), datetime.now().isoformat())
     )
     db.commit()
     return jsonify({"ok":True,"id":cur.lastrowid})
@@ -1794,9 +1804,12 @@ def pay_supplier_invoice(iid):
     pid = get_pid(); db = get_db()
     d = request.get_json(force=True)
     paid_date = d.get("paid_date", date.today().isoformat())
+    payment_method       = d.get("payment_method", "")
+    payment_account_id   = d.get("payment_account_id") or None
+    payment_account_name = d.get("payment_account_name", "")
     db.execute(
-        "UPDATE supplier_invoices SET status='odendi',paid_date=? WHERE id=? AND profile_id=?",
-        (paid_date, iid, pid)
+        "UPDATE supplier_invoices SET status='odendi',paid_date=?,payment_method=?,payment_account_id=?,payment_account_name=? WHERE id=? AND profile_id=?",
+        (paid_date, payment_method, payment_account_id, payment_account_name, iid, pid)
     )
     db.commit()
     return jsonify({"ok":True})

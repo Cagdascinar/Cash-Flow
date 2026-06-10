@@ -70,6 +70,7 @@ export default function Dashboard() {
           username={user?.username ?? ''}
           profileName={activeProfile?.name}
           profileType={activeProfile?.type}
+          avatar={activeProfile?.avatar}
           isPremium={user?.is_premium}
           quote={quote}
           onAvatarPress={() => router.push('/profiles' as any)}

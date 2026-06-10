@@ -195,8 +195,8 @@ export const misc = {
     req<any>(`/api/supplier-invoices?status=${status}`),
   addSupplierInvoice: (d: Record<string, unknown>) =>
     req<any>('/api/supplier-invoices', { method: 'POST', body: JSON.stringify(d) }),
-  paySupplierInvoice: (id: number) =>
-    req<any>(`/api/supplier-invoices/${id}/pay`, { method: 'POST' }),
+  paySupplierInvoice: (id: number, d?: Record<string, unknown>) =>
+    req<any>(`/api/supplier-invoices/${id}/pay`, { method: 'POST', body: JSON.stringify(d ?? {}) }),
   deleteSupplierInvoice: (id: number) =>
     req<any>(`/api/supplier-invoices/${id}`, { method: 'DELETE' }),
   supplierInvoiceAging: () => req<any>('/api/supplier-invoices/aging'),
