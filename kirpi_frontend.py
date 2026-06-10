@@ -7061,10 +7061,10 @@ function loadSupInvList(){
       var t = inv.invoice_type || 'alis';
       return t === _supInvType;
     });
+    (items||[]).forEach(function(inv){ window._supInvData[inv.id] = inv; });
     if(!filtered.length){
       el.innerHTML = '<div style="text-align:center;padding:28px 16px;color:var(--txt2);font-size:.85rem">🏭 '+
         (status==='bekliyor' ? 'Bekleyen fatura yok' : 'Ödenmiş fatura yok')+'</div>';
-      items.forEach(function(inv){ window._supInvData[inv.id] = inv; });
       return;
     }
     var today = new Date().toISOString().slice(0,10);
@@ -7099,7 +7099,6 @@ function loadSupInvList(){
         '<button onclick="delSupInv('+inv.id+')" style="background:none;border:none;font-size:1rem;cursor:pointer;padding:4px 6px;border-radius:8px;color:var(--txt2);flex-shrink:0;-webkit-tap-highlight-color:transparent" title="Sil">🗑</button>' +
         '</div>';
     }).join('');
-    items.forEach(function(inv){ window._supInvData[inv.id] = inv; });
   });
 }
 
