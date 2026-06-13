@@ -2743,6 +2743,35 @@ body{top:0!important}
     <button class="btn btn-primary" style="width:100%;padding:11px;font-size:.86rem" onclick="getTgCode()">🔗 Bağlantı Kodu Al</button>
   </div>
 
+  <!-- Uygulama Teması -->
+  <div class="settings-card">
+    <div class="settings-sect-title">🎨 Uygulama Teması</div>
+    <p style="font-size:.8rem;color:var(--txt2);margin-bottom:14px">Hazır bir tema seç veya kendi renklerini belirle. Seçim bu cihazda kaydedilir.</p>
+
+    <label style="font-size:.78rem;color:var(--txt2);margin-bottom:10px;display:block;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Hazır Temalar</label>
+    <div id="app-theme-grid" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px"></div>
+
+    <label style="font-size:.78rem;color:var(--txt2);margin-bottom:10px;display:block;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Özel Renkler</label>
+    <div style="display:flex;gap:12px;margin-bottom:16px">
+      <div style="flex:1">
+        <label style="font-size:.74rem;color:var(--txt2);margin-bottom:6px;display:block">Marka Rengi</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="color" id="custom-brand-color" value="#10069F" oninput="applyCustomTheme()" style="width:42px;height:38px;border:none;border-radius:10px;cursor:pointer;padding:2px;background:var(--bg3);flex-shrink:0">
+          <input type="text" id="custom-brand-hex" class="f-input" value="#10069F" oninput="syncColorFromHex('brand')" style="font-family:monospace;font-size:.82rem" maxlength="7">
+        </div>
+      </div>
+      <div style="flex:1">
+        <label style="font-size:.74rem;color:var(--txt2);margin-bottom:6px;display:block">Vurgu Rengi</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="color" id="custom-accent-color" value="#d5fd73" oninput="applyCustomTheme()" style="width:42px;height:38px;border:none;border-radius:10px;cursor:pointer;padding:2px;background:var(--bg3);flex-shrink:0">
+          <input type="text" id="custom-accent-hex" class="f-input" value="#d5fd73" oninput="syncColorFromHex('accent')" style="font-family:monospace;font-size:.82rem" maxlength="7">
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" onclick="saveAppTheme()" style="width:100%">💾 Temayı Kaydet</button>
+  </div>
+
   <!-- Rapor Ayarları -->
   <div class="settings-card">
     <div class="settings-sect-title">📄 PDF Rapor Ayarları</div>
@@ -3604,6 +3633,7 @@ function _bankLogo(name){
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
 function _appInit(){
+  loadSavedAppTheme();
   _syncDarkModeUI();
   var todayISO=new Date().toISOString().split('T')[0];
   var fdate=document.getElementById('f-date');
@@ -4217,6 +4247,7 @@ function initSettingsPage(){
   _syncSoundToggleUI();
   initTelegramSection();
   initReportSettings();
+  initAppThemeGrid();
 }
 
 function _renderAccountCard(me){
@@ -4329,6 +4360,109 @@ var _PDF_THEMES=[
   {key:'gri',name:'Gümüş',color:'#475569'},
 ];
 
+// ── UYGULAMA TEMA SİSTEMİ ────────────────────────────────────────────────────
+var APP_THEMES = [
+  {id:'kirpi',   name:'Kirpi',   brand:'#10069F', accent:'#d5fd73', b:'#4f48ff'},
+  {id:'okyanus', name:'Okyanus', brand:'#0077b6', accent:'#00f5d4', b:'#0096c7'},
+  {id:'orman',   name:'Orman',   brand:'#1b4332', accent:'#52b788', b:'#2d6a4f'},
+  {id:'mor',     name:'Mor',     brand:'#4a0e8f', accent:'#d4a5ff', b:'#7b2fff'},
+  {id:'gece',    name:'Gece',    brand:'#1a1a2e', accent:'#e94560', b:'#533483'},
+];
+
+function applyThemeVars(brand, accent, b){
+  var r = document.documentElement;
+  r.style.setProperty('--brand', brand);
+  r.style.setProperty('--accent', accent);
+  r.style.setProperty('--b', b);
+}
+
+function loadSavedAppTheme(){
+  var brand  = localStorage.getItem('appThemeBrand');
+  var accent = localStorage.getItem('appThemeAccent');
+  if(brand && accent){ applyThemeVars(brand, accent, brand); return; }
+  var id = localStorage.getItem('appThemeId') || 'kirpi';
+  var t = APP_THEMES.find(function(x){ return x.id===id; });
+  if(t) applyThemeVars(t.brand, t.accent, t.b);
+}
+
+function initAppThemeGrid(){
+  var grid = document.getElementById('app-theme-grid');
+  if(!grid) return;
+  var savedId    = localStorage.getItem('appThemeId') || 'kirpi';
+  var savedBrand  = localStorage.getItem('appThemeBrand');
+  var savedAccent = localStorage.getItem('appThemeAccent');
+  var html = '';
+  APP_THEMES.forEach(function(t){
+    var active = t.id === savedId && !savedBrand;
+    html += '<div class="tappable" onclick="selectPresetTheme(\''+t.id+'\')" '
+          + 'style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer">'
+          + '<div style="width:56px;height:56px;border-radius:16px;'
+          + 'background:linear-gradient(145deg,'+t.brand+' 0%,'+t.b+' 100%);'
+          + 'border:3px solid '+(active?t.accent:'transparent')+';'
+          + 'position:relative;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.35);transition:.2s">'
+          + '<div style="position:absolute;bottom:5px;right:5px;width:16px;height:16px;border-radius:50%;background:'+t.accent+';box-shadow:0 0 6px '+t.accent+'66"></div>'
+          + '</div>'
+          + '<span style="font-size:.66rem;font-weight:700;color:'+(active?'var(--accent)':'var(--txt2)')+'">'+t.name+'</span>'
+          + '</div>';
+  });
+  grid.innerHTML = html;
+  var themeObj = APP_THEMES.find(function(t){ return t.id===savedId; }) || APP_THEMES[0];
+  var bv = savedBrand  || themeObj.brand;
+  var av = savedAccent || themeObj.accent;
+  var bc = document.getElementById('custom-brand-color');
+  var bh = document.getElementById('custom-brand-hex');
+  var ac = document.getElementById('custom-accent-color');
+  var ah = document.getElementById('custom-accent-hex');
+  if(bc) bc.value = bv;
+  if(bh) bh.value = bv;
+  if(ac) ac.value = av;
+  if(ah) ah.value = av;
+}
+
+function selectPresetTheme(id){
+  var t = APP_THEMES.find(function(x){ return x.id===id; });
+  if(!t) return;
+  localStorage.setItem('appThemeId', id);
+  localStorage.removeItem('appThemeBrand');
+  localStorage.removeItem('appThemeAccent');
+  applyThemeVars(t.brand, t.accent, t.b);
+  initAppThemeGrid();
+  toast('Tema uygulandı: '+t.name+' ✓');
+}
+
+function applyCustomTheme(){
+  var brand  = (document.getElementById('custom-brand-color')||{}).value||'#10069F';
+  var accent = (document.getElementById('custom-accent-color')||{}).value||'#d5fd73';
+  var bh = document.getElementById('custom-brand-hex');
+  var ah = document.getElementById('custom-accent-hex');
+  if(bh) bh.value = brand;
+  if(ah) ah.value = accent;
+  applyThemeVars(brand, accent, brand);
+}
+
+function syncColorFromHex(which){
+  var hexEl    = document.getElementById('custom-'+which+'-hex');
+  var pickerEl = document.getElementById('custom-'+which+'-color');
+  if(!hexEl||!pickerEl) return;
+  var val = hexEl.value.trim();
+  if(/^#[0-9a-fA-F]{6}$/.test(val)){
+    pickerEl.value = val;
+    applyCustomTheme();
+  }
+}
+
+function saveAppTheme(){
+  var brand  = (document.getElementById('custom-brand-color')||{}).value||'#10069F';
+  var accent = (document.getElementById('custom-accent-color')||{}).value||'#d5fd73';
+  localStorage.setItem('appThemeBrand', brand);
+  localStorage.setItem('appThemeAccent', accent);
+  localStorage.removeItem('appThemeId');
+  applyThemeVars(brand, accent, brand);
+  initAppThemeGrid();
+  toast('Özel tema kaydedildi ✓');
+}
+
+// ── PDF RAPOR AYARLARI ────────────────────────────────────────────────────────
 function initReportSettings(){
   // Tema grid'i çiz
   var grid=document.getElementById('pdf-theme-grid');
