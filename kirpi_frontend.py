@@ -11,40 +11,40 @@ AUTH_HTML = r"""<!DOCTYPE html>
 <title>Kirpi — Nakit Akışın Cebinde!</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#f2f2f7;color:#1c1c1e;font-family:'Inter',system-ui,sans-serif;
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+body{background:#07091f;color:#e8eaff;font-family:'Plus Jakarta Sans',system-ui,sans-serif;
   min-height:100vh;display:grid;grid-template-columns:1fr 1fr;align-items:stretch}
 @media(max-width:700px){body{grid-template-columns:1fr}}
-.hero{background:linear-gradient(145deg,#ffffff 0%,#f0f0f8 100%);
+.hero{background:linear-gradient(145deg,#10069F 0%,#07091f 100%);
   display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 40px;
   position:relative;overflow:hidden}
 @media(max-width:700px){.hero{display:none}}
-.hero-title{font-size:2rem;font-weight:900;letter-spacing:-.04em;margin-bottom:8px;
-  background:linear-gradient(135deg,#818cf8,#a78bfa,#6ee7b7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.hero-sub{font-size:.9rem;color:#6d6d72;text-align:center;max-width:280px;line-height:1.6;margin-bottom:32px}
+.hero-title{font-size:2rem;font-weight:900;letter-spacing:-.04em;margin-bottom:8px;color:#fff}
+.hero-sub{font-size:.9rem;color:rgba(255,255,255,.6);text-align:center;max-width:280px;line-height:1.6;margin-bottom:32px}
 .hero-pills{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:300px}
-.pill{background:#e5e5ea;border:1px solid #d1d1d6;border-radius:20px;padding:6px 14px;
-  font-size:.75rem;color:#6d6d72;display:flex;align-items:center;gap:6px}
-.right{display:flex;align-items:center;justify-content:center;padding:40px 36px;background:#f2f2f7}
-.box{background:#ffffff;border:1px solid #d1d1d6;border-radius:20px;padding:40px 36px;
-  width:100%;max-width:400px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.pill{background:rgba(213,253,115,.12);border:1px solid rgba(213,253,115,.3);border-radius:20px;padding:6px 14px;
+  font-size:.75rem;color:#d5fd73;display:flex;align-items:center;gap:6px}
+.right{display:flex;align-items:center;justify-content:center;padding:40px 36px;background:#07091f}
+.box{background:#0d1140;border:1px solid #1a2275;border-radius:20px;padding:40px 36px;
+  width:100%;max-width:400px;box-shadow:0 4px 40px rgba(16,6,159,.4)}
 .logo{text-align:center;margin-bottom:32px}
 .logo img{width:64px;height:64px;border-radius:16px;margin-bottom:12px}
-.logo h1{font-size:1.4rem;font-weight:800;letter-spacing:-.02em;color:#1c1c1e}
-.logo p{font-size:.82rem;color:#6d6d72;margin-top:4px}
-label{display:block;font-size:.78rem;color:#6d6d72;margin-bottom:5px;font-weight:500}
-input{width:100%;background:#f2f2f7;border:1px solid #d1d1d6;color:#1c1c1e;
+.logo h1{font-size:1.4rem;font-weight:800;letter-spacing:-.02em;color:#fff}
+.logo p{font-size:.82rem;color:rgba(255,255,255,.45);margin-top:4px}
+label{display:block;font-size:.78rem;color:rgba(255,255,255,.5);margin-bottom:5px;font-weight:500}
+input{width:100%;background:#131a5c;border:1px solid #1a2275;color:#e8eaff;
   padding:12px 14px;border-radius:10px;font-size:.9rem;outline:none;margin-bottom:14px;
   font-family:inherit;transition:.15s}
-input:focus{border-color:#007aff;background:#ffffff}
-.btn{width:100%;padding:13px;background:#007aff;color:#fff;border:none;border-radius:10px;
-  font-size:.92rem;font-weight:700;cursor:pointer;transition:.2s;margin-top:4px}
-.btn:hover{background:#0062cc}
+input:focus{border-color:#d5fd73;background:#1a2275}
+.btn{width:100%;padding:13px;background:#d5fd73;color:#07091f;border:none;border-radius:10px;
+  font-size:.92rem;font-weight:800;cursor:pointer;transition:.2s;margin-top:4px}
+.btn:hover{background:#c8f55a}
 .msg{text-align:center;font-size:.82rem;padding:10px 14px;border-radius:10px;margin-bottom:16px}
-.msg.err{background:#ff3b3014;color:#c0281e;border:1px solid #ff3b3028}
-.msg.ok{background:#34c75914;color:#1a8a3a;border:1px solid #34c75928}
-.link{text-align:center;margin-top:18px;font-size:.82rem;color:#6d6d72}
-.link a{color:#007aff;text-decoration:none;font-weight:600}
-.link a:hover{color:#0062cc}
+.msg.err{background:rgba(246,70,93,.12);color:#f6465d;border:1px solid rgba(246,70,93,.3)}
+.msg.ok{background:rgba(213,253,115,.1);color:#d5fd73;border:1px solid rgba(213,253,115,.25)}
+.link{text-align:center;margin-top:18px;font-size:.82rem;color:rgba(255,255,255,.45)}
+.link a{color:#d5fd73;text-decoration:none;font-weight:700}
+.link a:hover{color:#c8f55a}
 </style>
 </head>
 <body>
@@ -125,7 +125,7 @@ HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="theme-color" content="#0a0c12">
+<meta name="theme-color" content="#10069F">
 <meta name="description" content="Kirpi — Nakit Akışın Cebinde! Gelir, gider, kart borçları ve bütçenizi tek yerden yönetin.">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -144,26 +144,23 @@ HTML = r"""<!DOCTYPE html>
 *{box-sizing:border-box;margin:0;padding:0}
 html{overflow-x:hidden}
 body{position:relative;overflow-x:hidden}
-/* ── Binance Dark (varsayılan) ── */
+/* ── Kirpi Dark (Varsayılan) ── */
 :root{
-  --bg:#0b0e11;--bg2:#1e2026;--bg3:#2b2f36;--bg4:#363c45;
-  --g:#0ecb81;--r:#f6465d;--b:#f0b90b;--b2:#f0b90b;--y:#f0b90b;--p:#af52de;--c:#00b8d9;
-  --txt:#eaecef;--txt2:#848e9c;--border:#2b2f36;--border2:#363c45;
-  --radius:12px;--shadow:0 2px 16px rgba(0,0,0,.5);
-  --font:'Inter',system-ui,sans-serif;
+  --bg:#07091f;--bg2:#0d1140;--bg3:#131a5c;--bg4:#1a2275;
+  --g:#d5fd73;--r:#f6465d;--b:#4f48ff;--b2:#d5fd73;--y:#f0b90b;--p:#af52de;--c:#00b8d9;
+  --brand:#10069F;--accent:#d5fd73;
+  --txt:#e8eaff;--txt2:#8b96d4;--border:#1a2275;--border2:#232c90;
+  --radius:14px;--shadow:0 4px 24px rgba(16,6,159,.35);
+  --font:'Plus Jakarta Sans',system-ui,sans-serif;
 }
-/* Light mod isteyenler için */
 [data-theme="light"]{
-  --bg:#f0f4f8;--bg2:#ffffff;--bg3:#e8ecf0;--bg4:#d1d7de;
-  --g:#0ecb81;--r:#f6465d;--b:#f0b90b;--b2:#d4a017;--y:#f0b90b;
-  --txt:#1e2026;--txt2:#707a8a;--border:#dde1e7;--border2:#c8cdd4;
-  --shadow:0 2px 16px rgba(0,0,0,.08);
+  --bg:#f2f3ff;--bg2:#ffffff;--bg3:#e8ebff;--bg4:#d6daff;
+  --g:#6abf00;--r:#f6465d;--b:#10069F;--b2:#1510d4;--y:#c89600;
+  --brand:#10069F;--accent:#d5fd73;
+  --txt:#07091f;--txt2:#4a52b8;--border:#d6daff;--border2:#b8c3ff;
+  --shadow:0 4px 24px rgba(16,6,159,.1);
 }
-:root{
-  --radius:14px;--shadow:0 2px 16px rgba(0,0,0,.08);
-  --font:'Inter',system-ui,sans-serif;
-}
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap');
 html{height:auto;overflow-y:auto}
 body{background:var(--bg);color:var(--txt);font-family:var(--font);min-height:100vh;
   overflow-x:hidden;overflow-y:auto;height:auto;
@@ -173,8 +170,9 @@ input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:tex
 
 /* ── LAYOUT ── */
 .shell{display:flex;min-height:100vh}
-nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.06);
-    display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;height:100vh;z-index:100}
+nav{width:220px;background:var(--brand);border-right:none;
+    display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;height:100vh;z-index:100;
+    box-shadow:4px 0 24px rgba(16,6,159,.4)}
 .main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh;overflow-x:hidden;min-width:0;
   padding-top:calc(54px + env(safe-area-inset-top,0px))}
 /* Tablet: 768-1200px — body kaydirir, hiçbir şey scroll'u engellemez */
@@ -190,28 +188,28 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
       position:fixed;bottom:0;left:0;right:0;top:auto;z-index:9999;
       padding-bottom:env(safe-area-inset-bottom,0px);
       overflow:visible;
-      background:rgba(17,18,20,.92);
+      background:rgba(7,9,31,.95);
       backdrop-filter:blur(28px) saturate(200%);-webkit-backdrop-filter:blur(28px) saturate(200%);
-      box-shadow:0 -0.5px 0 rgba(255,255,255,.08),0 -12px 40px rgba(0,0,0,.6)}
-  [data-theme="light"] nav{background:rgba(255,255,255,.92);box-shadow:0 -0.5px 0 rgba(0,0,0,.1),0 -12px 40px rgba(0,0,0,.08)}
+      box-shadow:0 -0.5px 0 rgba(79,72,255,.2),0 -12px 40px rgba(16,6,159,.5)}
+  [data-theme="light"] nav{background:rgba(16,6,159,.97);box-shadow:0 -0.5px 0 rgba(255,255,255,.1),0 -12px 40px rgba(16,6,159,.3)}
   .main{margin-left:0;margin-bottom:calc(70px + env(safe-area-inset-bottom,0px));position:relative;z-index:1}
   .nav-logo{display:none}
 }
 
 /* ── NAV ── */
-.nav-logo{padding:24px 20px 16px;border-bottom:1px solid var(--border);margin-bottom:8px}
-.nav-logo .brand{font-size:1.1rem;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
-.nav-logo .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--b2)}
-.nav-logo .sub{font-size:.72rem;color:var(--txt2);margin-top:2px;padding-left:16px}
+.nav-logo{padding:24px 20px 16px;border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:8px}
+.nav-logo .brand{font-size:1.1rem;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:8px;color:#fff}
+.nav-logo .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.nav-logo .sub{font-size:.72rem;color:rgba(255,255,255,.5);margin-top:2px;padding-left:16px}
 .nav-links{flex:1;padding:4px 8px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
-.nav-sect{font-size:.57rem;text-transform:uppercase;letter-spacing:.13em;color:var(--txt2);
-          font-weight:700;padding:12px 12px 3px;opacity:.45;pointer-events:none}
+.nav-sect{font-size:.57rem;text-transform:uppercase;letter-spacing:.13em;color:rgba(255,255,255,.35);
+          font-weight:700;padding:12px 12px 3px;pointer-events:none}
 .nl{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;
-    cursor:pointer;color:var(--txt2);font-size:.86rem;font-weight:500;transition:.14s;
+    cursor:pointer;color:rgba(255,255,255,.6);font-size:.86rem;font-weight:500;transition:.14s;
     user-select:none;position:relative}
-.nl:hover{background:var(--bg3);color:var(--txt)}
-.nl.active{background:rgba(0,122,255,.09);color:var(--b);font-weight:600;
-  box-shadow:inset 3px 0 0 var(--b)}
+.nl:hover{background:rgba(255,255,255,.1);color:#fff}
+.nl.active{background:var(--accent);color:#07091f;font-weight:700;box-shadow:none}
+.nl.active .ico{filter:none}
 .nl .ico{font-size:1.1rem;width:22px;text-align:center;flex-shrink:0}
 
 /* ── MOBILE ALT NAV — Apple iOS Tab Bar Standard ── */
@@ -275,10 +273,10 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
   /* Aktif durum — ikon büyüsün + etiket renk */
   .nl.active .ico {
     transform:scale(1.08);
-    background:rgba(0,122,255,.12);
+    background:rgba(213,253,115,.18);
   }
   .nl.active span:not(.ico) {
-    color:var(--b);
+    color:var(--accent);
     font-weight:700;
   }
   .nl::after { display:none!important }
@@ -286,16 +284,16 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
   /* Ekle butonu — merkezi vurgulu */
   .nl-add-ghost { display:none!important }
   .nl-add .ico {
-    background:linear-gradient(145deg,#007aff,#0062cc)!important;
-    color:#fff!important;
+    background:linear-gradient(145deg,var(--accent),#b8e832)!important;
+    color:#07091f!important;
     border-radius:14px;
     font-size:1.2rem;
-    box-shadow:0 3px 12px rgba(0,122,255,.45);
+    box-shadow:0 3px 12px rgba(213,253,115,.4);
     width:36px!important; height:36px!important;
   }
-  .nl-add.active .ico { background:linear-gradient(145deg,#007aff,#0062cc)!important; }
-  .nl-add span:not(.ico) { color:var(--b)!important; font-weight:700; }
-  .nl-add:active .ico { transform:scale(.9)!important; box-shadow:0 1px 6px rgba(0,122,255,.3); }
+  .nl-add.active .ico { background:linear-gradient(145deg,var(--accent),#b8e832)!important; }
+  .nl-add span:not(.ico) { color:var(--accent)!important; font-weight:700; }
+  .nl-add:active .ico { transform:scale(.9)!important; box-shadow:0 1px 6px rgba(213,253,115,.25); }
 
   .nl-desktop,.nl-desktop-only,.nl-menu,.nl-more,.nav-sect{display:none!important}
 }
@@ -315,7 +313,7 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 /* ── SPLASH — CSS ile otomatik kapanır (JS hata yapsa bile) ── */
 #splash-screen{
   position:fixed;inset:0;z-index:99999;
-  background:linear-gradient(160deg,#050c1a 0%,#0d1f3c 50%,#0a0e1a 100%);
+  background:linear-gradient(160deg,#07091f 0%,#10069F 55%,#07091f 100%);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   /* 1.5s sonra CSS kendisi kapatır — JS olmadan da çalışır */
   animation:_splash-auto .45s 1.5s ease forwards;
@@ -326,11 +324,11 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 .splash-center{display:flex;flex-direction:column;align-items:center;gap:0}
 .splash-icon-wrap{
   width:96px;height:96px;border-radius:28px;
-  background:linear-gradient(145deg,#1a3a6b,#0d2a5c);
-  border:1px solid rgba(99,160,255,.2);
+  background:linear-gradient(145deg,#1a10cc,#10069F);
+  border:1px solid rgba(213,253,115,.3);
   display:flex;align-items:center;justify-content:center;
   font-size:3rem;margin-bottom:20px;
-  box-shadow:0 0 60px rgba(99,160,255,.15),0 20px 60px rgba(0,0,0,.5);
+  box-shadow:0 0 60px rgba(213,253,115,.2),0 20px 60px rgba(0,0,0,.5);
   opacity:0;
   animation:spl-icon .5s .05s cubic-bezier(.34,1.56,.64,1) forwards;
 }
@@ -350,7 +348,7 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 /* İnce ilerleme çizgisi */
 .splash-bar{
   position:absolute;bottom:0;left:0;height:2px;
-  background:linear-gradient(90deg,#6366f1,#60a5fa,#34d399);
+  background:linear-gradient(90deg,#10069F,#4f48ff,#d5fd73);
   animation:spl-bar 1.2s .1s ease-out forwards;
   border-radius:0 2px 2px 0;
 }
@@ -398,13 +396,13 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 .lang-btn{padding:8px 6px;border-radius:10px;border:1.5px solid var(--border2);background:var(--bg3);
   color:var(--txt);font-size:.75rem;font-weight:600;cursor:pointer;transition:.14s;text-align:center;
   -webkit-tap-highlight-color:transparent}
-.lang-btn:hover{border-color:var(--b);background:rgba(0,122,255,.07)}
-.lang-btn.active{border-color:var(--b);background:rgba(0,122,255,.13);color:var(--b)}
+.lang-btn:hover{border-color:var(--b);background:rgba(79,72,255,.07)}
+.lang-btn.active{border-color:var(--accent);background:rgba(213,253,115,.12);color:var(--accent)}
 /* Ödeme yöntemi çipleri */
 .pay-chip{padding:7px 13px;border-radius:10px;border:1.5px solid var(--border2);background:var(--bg3);
   color:var(--txt2);font-size:.8rem;font-weight:600;cursor:pointer;transition:.14s;
   -webkit-tap-highlight-color:transparent}
-.pay-chip.active{border-color:var(--b);background:rgba(0,122,255,.1);color:var(--b)}
+.pay-chip.active{border-color:var(--accent);background:rgba(213,253,115,.12);color:var(--accent)}
 @media(max-width:600px){.page{padding:16px 16px 20px}}
 .page-title{
   font-size:1.9rem;font-weight:900;margin-bottom:4px;
@@ -473,8 +471,8 @@ nav{width:220px;background:var(--bg2);border-right:1px solid rgba(255,255,255,.0
 :root:not([data-theme="dark"]) .rate-gbp .val,:root:not([data-theme="dark"]) .rate-gold .val{color:#7a4a00}
 :root:not([data-theme="dark"]) .rate-usd .lbl,:root:not([data-theme="dark"]) .rate-eur .lbl,
 :root:not([data-theme="dark"]) .rate-gbp .lbl,:root:not([data-theme="dark"]) .rate-gold .lbl{color:rgba(0,0,0,.55)}
-.stat-bal{background:linear-gradient(135deg,#1e2845,#161c33);border-color:#6366f133}
-.stat-bal .glow{background:var(--b)}
+.stat-bal{background:linear-gradient(135deg,#10069F22,#0d114033);border-color:rgba(213,253,115,.2)}
+.stat-bal .glow{background:var(--accent)}
 .stat-g{background:linear-gradient(135deg,#0d2118,#0a1a12);border-color:#22c55e22}
 .stat-g .glow{background:var(--g)}
 .stat-r{background:linear-gradient(135deg,#1f0e0e,#180a0a);border-color:#ef444422}
@@ -510,10 +508,10 @@ canvas{display:block;width:100%!important}
 .ledger-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
 .search-box{flex:1;min-width:160px;background:var(--bg3);border:1px solid var(--border2);
   color:var(--txt);padding:9px 14px;border-radius:9px;font-size:.85rem;outline:none}
-.search-box:focus{border-color:var(--b2)}
+.search-box:focus{border-color:var(--accent)}
 .filter-sel{background:var(--bg3);border:1px solid var(--border2);color:var(--txt2);
   padding:9px 12px;border-radius:9px;font-size:.82rem;outline:none;cursor:pointer}
-.filter-sel:focus{border-color:var(--b2)}
+.filter-sel:focus{border-color:var(--accent)}
 .btn{
   padding:10px 20px;border-radius:12px;border:none;
   font-size:.84rem;font-weight:700;cursor:pointer;
@@ -524,28 +522,29 @@ canvas{display:block;width:100%!important}
 .btn:hover{transform:translateY(-1px)}
 .btn:active{transform:scale(.96);filter:brightness(.92)}
 .btn-primary{
-  background:linear-gradient(135deg,#f0b90b,#e0a800);
-  color:#1a1200;
-  box-shadow:0 4px 14px rgba(240,185,11,.35),0 2px 4px rgba(0,0,0,.2);
+  background:linear-gradient(135deg,#d5fd73,#b8e832);
+  color:#07091f;
+  box-shadow:0 4px 14px rgba(213,253,115,.35),0 2px 4px rgba(0,0,0,.2);
+  font-weight:700;
 }
-.btn-primary:hover{box-shadow:0 6px 20px rgba(240,185,11,.45)}
-.btn-primary:active{box-shadow:0 2px 8px rgba(240,185,11,.3);transform:translateY(1px) scale(.97)}
+.btn-primary:hover{box-shadow:0 6px 20px rgba(213,253,115,.5)}
+.btn-primary:active{box-shadow:0 2px 8px rgba(213,253,115,.3);transform:translateY(1px) scale(.97)}
 .btn-danger{
   background:linear-gradient(135deg,#ef4444,#dc2626);
   color:#fff;box-shadow:0 4px 14px rgba(239,68,68,.35);
 }
 .btn-danger:hover{box-shadow:0 6px 20px rgba(239,68,68,.45)}
 .btn-ghost{
-  background:var(--bg3);border:1.5px solid var(--border2);
+  background:transparent;border:1.5px solid var(--border2);
   color:var(--txt2);box-shadow:none;
 }
-.btn-ghost:hover{border-color:var(--b2);color:var(--b2);background:var(--bg4)}
-.btn-ghost:active{background:var(--bg4);transform:scale(.97)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);background:rgba(213,253,115,.06)}
+.btn-ghost:active{background:rgba(213,253,115,.1);transform:scale(.97)}
 .btn-green{
-  background:linear-gradient(135deg,#22c55e,#16a34a);
-  color:#fff;box-shadow:0 4px 14px rgba(34,197,94,.3);
+  background:linear-gradient(135deg,#d5fd73,#b8e832);
+  color:#07091f;font-weight:700;box-shadow:0 4px 14px rgba(213,253,115,.3);
 }
-.btn-green:hover{box-shadow:0 6px 20px rgba(34,197,94,.4)}
+.btn-green:hover{box-shadow:0 6px 20px rgba(213,253,115,.4)}
 
 .ledger-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);
   box-shadow:0 1px 6px rgba(0,0,0,.04)}
@@ -558,7 +557,7 @@ th.sortable:hover{color:var(--b2)}
 th .sort-ico{margin-left:4px;opacity:.4}
 td{padding:0;border-bottom:1px solid var(--border);vertical-align:middle}
 td .cell{padding:10px 12px;display:flex;align-items:center;gap:6px;min-height:44px}
-tbody tr:hover{background:rgba(0,122,255,.03)}
+tbody tr:hover{background:rgba(79,72,255,.03)}
 tbody tr.selected{background:#6366f10d}
 tbody tr:last-child td{border-bottom:none}
 
@@ -618,7 +617,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   padding:11px 14px;border-radius:11px;font-size:.92rem;outline:none;transition:.15s;font-family:inherit;
   -webkit-appearance:none;appearance:none;
   box-shadow:0 1px 3px rgba(0,0,0,.06) inset}
-.f-input:focus{border-color:var(--b);background:var(--bg2);box-shadow:0 0 0 3px rgba(0,122,255,.12)}
+.f-input:focus{border-color:var(--accent);background:var(--bg2);box-shadow:0 0 0 3px rgba(213,253,115,.12)}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
 @media(max-width:500px){.form-row{grid-template-columns:1fr}}
 .type-tabs{display:flex;gap:8px;margin-bottom:16px}
@@ -653,7 +652,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .prog-fill{height:100%;border-radius:4px;transition:width .7s cubic-bezier(.4,0,.2,1)}
 
 /* ── GOALS / TASARRUF ── */
-.goals-capacity-card{background:linear-gradient(160deg,#eef3ff,#f0f0f8);border-color:#007aff18}
+.goals-capacity-card{background:linear-gradient(160deg,#eef3ff,#f0f0f8);border-color:#10069F18}
 .goals-stat-cell{background:var(--bg3);border-radius:12px;padding:12px 14px;text-align:center}
 .gsc-lbl{font-size:.63rem;text-transform:uppercase;letter-spacing:.09em;color:var(--txt2);font-weight:700;margin-bottom:4px}
 .gsc-val{font-size:1.05rem;font-weight:800;letter-spacing:-.02em}
@@ -678,7 +677,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .cb-text{font-size:.82rem;color:var(--txt);line-height:1.55}
 
 /* ── TOAST ── */
-#toast{position:fixed;bottom:72px;right:20px;background:var(--bg3);border:1px solid var(--b);
+#toast{position:fixed;bottom:72px;right:20px;background:var(--bg3);border:1px solid var(--accent);
   color:var(--txt);padding:12px 20px;border-radius:10px;font-size:.85rem;
   transform:translateY(20px);opacity:0;transition:.25s;z-index:999;pointer-events:none;box-shadow:var(--shadow)}
 #toast.show{transform:translateY(0);opacity:1}
@@ -905,20 +904,20 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 
 /* ── HERO BALANCE CARD — Premium ────────────────────────────── */
 .hero-card{
-  background:linear-gradient(145deg,#050e22 0%,#0d1f3c 40%,#1a3a6b 80%,#0f2244 100%);
-  border:1px solid rgba(99,160,255,.12);
+  background:linear-gradient(145deg,#10069F 0%,#1a10cc 45%,#0d1140 100%);
+  border:1px solid rgba(213,253,115,.15);
   border-radius:28px;padding:24px 24px 20px;margin-bottom:16px;
   position:relative;overflow:hidden;
-  box-shadow:0 20px 60px rgba(5,14,34,.7),0 4px 20px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.06);
+  box-shadow:0 20px 60px rgba(16,6,159,.6),0 4px 20px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.08);
 }
 .hero-card::before{
   content:'';position:absolute;top:-80px;right:-80px;width:320px;height:320px;border-radius:50%;
-  background:radial-gradient(circle,rgba(99,160,255,.22) 0%,transparent 65%);
+  background:radial-gradient(circle,rgba(213,253,115,.15) 0%,transparent 65%);
   animation:hero-glow 4s ease-in-out infinite;
 }
 .hero-card::after{
   content:'';position:absolute;bottom:-70px;left:-50px;width:250px;height:250px;border-radius:50%;
-  background:radial-gradient(circle,rgba(52,199,89,.16) 0%,transparent 65%);
+  background:radial-gradient(circle,rgba(79,72,255,.2) 0%,transparent 65%);
 }
 @keyframes hero-glow{0%,100%{opacity:.8;transform:scale(1)}50%{opacity:1;transform:scale(1.08)}}
 .hero-top-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;position:relative}
@@ -942,7 +941,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);
 }
 .hero-period-tab{padding:5px 14px;border-radius:8px;font-size:.7rem;font-weight:600;color:rgba(255,255,255,.4);cursor:pointer;transition:.2s;border:none;background:transparent;letter-spacing:.02em}
-.hero-period-tab.active{background:rgba(255,255,255,.95);color:#0d1f3c;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.hero-period-tab.active{background:#d5fd73;color:#07091f;font-weight:700;box-shadow:0 2px 8px rgba(213,253,115,.25)}
 .hero-year-nav{display:none;align-items:center;gap:8px;margin-bottom:8px}
 .hero-year-btn{width:26px;height:26px;border-radius:50%;border:none;background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);font-size:.85rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
 .hero-year-btn:hover{background:rgba(255,255,255,.2);color:#fff}
@@ -954,7 +953,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .hero-balance{
   font-size:2.6rem;font-weight:900;letter-spacing:-.05em;line-height:1;
   margin-bottom:6px;color:#fff;position:relative;
-  text-shadow:0 0 40px rgba(99,160,255,.3),0 2px 12px rgba(0,0,0,.3);
+  text-shadow:0 0 40px rgba(213,253,115,.2),0 2px 12px rgba(0,0,0,.3);
   font-variant-numeric:tabular-nums;
 }
 .hero-net-sub{font-size:.72rem;color:rgba(255,255,255,.35);margin-bottom:18px;min-height:14px;position:relative}
@@ -965,7 +964,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
   cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;font-family:inherit;
   backdrop-filter:blur(8px);
 }
-.hero-sel option{background:#0d1f3c;color:#fff}
+.hero-sel option{background:#0d1140;color:#fff}
 .hero-chips{display:flex;gap:8px;flex-wrap:wrap;position:relative}
 .hero-chip{
   display:flex;align-items:center;gap:5px;
@@ -1043,7 +1042,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .sh-dot.yl{background:var(--y);box-shadow:0 0 5px #f59e0b80}
 .sh-dot.cy{background:var(--c);box-shadow:0 0 5px #06b6d480}
 .sh-dot.pp{background:var(--p);box-shadow:0 0 5px #a855f780}
-.sh-badge{background:var(--b);color:#fff;font-size:.64rem;font-weight:800;padding:2px 8px;border-radius:10px;min-width:20px;text-align:center;line-height:1.5}
+.sh-badge{background:var(--accent);color:#07091f;font-size:.64rem;font-weight:800;padding:2px 8px;border-radius:10px;min-width:20px;text-align:center;line-height:1.5}
 .sh-chevron{color:var(--txt2);font-size:.78rem;flex-shrink:0;display:inline-block;transition:transform .3s cubic-bezier(.4,0,.2,1)}
 .sh-chevron.closed{transform:rotate(-90deg)}
 .s-body{overflow:hidden;max-height:3000px;opacity:1;padding-top:12px;margin-bottom:14px;transition:max-height .4s cubic-bezier(.4,0,.2,1),opacity .3s ease,padding-top .3s,margin-bottom .3s}
@@ -1059,7 +1058,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .today-card.gn .tc-lbl{color:#1a8a3a}.today-card.gn .tc-val{color:var(--g)}
 .today-card.rd{background:linear-gradient(135deg,#fff0ef,#ffe5e3);border:1px solid #ff3b3030}
 .today-card.rd .tc-lbl{color:#c0281e}.today-card.rd .tc-val{color:var(--r)}
-.today-card.nt{background:linear-gradient(135deg,#eef3ff,#e6ecff);border:1px solid #007aff28}
+.today-card.nt{background:linear-gradient(135deg,#eef3ff,#e6ecff);border:1px solid #10069F28}
 .today-card.nt .tc-lbl{color:#004dcc}.today-card.nt .tc-val{color:var(--b)}
 
 /* ── UPCOMING PAYMENTS ─────────────────────────────────────── */
@@ -1111,7 +1110,7 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 .empty-cc{text-align:center;padding:22px 16px;color:var(--txt2);font-size:.82rem;line-height:1.7}
 .qd-btn{padding:5px 11px;border:1px solid var(--border2);border-radius:8px;font-size:.72rem;font-weight:600;color:var(--txt2);background:var(--bg3);cursor:pointer;transition:.15s;white-space:nowrap;font-family:inherit}
 .qd-btn:hover{border-color:var(--b);color:var(--b)}
-.qd-btn.qd-active{background:var(--b);color:#fff;border-color:var(--b)}
+.qd-btn.qd-active{background:var(--accent);color:#07091f;border-color:var(--accent)}
 
 /* ── MOBILE NAV ENHANCEMENTS ────────────────────────────────── */
 .nl-desktop{}
@@ -1161,8 +1160,8 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
 .todo-nav-btn:active{background:var(--bg3)}
 .todo-add-row{display:flex;gap:8px;margin-bottom:16px}
 .todo-add-input{flex:1;background:var(--bg2);border:1.5px solid var(--border2);border-radius:12px;padding:11px 14px;font-size:.9rem;color:var(--txt);outline:none;transition:.15s;font-family:var(--font)}
-.todo-add-input:focus{border-color:var(--b);box-shadow:0 0 0 3px rgba(0,122,255,.1)}
-.todo-add-btn{background:var(--b);border:none;border-radius:12px;padding:0 18px;color:#fff;font-size:1.1rem;cursor:pointer;font-weight:700;transition:.1s}
+.todo-add-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(213,253,115,.1)}
+.todo-add-btn{background:var(--accent);border:none;border-radius:12px;padding:0 18px;color:#07091f;font-size:1.1rem;cursor:pointer;font-weight:700;transition:.1s}
 .todo-add-btn:active{opacity:.8;transform:scale(.96)}
 .todo-list{display:flex;flex-direction:column;gap:8px}
 .todo-item{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:13px;cursor:pointer;transition:.12s;-webkit-tap-highlight-color:transparent}
@@ -1195,11 +1194,15 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
 .aging-card .ac-lbl{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
 .aging-card .ac-val{font-size:1.05rem;font-weight:800;letter-spacing:-.02em}
 .aging-card .ac-cnt{font-size:.7rem;margin-top:3px;opacity:.7}
-.aging-card.green{background:#edfaf2;border-color:#34c75930}.aging-card.green .ac-lbl{color:#1a8a3a}.aging-card.green .ac-val{color:var(--g)}
-.aging-card.yellow{background:#fffbeb;border-color:#ff950030}.aging-card.yellow .ac-lbl{color:#a06000}.aging-card.yellow .ac-val{color:var(--y)}
-.aging-card.orange{background:#fff7ed;border-color:#ea730030}.aging-card.orange .ac-lbl{color:#994700}.aging-card.orange .ac-val{color:#ea7300}
-.aging-card.red{background:#fff0ef;border-color:#ff3b3030}.aging-card.red .ac-lbl{color:#c0281e}.aging-card.red .ac-val{color:var(--r)}
-.float-gain-banner{background:linear-gradient(135deg,var(--b),var(--b2));border-radius:14px;padding:18px 20px;color:#fff;display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.aging-card.green{background:rgba(213,253,115,.08);border-color:rgba(213,253,115,.25)}.aging-card.green .ac-lbl{color:var(--g)}.aging-card.green .ac-val{color:var(--g)}
+.aging-card.yellow{background:rgba(255,149,0,.08);border-color:rgba(255,149,0,.25)}.aging-card.yellow .ac-lbl{color:var(--y)}.aging-card.yellow .ac-val{color:var(--y)}
+.aging-card.orange{background:rgba(234,115,0,.08);border-color:rgba(234,115,0,.25)}.aging-card.orange .ac-lbl{color:#ea7300}.aging-card.orange .ac-val{color:#ea7300}
+.aging-card.red{background:rgba(246,70,93,.08);border-color:rgba(246,70,93,.25)}.aging-card.red .ac-lbl{color:var(--r)}.aging-card.red .ac-val{color:var(--r)}
+[data-theme="light"] .aging-card.green{background:#edfaf2}.
+[data-theme="light"] .aging-card.yellow{background:#fffbeb}.
+[data-theme="light"] .aging-card.orange{background:#fff7ed}.
+[data-theme="light"] .aging-card.red{background:#fff0ef}.
+.float-gain-banner{background:linear-gradient(135deg,var(--brand),#1a10cc);border:1px solid rgba(213,253,115,.2);border-radius:14px;padding:18px 20px;color:#fff;display:flex;align-items:center;gap:16px;margin-bottom:16px}
 .fgb-icon{font-size:2rem;flex-shrink:0}
 .fgb-info{flex:1}
 .fgb-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;opacity:.8;margin-bottom:4px}
@@ -1219,14 +1222,14 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
 .asset-card:active{background:var(--bg3);transform:scale(.99)}
 .asset-card-top{display:flex;align-items:center;gap:12px;margin-bottom:12px}
 .asset-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0}
-.asset-icon.arac{background:#eef3ff;border:1px solid #007aff20}
+.asset-icon.arac{background:#eef3ff;border:1px solid #10069F20}
 .asset-icon.bilgisayar{background:#f0fdf4;border:1px solid #34c75920}
 .asset-icon.makine{background:#fffbeb;border:1px solid #ff950020}
 .asset-icon.diger{background:#f5f5f5;border:1px solid #d1d1d6}
 .asset-name{font-size:.95rem;font-weight:700;color:var(--txt)}
 .asset-type-badge{font-size:.62rem;font-weight:700;padding:2px 8px;border-radius:8px;background:var(--bg3);color:var(--txt2);margin-top:3px;display:inline-block}
 .asset-dep-bar-bg{height:6px;background:var(--bg3);border-radius:4px;overflow:hidden;margin-bottom:8px}
-.asset-dep-bar-fill{height:100%;background:linear-gradient(90deg,var(--b),var(--b2));border-radius:4px;transition:width .7s cubic-bezier(.4,0,.2,1)}
+.asset-dep-bar-fill{height:100%;background:linear-gradient(90deg,var(--brand),var(--b));border-radius:4px;transition:width .7s cubic-bezier(.4,0,.2,1)}
 .asset-nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .asset-num-cell .anc-lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--txt2);font-weight:600;margin-bottom:3px}
 .asset-num-cell .anc-val{font-size:.85rem;font-weight:700;color:var(--txt)}
@@ -1247,8 +1250,8 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
 .cdr-cell.yest .dc-val{color:var(--txt2)}
 .cdr-input-row{display:flex;gap:8px;margin-top:12px;border-top:1px solid var(--border);padding-top:12px}
 .cdr-bal-input{flex:1;background:var(--bg);border:1.5px solid var(--border2);border-radius:10px;padding:9px 12px;font-size:.88rem;color:var(--txt);outline:none;font-family:var(--font)}
-.cdr-bal-input:focus{border-color:var(--b)}
-.cdr-save-btn{background:var(--b);border:none;border-radius:10px;padding:0 16px;color:#fff;font-size:.85rem;font-weight:600;cursor:pointer;transition:.1s}
+.cdr-bal-input:focus{border-color:var(--accent)}
+.cdr-save-btn{background:var(--accent);border:none;border-radius:10px;padding:0 16px;color:#07091f;font-size:.85rem;font-weight:600;cursor:pointer;transition:.1s}
 .cdr-save-btn:active{opacity:.8}
 
 /* ── MODAL BASE ──────────────────────────────────────────────── */
@@ -1261,20 +1264,20 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
 .mod-field{margin-bottom:12px}
 .mod-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--txt2);margin-bottom:5px}
 .mod-input{width:100%;background:var(--bg2);border:1.5px solid var(--border2);border-radius:11px;padding:11px 13px;font-size:.9rem;color:var(--txt);outline:none;box-sizing:border-box;font-family:var(--font);transition:.15s}
-.mod-input:focus{border-color:var(--b);box-shadow:0 0 0 3px rgba(0,122,255,.1)}
+.mod-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(213,253,115,.1)}
 .mod-row{display:flex;gap:8px}
 .mod-row .mod-field{flex:1}
 .mod-actions{display:flex;gap:8px;margin-top:16px}
 .mod-btn{flex:1;padding:13px;border:none;border-radius:12px;font-size:.9rem;font-weight:700;cursor:pointer;transition:.1s}
 .mod-btn:active{opacity:.8;transform:scale(.98)}
-.mod-btn.primary{background:var(--b);color:#fff}
+.mod-btn.primary{background:linear-gradient(135deg,#d5fd73,#b8e832);color:#07091f}
 .mod-btn.danger{background:var(--r);color:#fff}
 .mod-btn.cancel{background:var(--bg3);color:var(--txt)}
 
 /* ── ACCOUNTS PAGE ───────────────────────────────────────────── */
 .acc-type-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px}
 .acc-type-chip{padding:7px 14px;border-radius:20px;border:1.5px solid var(--border2);background:var(--bg3);color:var(--txt2);font-size:.78rem;font-weight:700;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent;white-space:nowrap}
-.acc-type-chip.active{background:var(--b);border-color:var(--b);color:#fff}
+.acc-type-chip.active{background:var(--accent);border-color:var(--accent);color:#07091f}
 .color-dot{width:26px;height:26px;border-radius:50%;border:3px solid transparent;cursor:pointer;transition:.12s;-webkit-tap-highlight-color:transparent;flex-shrink:0}
 .color-dot.active{box-shadow:0 0 0 2px var(--bg2),0 0 0 4px var(--txt)}
 .acc-list-item{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:14px 16px;margin-bottom:10px;position:relative;overflow:hidden}
@@ -1471,7 +1474,7 @@ body{top:0!important}
       <span style="display:block;width:16px;height:2px;background:var(--txt);border-radius:2px;transition:.2s"></span>
       <span style="display:block;width:20px;height:2px;background:var(--txt);border-radius:2px;transition:.2s"></span>
     </button>
-    <div class="top-header-logo tappable" onclick="openMoreSheet()" style="cursor:pointer">🦔 <span style="color:var(--b);font-weight:900">Kirpi Finans</span></div>
+    <div class="top-header-logo tappable" onclick="openMoreSheet()" style="cursor:pointer">🦔 <span style="color:var(--accent);font-weight:900">Kirpi Finans</span></div>
   </div>
   <div class="top-header-right">
     <div class="notif-bell-wrap">
@@ -1501,7 +1504,7 @@ body{top:0!important}
             </select>
             <input id="new-profile-name" placeholder="İsim ya da Ünvan" style="width:100%;background:var(--bg2);border:1px solid var(--border2);color:var(--txt);padding:7px 10px;border-radius:7px;font-size:.8rem;margin-bottom:8px;outline:none">
             <div style="display:flex;gap:6px">
-              <button onclick="createProfile()" style="flex:1;padding:7px;background:var(--b);border:none;border-radius:7px;color:#fff;font-size:.78rem;cursor:pointer;font-weight:600">Oluştur</button>
+              <button onclick="createProfile()" style="flex:1;padding:7px;background:var(--accent);border:none;border-radius:7px;color:#07091f;font-size:.78rem;cursor:pointer;font-weight:600">Oluştur</button>
               <button onclick="cancelAddProfile()" style="padding:7px 10px;background:transparent;border:1px solid var(--border2);border-radius:7px;color:var(--txt2);font-size:.78rem;cursor:pointer">İptal</button>
             </div>
           </div>
@@ -1553,7 +1556,7 @@ body{top:0!important}
   <!-- Yenile butonu — veri gelmezse görünür -->
   <div id="dash-retry-bar" style="display:none;background:#ff3b3014;border:1px solid #ff3b3030;border-radius:10px;padding:10px 14px;margin-bottom:12px;display:none;align-items:center;gap:10px;font-size:.83rem;color:var(--r)">
     <span>⚠️ Veriler yüklenemedi.</span>
-    <button onclick="loadDashboard();this.parentElement.style.display='none'" style="margin-left:auto;padding:5px 14px;background:var(--b);color:#fff;border:none;border-radius:7px;font-size:.8rem;cursor:pointer;font-weight:700">↻ Yenile</button>
+    <button onclick="loadDashboard();this.parentElement.style.display='none'" style="margin-left:auto;padding:5px 14px;background:var(--accent);color:#07091f;border:none;border-radius:7px;font-size:.8rem;cursor:pointer;font-weight:700">↻ Yenile</button>
   </div>
 
   <!-- ── HERO BALANCE ── -->
@@ -1664,7 +1667,7 @@ body{top:0!important}
   </div>
 
   <!-- ── HATIRLATICILAR ── -->
-  <div id="reminders-card" style="display:none;background:var(--bg2);border:1.5px solid #007aff30;border-radius:16px;padding:16px 18px;margin-bottom:12px">
+  <div id="reminders-card" style="display:none;background:var(--bg2);border:1.5px solid #10069F30;border-radius:16px;padding:16px 18px;margin-bottom:12px">
     <div style="font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--b);margin-bottom:10px">🔔 Yaklaşan Ödemeler</div>
     <div id="reminders-list"></div>
   </div>
@@ -1680,7 +1683,7 @@ body{top:0!important}
       </div>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
         <div style="flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden">
-          <div id="ins-score-bar" style="height:100%;border-radius:4px;background:linear-gradient(90deg,#34c759,#007aff);transition:width .8s cubic-bezier(.4,0,.2,1);width:0%"></div>
+          <div id="ins-score-bar" style="height:100%;border-radius:4px;background:linear-gradient(90deg,#34c759,#10069F);transition:width .8s cubic-bezier(.4,0,.2,1);width:0%"></div>
         </div>
         <div id="ins-score-val" style="font-size:1.1rem;font-weight:900;color:var(--txt);min-width:40px;text-align:right">—</div>
       </div>
@@ -1736,7 +1739,7 @@ body{top:0!important}
         <div style="color:var(--txt2)">💳 Kart borcu: <span id="ins-kart-borcu" style="font-weight:700;color:var(--r)">—</span></div>
         <div style="color:var(--txt2)">Asgari ödeme: <span id="ins-kart-asgari" style="font-weight:700;color:var(--y)">—</span></div>
         <div onclick="showAvailableLimitModal()" style="color:var(--txt2);cursor:pointer">🟢 Kullanılabilir limit: <span id="ins-kart-limit" style="font-weight:700;color:var(--g)">—</span> <span style="font-size:.65rem;opacity:.6">›</span></div>
-        <button onclick="goPage('hesaplar',document.querySelector('[data-page=hesaplar]'))" style="background:var(--b);color:#fff;border:none;border-radius:8px;padding:4px 12px;font-size:.72rem;cursor:pointer;font-weight:600">Ödeme Yap →</button>
+        <button onclick="goPage('hesaplar',document.querySelector('[data-page=hesaplar]'))" style="background:var(--accent);color:#07091f;border:none;border-radius:8px;padding:4px 12px;font-size:.72rem;cursor:pointer;font-weight:600">Ödeme Yap →</button>
       </div>
     </div>
 
@@ -1848,7 +1851,7 @@ body{top:0!important}
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <!-- Tür seçimi: pill butonlar -->
       <div style="display:flex;gap:4px;background:var(--bg3);border-radius:9px;padding:3px;flex-shrink:0" id="type-pill-group">
-        <button onclick="setTypePill('')"    id="pill-all"    class="type-pill active" style="padding:5px 14px;border:none;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;transition:.15s;background:#fff;color:var(--txt);box-shadow:0 1px 4px rgba(0,0,0,.1)">Tümü</button>
+        <button onclick="setTypePill('')"    id="pill-all"    class="type-pill active" style="padding:5px 14px;border:none;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;transition:.15s;background:#d5fd73;color:#07091f;box-shadow:0 1px 4px rgba(213,253,115,.25)">Tümü</button>
         <button onclick="setTypePill('gelir')" id="pill-gelir" class="type-pill"       style="padding:5px 14px;border:none;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;transition:.15s;background:transparent;color:var(--txt2)">↑ Gelir</button>
         <button onclick="setTypePill('gider')" id="pill-gider" class="type-pill"       style="padding:5px 14px;border:none;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;transition:.15s;background:transparent;color:var(--txt2)">↓ Gider</button>
       </div>
@@ -1989,7 +1992,7 @@ body{top:0!important}
       <!-- GELİR: Kart iadesi -->
       <div id="f-income-refund" style="display:none;margin-bottom:16px">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:8px">
-          <input type="checkbox" id="f-refund-check" onchange="toggleRefundCard(this.checked)" style="width:16px;height:16px;accent-color:var(--b)">
+          <input type="checkbox" id="f-refund-check" onchange="toggleRefundCard(this.checked)" style="width:16px;height:16px;accent-color:#d5fd73">
           <span style="font-size:.85rem;color:var(--txt)">💳 Kart iadesi — kart borcundan düşsün</span>
         </label>
         <div id="f-refund-card-row" style="display:none">
@@ -2393,7 +2396,7 @@ body{top:0!important}
       <div style="margin-bottom:18px">
         <label>Renk</label>
         <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:7px">
-          <button type="button" class="color-dot active" data-color="#007aff" onclick="selectAccColor(this)" style="background:#007aff"></button>
+          <button type="button" class="color-dot active" data-color="#10069F" onclick="selectAccColor(this)" style="background:#10069F"></button>
           <button type="button" class="color-dot" data-color="#34c759" onclick="selectAccColor(this)" style="background:#34c759"></button>
           <button type="button" class="color-dot" data-color="#ff9500" onclick="selectAccColor(this)" style="background:#ff9500"></button>
           <button type="button" class="color-dot" data-color="#ff3b30" onclick="selectAccColor(this)" style="background:#ff3b30"></button>
@@ -2700,15 +2703,15 @@ body{top:0!important}
       <div style="font-size:.82rem;font-weight:700;color:var(--txt);margin-bottom:10px">Nasıl çalışır?</div>
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
         <div style="display:flex;gap:10px;align-items:flex-start">
-          <div style="width:22px;height:22px;border-radius:50%;background:var(--b);color:#fff;font-size:.7rem;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">1</div>
-          <div style="font-size:.8rem;color:var(--txt2);line-height:1.5">Telegram'da <b id="tg-botname-lbl" style="color:var(--b)">@KirpiNakitBot</b>'u ara ve <b>Başlat</b>'a bas</div>
+          <div style="width:22px;height:22px;border-radius:50%;background:var(--brand);color:#d5fd73;font-size:.7rem;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">1</div>
+          <div style="font-size:.8rem;color:var(--txt2);line-height:1.5">Telegram'da <b id="tg-botname-lbl" style="color:var(--accent)">@KirpiNakitBot</b>'u ara ve <b>Başlat</b>'a bas</div>
         </div>
         <div style="display:flex;gap:10px;align-items:flex-start">
-          <div style="width:22px;height:22px;border-radius:50%;background:var(--b);color:#fff;font-size:.7rem;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">2</div>
+          <div style="width:22px;height:22px;border-radius:50%;background:var(--brand);color:#d5fd73;font-size:.7rem;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">2</div>
           <div style="font-size:.8rem;color:var(--txt2);line-height:1.5">Aşağıdan <b>Bağlantı Kodu Al</b> butonuna bas</div>
         </div>
         <div style="display:flex;gap:10px;align-items:flex-start">
-          <div style="width:22px;height:22px;border-radius:50%;background:var(--b);color:#fff;font-size:.7rem;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">3</div>
+          <div style="width:22px;height:22px;border-radius:50%;background:var(--brand);color:#d5fd73;font-size:.7rem;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">3</div>
           <div style="font-size:.8rem;color:var(--txt2);line-height:1.5">Bota <code style="background:var(--bg3);padding:2px 6px;border-radius:5px">/link KOD</code> gönder — bağlandı! 🎉</div>
         </div>
         <div style="display:flex;gap:10px;align-items:flex-start">
@@ -2728,7 +2731,7 @@ body{top:0!important}
     <div id="tg-code-area" style="display:none;margin-bottom:12px">
       <div style="background:var(--bg3);border-radius:13px;padding:14px 16px;margin-bottom:10px;border:1px solid var(--border2)">
         <div style="font-size:.7rem;color:var(--txt2);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Telegram botuna bu kodu gönderin</div>
-        <div id="tg-code-val" style="font-size:1.5rem;font-weight:900;letter-spacing:.18em;color:var(--b);font-family:monospace">—</div>
+        <div id="tg-code-val" style="font-size:1.5rem;font-weight:900;letter-spacing:.18em;color:var(--accent);font-family:monospace">—</div>
         <div style="font-size:.7rem;color:var(--txt2);margin-top:6px">Komut: <code id="tg-cmd" style="background:var(--bg4);padding:2px 6px;border-radius:5px">/link KOD</code> &nbsp;·&nbsp; 15 dk geçerli</div>
       </div>
       <div style="font-size:.78rem;color:var(--txt2);line-height:1.7">
@@ -2912,11 +2915,11 @@ body{top:0!important}
 
   <!-- Fatura sekmeleri -->
   <div style="display:flex;gap:8px;margin-bottom:14px">
-    <button class="btn tappable" id="sup-tab-type-alis" onclick="setSupInvType('alis')" style="flex:1;background:var(--b);color:#fff;border:none;font-size:.8rem">Alış Faturaları</button>
+    <button class="btn tappable" id="sup-tab-type-alis" onclick="setSupInvType('alis')" style="flex:1;background:var(--accent);color:#07091f;border:none;font-size:.8rem">Alış Faturaları</button>
     <button class="btn btn-ghost tappable" id="sup-tab-type-satis" onclick="setSupInvType('satis')" style="flex:1;font-size:.8rem">Satış Faturaları</button>
   </div>
   <div style="display:flex;gap:8px;margin-bottom:14px">
-    <button class="btn tappable" id="sup-tab-pending" onclick="setSupTab('pending')" style="flex:1;background:var(--b);color:#fff;border:none">Bekleyenler</button>
+    <button class="btn tappable" id="sup-tab-pending" onclick="setSupTab('pending')" style="flex:1;background:var(--accent);color:#07091f;border:none">Bekleyenler</button>
     <button class="btn btn-ghost tappable" id="sup-tab-paid" onclick="setSupTab('paid')" style="flex:1">Ödenmiş</button>
     <button class="btn btn-ghost tappable" onclick="openSupInvModal()" style="flex:0 0 auto;padding:0 16px">＋</button>
   </div>
@@ -2935,7 +2938,7 @@ body{top:0!important}
   </div>
 
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-    <div style="background:linear-gradient(135deg,#eef3ff,#e6ecff);border:1px solid #007aff20;border-radius:14px;padding:14px">
+    <div style="background:linear-gradient(135deg,#eef3ff,#e6ecff);border:1px solid #10069F20;border-radius:14px;padding:14px">
       <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#004dcc;margin-bottom:5px">Toplam Defter Değeri</div>
       <div style="font-size:1.1rem;font-weight:900;color:var(--b)" id="asset-total-book">₺0</div>
     </div>
@@ -3033,7 +3036,7 @@ body{top:0!important}
     <div class="mod-row">
       <div class="mod-field">
         <div class="mod-label">Renk</div>
-        <input class="mod-input" type="color" id="proj-color" value="#007aff" style="height:46px;padding:4px 8px">
+        <input class="mod-input" type="color" id="proj-color" value="#10069F" style="height:46px;padding:4px 8px">
       </div>
       <div class="mod-field">
         <div class="mod-label">Bütçe (₺)</div>
@@ -3133,7 +3136,7 @@ body{top:0!important}
     <div class="mod-field">
       <div class="mod-label">Fatura Tipi</div>
       <div style="display:flex;gap:8px">
-        <button id="sup-inv-type-alis" class="btn tappable" onclick="setInvTypeBtn('alis')" style="flex:1;background:var(--b);color:#fff;border:none;font-size:.85rem">📥 Alış</button>
+        <button id="sup-inv-type-alis" class="btn tappable" onclick="setInvTypeBtn('alis')" style="flex:1;background:var(--accent);color:#07091f;border:none;font-size:.85rem">📥 Alış</button>
         <button id="sup-inv-type-satis" class="btn btn-ghost tappable" onclick="setInvTypeBtn('satis')" style="flex:1;font-size:.85rem">📤 Satış</button>
       </div>
     </div>
@@ -3187,7 +3190,7 @@ body{top:0!important}
     <div class="mod-field">
       <div class="mod-label">Ödeme Yöntemi</div>
       <div style="display:flex;gap:8px">
-        <button id="pay-mth-havale" class="btn tappable" onclick="setPayMethod('havale')" style="flex:1;background:var(--b);color:#fff;border:none;font-size:.78rem">🏦 Havale/EFT</button>
+        <button id="pay-mth-havale" class="btn tappable" onclick="setPayMethod('havale')" style="flex:1;background:var(--accent);color:#07091f;border:none;font-size:.78rem">🏦 Havale/EFT</button>
         <button id="pay-mth-kart" class="btn btn-ghost tappable" onclick="setPayMethod('kart')" style="flex:1;font-size:.78rem">💳 Kart</button>
         <button id="pay-mth-nakit" class="btn btn-ghost tappable" onclick="setPayMethod('nakit')" style="flex:1;font-size:.78rem">💵 Nakit</button>
       </div>
@@ -3919,7 +3922,7 @@ function renderSettingsProfiles(){
         +'<div style="width:48px;height:48px;border-radius:50%;background:var(--bg3);border:2px solid var(--border2);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer" onclick="triggerProfileAvatarUpload('+p.id+')" title="Fotoğraf değiştir">'
           +avatarHtml
         +'</div>'
-        +'<div style="position:absolute;bottom:0;right:0;width:16px;height:16px;background:var(--b);border-radius:50%;border:2px solid var(--bg2);display:flex;align-items:center;justify-content:center;pointer-events:none">'
+        +'<div style="position:absolute;bottom:0;right:0;width:16px;height:16px;background:var(--brand);border-radius:50%;border:2px solid var(--bg2);display:flex;align-items:center;justify-content:center;pointer-events:none">'
           +'<span style="color:#fff;font-size:.55rem;line-height:1">📷</span>'
         +'</div>'
       +'</div>'
@@ -3927,7 +3930,7 @@ function renderSettingsProfiles(){
         +'<div class="sp-info">'+p.name+'</div>'
         +'<div class="sp-type">'+(p.type==='sirket'?'Şirket':'Kişisel')+'</div>'
       +'</div>'
-      +(isActive?'<span class="sp-active">Aktif</span>':'<button onclick="switchProfile('+p.id+')" style="padding:5px 12px;background:var(--b);border:none;border-radius:8px;color:#fff;font-size:.75rem;cursor:pointer;font-weight:600">Geç</button>')
+      +(isActive?'<span class="sp-active">Aktif</span>':'<button onclick="switchProfile('+p.id+')" style="padding:5px 12px;background:var(--accent);border:none;border-radius:8px;color:#07091f;font-size:.75rem;cursor:pointer;font-weight:600">Geç</button>')
       +'</div>'
       +'<input type="file" id="pav-input-'+p.id+'" accept="image/*" style="display:none" onchange="handleProfileAvatarUpload(this,'+p.id+')">';
   }).join('');
@@ -5429,7 +5432,7 @@ function deleteGoal(id){
 }
 
 // ── ACCOUNTS (Banka Ürünleri) ─────────────────────────────────────────────────
-var _accColor='#007aff';
+var _accColor='#10069F';
 var _accType='vadesiz';
 
 function selectAccType(btn){
@@ -5468,9 +5471,9 @@ function resetAccForm(){
   _accType='vadesiz';
   // reset color to blue
   document.querySelectorAll('.color-dot').forEach(function(b){
-    b.classList.toggle('active', b.getAttribute('data-color')==='#007aff');
+    b.classList.toggle('active', b.getAttribute('data-color')==='#10069F');
   });
-  _accColor='#007aff';
+  _accColor='#10069F';
   selectAccType(document.querySelector('.acc-type-chip[data-type="vadesiz"]'));
 }
 
@@ -5512,7 +5515,7 @@ function editAccount(a){
     b.classList.toggle('active', b.getAttribute('data-type')===_accType);
   });
   selectAccType(document.querySelector('.acc-type-chip[data-type="'+_accType+'"]'));
-  _accColor=a.color||'#007aff';
+  _accColor=a.color||'#10069F';
   document.querySelectorAll('.color-dot').forEach(function(b){
     b.classList.toggle('active', b.getAttribute('data-color')===_accColor);
   });
@@ -5798,9 +5801,9 @@ function setTypePill(val){
     var btn=document.getElementById('pill-'+k);
     if(!btn) return;
     var isActive=(k==='all'&&val==='')||(k===val);
-    btn.style.background=isActive?'#fff':'transparent';
-    btn.style.color=isActive?'var(--txt)':'var(--txt2)';
-    btn.style.boxShadow=isActive?'0 1px 4px rgba(0,0,0,.1)':'none';
+    btn.style.background=isActive?'#d5fd73':'transparent';
+    btn.style.color=isActive?'#07091f':'var(--txt2)';
+    btn.style.boxShadow=isActive?'0 1px 4px rgba(213,253,115,.25)':'none';
   });
   filterLedger();
 }
@@ -6154,10 +6157,10 @@ var dbView = 'month';  // 'month' | 'year'
 
 function setDbView(v){
   dbView = v;
-  document.getElementById('view-month-btn').style.background = v==='month' ? 'var(--b)' : 'transparent';
-  document.getElementById('view-month-btn').style.color      = v==='month' ? '#fff' : 'var(--txt2)';
-  document.getElementById('view-year-btn').style.background  = v==='year'  ? 'var(--b)' : 'transparent';
-  document.getElementById('view-year-btn').style.color       = v==='year'  ? '#fff' : 'var(--txt2)';
+  document.getElementById('view-month-btn').style.background = v==='month' ? '#d5fd73' : 'transparent';
+  document.getElementById('view-month-btn').style.color      = v==='month' ? '#07091f' : 'var(--txt2)';
+  document.getElementById('view-year-btn').style.background  = v==='year'  ? '#d5fd73' : 'transparent';
+  document.getElementById('view-year-btn').style.color       = v==='year'  ? '#07091f' : 'var(--txt2)';
   document.getElementById('month-nav').style.display = v==='month' ? '' : 'none';
   document.getElementById('year-nav').style.display  = v==='year'  ? '' : 'none';
   loadDashboard();
@@ -6457,8 +6460,8 @@ function _buildDayChips(){
       btn.type = 'button';
       btn.textContent = day;
       var sel = _recSelDays.indexOf(day) >= 0;
-      btn.style.cssText = 'width:38px;height:38px;border-radius:10px;border:1.5px solid '+(sel?'var(--b)':'var(--border2)')+
-        ';background:'+(sel?'var(--b)':'var(--bg3)')+';color:'+(sel?'#fff':'var(--txt2)')+
+      btn.style.cssText = 'width:38px;height:38px;border-radius:10px;border:1.5px solid '+(sel?'#d5fd73':'var(--border2)')+
+        ';background:'+(sel?'#d5fd73':'var(--bg3)')+';color:'+(sel?'#07091f':'var(--txt2)')+
         ';font-size:.82rem;font-weight:700;cursor:pointer;transition:.12s;-webkit-tap-highlight-color:transparent';
       btn.onclick = function(){
         var idx = _recSelDays.indexOf(day);
@@ -7070,10 +7073,10 @@ function setSupTab(tab){
   var pb = document.getElementById('sup-tab-pending');
   var pd = document.getElementById('sup-tab-paid');
   if(pb) pb.style.cssText = tab==='pending' ?
-    'flex:1;background:var(--b);color:#fff;border:none' :
+    'flex:1;background:#d5fd73;color:#07091f;border:none' :
     'flex:1;background:transparent;border:1px solid var(--border2);color:var(--txt)';
   if(pd) pd.style.cssText = tab==='paid' ?
-    'flex:1;background:var(--b);color:#fff;border:none' :
+    'flex:1;background:#d5fd73;color:#07091f;border:none' :
     'flex:1;background:transparent;border:1px solid var(--border2);color:var(--txt)';
   loadSupInvList();
 }
@@ -7082,7 +7085,7 @@ function setSupInvType(type){
   _supInvType = type;
   var ta = document.getElementById('sup-tab-type-alis');
   var ts = document.getElementById('sup-tab-type-satis');
-  var activeStyle = 'flex:1;background:var(--b);color:#fff;border:none;font-size:.8rem';
+  var activeStyle = 'flex:1;background:#d5fd73;color:#07091f;border:none;font-size:.8rem';
   var ghostStyle  = 'flex:1;background:transparent;border:1px solid var(--border2);color:var(--txt);font-size:.8rem';
   if(ta) ta.style.cssText = type==='alis' ? activeStyle : ghostStyle;
   if(ts) ts.style.cssText = type==='satis' ? activeStyle : ghostStyle;
@@ -7093,7 +7096,7 @@ function setInvTypeBtn(type){
   _supInvType = type;
   var ba = document.getElementById('sup-inv-type-alis');
   var bs = document.getElementById('sup-inv-type-satis');
-  var activeStyle = 'flex:1;background:var(--b);color:#fff;border:none;font-size:.85rem';
+  var activeStyle = 'flex:1;background:#d5fd73;color:#07091f;border:none;font-size:.85rem';
   var ghostStyle  = 'flex:1;background:transparent;border:1px solid var(--border2);color:var(--txt);font-size:.85rem';
   if(ba) ba.style.cssText = type==='alis' ? activeStyle : ghostStyle;
   if(bs) bs.style.cssText = type==='satis' ? activeStyle : ghostStyle;
@@ -7220,7 +7223,7 @@ function loadSupInvList(){
       }
       var dotColor = overdue ? 'var(--r)' : (inv.status==='odendi' ? 'var(--g)' : 'var(--y)');
       var typeBadge = (inv.invoice_type||'alis') === 'alis'
-        ? '<span style="font-size:.6rem;background:rgba(0,122,255,.12);color:var(--b);border-radius:4px;padding:1px 5px;font-weight:700;margin-right:4px">ALIŞ</span>'
+        ? '<span style="font-size:.6rem;background:rgba(213,253,115,.12);color:var(--accent);border-radius:4px;padding:1px 5px;font-weight:700;margin-right:4px">ALIŞ</span>'
         : '<span style="font-size:.6rem;background:rgba(14,203,129,.12);color:var(--g);border-radius:4px;padding:1px 5px;font-weight:700;margin-right:4px">SATIŞ</span>';
       return '<div class="sup-inv-item" style="gap:10px">' +
         '<div class="sup-inv-dot" style="background:'+dotColor+';flex-shrink:0"></div>' +
@@ -7306,7 +7309,7 @@ function setPayMethod(m){
     var btn = document.getElementById('pay-mth-'+k);
     if(!btn) return;
     btn.style.cssText = k===m
-      ? 'flex:1;background:var(--b);color:#fff;border:none;font-size:.78rem'
+      ? 'flex:1;background:#d5fd73;color:#07091f;border:none;font-size:.78rem'
       : 'flex:1;background:transparent;border:1px solid var(--border2);color:var(--txt);font-size:.78rem';
   });
 }
@@ -7397,7 +7400,7 @@ function loadTplList(){
         '<div style="text-align:right;flex-shrink:0">' +
           '<div style="font-size:.9rem;font-weight:700;color:'+typeColor+'">'+fmt(t.amount)+'</div>' +
           '<div style="display:flex;gap:6px;margin-top:6px;justify-content:flex-end">' +
-            '<button onclick="openApplyTpl('+t.id+')" style="background:var(--b);color:#fff;border:none;border-radius:8px;padding:4px 10px;font-size:.72rem;font-weight:700;cursor:pointer" class="tappable">▶ Uygula</button>' +
+            '<button onclick="openApplyTpl('+t.id+')" style="background:#d5fd73;color:#07091f;border:none;border-radius:8px;padding:4px 10px;font-size:.72rem;font-weight:700;cursor:pointer" class="tappable">▶ Uygula</button>' +
             '<button onclick="delTpl('+t.id+')" style="background:none;border:none;font-size:1rem;cursor:pointer;color:var(--txt2);padding:4px" class="tappable">🗑</button>' +
           '</div>' +
         '</div>' +
@@ -7491,7 +7494,7 @@ function loadProjList(){
 
 function openProjModal(){
   ['proj-name','proj-desc','proj-budget'].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=''; });
-  var c = document.getElementById('proj-color'); if(c) c.value='#007aff';
+  var c = document.getElementById('proj-color'); if(c) c.value='#10069F';
   document.getElementById('mod-proj').style.display = 'flex';
   setTimeout(setupNumInputs, 50);
 }
@@ -8017,7 +8020,7 @@ function closeAvailLimitModal(){ var m=document.getElementById('avail-limit-moda
       <label style="font-size:.78rem;color:var(--txt2);display:block;margin-bottom:5px">🏦 Hangi Hesaba Geldi?</label>
       <select id="txe-income-account" class="f-input"><option value="">— Belirtme (Nakit) —</option></select>
     </div>
-    <button onclick="saveTxEdit()" style="width:100%;padding:13px;background:var(--b);color:#fff;border:none;border-radius:10px;font-size:.92rem;font-weight:700;cursor:pointer">Kaydet</button>
+    <button onclick="saveTxEdit()" style="width:100%;padding:13px;background:#d5fd73;color:#07091f;border:none;border-radius:10px;font-size:.92rem;font-weight:700;cursor:pointer">Kaydet</button>
   </div>
 </div>
 
