@@ -203,4 +203,16 @@ export const misc = {
   exportExcel: () => `${BASE_URL}/api/export/excel`,
   exportPdf:   () => `${BASE_URL}/api/export/pdf`,
   motivation:  () => req<any>('/api/motivation'),
+  // Templates
+  templates:      () => req<any[]>('/api/templates'),
+  addTemplate:    (d: Record<string, unknown>) =>
+    req<any>('/api/templates', { method: 'POST', body: JSON.stringify(d) }),
+  applyTemplate:  (id: number, d: Record<string, unknown>) =>
+    req<any>(`/api/templates/${id}/apply`, { method: 'POST', body: JSON.stringify(d) }),
+  deleteTemplate: (id: number) => req<any>(`/api/templates/${id}`, { method: 'DELETE' }),
+  // Projects
+  projects:      () => req<any[]>('/api/projects'),
+  addProject:    (d: Record<string, unknown>) =>
+    req<any>('/api/projects', { method: 'POST', body: JSON.stringify(d) }),
+  deleteProject: (id: number) => req<any>(`/api/projects/${id}`, { method: 'DELETE' }),
 };

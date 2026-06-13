@@ -170,6 +170,13 @@ export default function MoreScreen() {
           <Row ico="📊" label="Günlük Kart Raporu" sub="Kart bakiyesi takibi" onPress={() => go('/card-report')} />
         </View>
 
+        <Text style={s.grp}>Planlama</Text>
+        <View style={s.group}>
+          <Row ico="📋" label="İşlem Şablonları" sub="Sık işlemleri kaydet, tek tıkla uygula" onPress={() => go('/templates')} />
+          <View style={s.sep} />
+          <Row ico="📁" label="Projeler" sub="Proje bazlı harcama takibi" onPress={() => go('/projects')} />
+        </View>
+
         <Text style={s.grp}>Araçlar</Text>
         <View style={s.group}>
           <Row ico="🔔" label="Bildirimler" onPress={() => go('/notifications')} />
