@@ -1474,7 +1474,7 @@ body{top:0!important}
       <span style="display:block;width:16px;height:2px;background:var(--txt);border-radius:2px;transition:.2s"></span>
       <span style="display:block;width:20px;height:2px;background:var(--txt);border-radius:2px;transition:.2s"></span>
     </button>
-    <div class="top-header-logo tappable" onclick="openMoreSheet()" style="cursor:pointer">🦔 <span style="color:var(--accent);font-weight:900">Kirpi Finans</span></div>
+    <div class="top-header-logo tappable" onclick="openMoreSheet()" style="cursor:pointer">🦔 <span style="color:#818cf8;font-weight:900">Kirpi Finans</span></div>
   </div>
   <div class="top-header-right">
     <div class="notif-bell-wrap">
