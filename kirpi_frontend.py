@@ -1360,6 +1360,12 @@ body{top:0!important}
     <div class="nl nl-desktop" data-page="budget" onclick="goPage('budget',this)">
       <span class="ico">🎯</span>Tasarruf
     </div>
+    <div class="nl nl-desktop" data-page="templates" onclick="goPage('templates',this)">
+      <span class="ico">📋</span>Şablonlar
+    </div>
+    <div class="nl nl-desktop" data-page="projects" onclick="goPage('projects',this)">
+      <span class="ico">📁</span>Projeler
+    </div>
     <div class="nl nl-desktop" data-page="import" onclick="goPage('import',this)">
       <span class="ico">📂</span>İçe Aktar
     </div>
@@ -1418,6 +1424,12 @@ body{top:0!important}
     </div>
     <div class="more-tile" onclick="goPageFromSheet('hesaplar')">
       <div class="mt-ico">🏦</div><div class="mt-lbl">Hesaplar</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('templates')">
+      <div class="mt-ico">📋</div><div class="mt-lbl">Şablonlar</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('projects')">
+      <div class="mt-ico">📁</div><div class="mt-lbl">Projeler</div>
     </div>
     <div class="more-tile" onclick="goPageFromSheet('import')">
       <div class="mt-ico">📂</div><div class="mt-lbl">İçe Aktar</div>
@@ -1943,7 +1955,11 @@ body{top:0!important}
         <div><label>Tarih</label><input class="f-input" type="date" id="f-date"></div>
       </div>
       <div style="margin-bottom:12px"><label>Kategori</label><select class="f-input" id="f-cat"></select></div>
-      <div style="margin-bottom:14px"><label>Açıklama</label><input class="f-input" type="text" id="f-desc" placeholder="örn. Market alışverişi"></div>
+      <div style="margin-bottom:12px"><label>Açıklama</label><input class="f-input" type="text" id="f-desc" placeholder="örn. Market alışverişi"></div>
+      <div style="display:flex;gap:10px;margin-bottom:14px">
+        <div style="flex:1"><label>Proje <span style="font-weight:400;color:var(--txt2)">(isteğe bağlı)</span></label><select class="f-input" id="f-project"><option value="">— Proje seç —</option></select></div>
+        <div style="flex:1"><label>Etiketler <span style="font-weight:400;color:var(--txt2)">(virgülle ayır)</span></label><input class="f-input" type="text" id="f-tags" placeholder="yemek, tatil"></div>
+      </div>
 
       <!-- ÖDEME YÖNTEMİ — sadece gider için -->
       <div id="f-pay-section" style="margin-bottom:16px">
@@ -2008,6 +2024,24 @@ body{top:0!important}
 </div>
 
 <!-- IMPORT -->
+<!-- ── ŞABLONLAR ────────────────────────────────────────────── -->
+<div class="page" id="page-templates">
+  <div class="page-title">İşlem Şablonları</div>
+  <div class="page-sub">Sık kullandığın işlemleri kaydet, tek tıkla ekle</div>
+
+  <button class="btn btn-primary tappable" style="width:100%;margin-bottom:16px" onclick="openTplModal()">＋ Şablon Ekle</button>
+  <div id="tpl-list"></div>
+</div>
+
+<!-- ── PROJELER ─────────────────────────────────────────────── -->
+<div class="page" id="page-projects">
+  <div class="page-title">Projeler</div>
+  <div class="page-sub">İşlemlerinizi projelere bağlayın, proje bazlı harcama takibi yapın</div>
+
+  <button class="btn btn-primary tappable" style="width:100%;margin-bottom:16px" onclick="openProjModal()">＋ Proje Ekle</button>
+  <div id="proj-list"></div>
+</div>
+
 <div class="page" id="page-import">
   <div class="page-title">Banka Verisi İçe Aktar</div>
   <div class="page-sub">Banka uygulaması → Hesap Hareketleri → CSV/Excel olarak dışa aktar → buraya yükle</div>
@@ -2933,6 +2967,90 @@ body{top:0!important}
 </div>
 
 <!-- ── MODALS ──────────────────────────────────────────────────── -->
+<!-- Şablon Ekle Modalı -->
+<div id="mod-tpl" class="mod-backdrop" style="display:none" onclick="if(event.target===this)closeMod('mod-tpl')">
+  <div class="mod-sheet">
+    <div class="mod-handle"></div>
+    <div class="mod-title">Şablon Ekle</div>
+    <div class="mod-field">
+      <div class="mod-label">Şablon Adı *</div>
+      <input class="mod-input" id="tpl-name" placeholder="Kira Ödemesi">
+    </div>
+    <div class="mod-row">
+      <div class="mod-field">
+        <div class="mod-label">Tür</div>
+        <select class="mod-input" id="tpl-type">
+          <option value="gider">Gider</option>
+          <option value="gelir">Gelir</option>
+        </select>
+      </div>
+      <div class="mod-field">
+        <div class="mod-label">Tutar (₺)</div>
+        <input class="mod-input" type="text" inputmode="decimal" data-num id="tpl-amount" placeholder="1.500,00">
+      </div>
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Kategori</div>
+      <input class="mod-input" id="tpl-category" placeholder="Kira">
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Açıklama</div>
+      <input class="mod-input" id="tpl-desc" placeholder="Aylık kira">
+    </div>
+    <div class="mod-actions">
+      <button class="mod-btn cancel" onclick="closeMod('mod-tpl')">İptal</button>
+      <button class="mod-btn primary" onclick="saveTpl()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Şablon Uygula Modalı -->
+<div id="mod-tpl-apply" class="mod-backdrop" style="display:none" onclick="if(event.target===this)closeMod('mod-tpl-apply')">
+  <div class="mod-sheet">
+    <div class="mod-handle"></div>
+    <div class="mod-title">Şablonu Uygula</div>
+    <div id="mod-tpl-apply-info" style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:.88rem;color:var(--txt)"></div>
+    <div class="mod-field">
+      <div class="mod-label">Tarih</div>
+      <input class="mod-input" type="date" id="tpl-apply-date">
+    </div>
+    <div class="mod-actions">
+      <button class="mod-btn cancel" onclick="closeMod('mod-tpl-apply')">İptal</button>
+      <button class="mod-btn primary" onclick="confirmApplyTpl()">✓ İşlem Ekle</button>
+    </div>
+  </div>
+</div>
+
+<!-- Proje Ekle Modalı -->
+<div id="mod-proj" class="mod-backdrop" style="display:none" onclick="if(event.target===this)closeMod('mod-proj')">
+  <div class="mod-sheet">
+    <div class="mod-handle"></div>
+    <div class="mod-title">Proje Ekle</div>
+    <div class="mod-field">
+      <div class="mod-label">Proje Adı *</div>
+      <input class="mod-input" id="proj-name" placeholder="Ofis Tadilat">
+    </div>
+    <div class="mod-row">
+      <div class="mod-field">
+        <div class="mod-label">Renk</div>
+        <input class="mod-input" type="color" id="proj-color" value="#007aff" style="height:46px;padding:4px 8px">
+      </div>
+      <div class="mod-field">
+        <div class="mod-label">Bütçe (₺)</div>
+        <input class="mod-input" type="text" inputmode="decimal" data-num id="proj-budget" placeholder="50.000,00">
+      </div>
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Açıklama</div>
+      <input class="mod-input" id="proj-desc" placeholder="İsteğe bağlı">
+    </div>
+    <div class="mod-actions">
+      <button class="mod-btn cancel" onclick="closeMod('mod-proj')">İptal</button>
+      <button class="mod-btn primary" onclick="saveProj()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
 <!-- Tedarikçi Ekle Modalı -->
 <div id="mod-supplier" class="mod-backdrop" style="display:none" onclick="if(event.target===this)closeMod('mod-supplier')">
   <div class="mod-sheet">
@@ -3610,12 +3728,14 @@ function goPage(id, el){
     if(id==='recurring') initRecurringPage();
     if(id==='invest') initInvestPage();
     if(id==='hesaplar'){ loadAccounts(); loadCards(); }
-    if(id==='add'){ setTab('gider'); loadAccountsDropdown(); loadCardsDropdown(); _updateAddProfileBanner(); }
+    if(id==='add'){ setTab('gider'); loadAccountsDropdown(); loadCardsDropdown(); loadProjectsDropdown(); _updateAddProfileBanner(); }
     if(id==='settings') initSettingsPage();
     if(id==='budget') loadGoalsPage();
     if(id==='todos') initTodosPage();
     if(id==='supplier') initSupplierPage();
     if(id==='assets') initAssetsPage();
+    if(id==='templates') initTemplatesPage();
+    if(id==='projects') initProjectsPage();
     if(id==='cardreport') loadCardReport();
   }
 
@@ -5493,6 +5613,16 @@ function _buildAccDropdown(sel, list, prev){
   if(prev) sel.value=prev;
 }
 
+function loadProjectsDropdown(){
+  var sel = document.getElementById('f-project');
+  if(!sel) return;
+  xhr('/api/projects', null, function(items){
+    var prev = sel.value;
+    sel.innerHTML = '<option value="">— Proje seç —</option>' +
+      (items||[]).map(function(p){ return '<option value="'+p.id+'"'+(prev==p.id?' selected':'')+'>'+escHtml(p.name)+'</option>'; }).join('');
+  });
+}
+
 function loadAccountsDropdown(filterType){
   var sel=document.getElementById('f-account');
   if(!sel) return;
@@ -5565,7 +5695,11 @@ function addTx(){
   var desc=document.getElementById('f-desc').value;
   var dt=document.getElementById('f-date').value;
   if(!amount||amount<=0){toast('Tutar giriniz');return}
+  var projSel = document.getElementById('f-project');
+  var tagsFld = document.getElementById('f-tags');
   var payload={type:curTab,amount:amount,category:cat,description:desc,date:dt};
+  if(projSel&&projSel.value) payload.project_id = parseInt(projSel.value);
+  if(tagsFld&&tagsFld.value.trim()) payload.tags = tagsFld.value.trim();
   if(curTab==='gider'){
     var activeChip=document.querySelector('.pay-chip.active');
     var pt=activeChip?activeChip.dataset.ptype:'nakit';
@@ -5597,6 +5731,8 @@ function addTx(){
       var acc=document.getElementById('f-account'); if(acc) acc.value='';
       var crd=document.getElementById('f-card'); if(crd) crd.value='';
       var inc=document.getElementById('f-income-account'); if(inc) inc.value='';
+      var fp=document.getElementById('f-project'); if(fp) fp.value='';
+      var ft=document.getElementById('f-tags'); if(ft) ft.value='';
       loadDashboard(); loadAllTx();
       // Kart veya hesap kullanıldıysa cache ve listeler güncelle
       if(payload.card_id){
@@ -7234,6 +7370,151 @@ function fmtShort(n){
   if(n>=1000000) return '₺'+(n/1000000).toFixed(1)+'M';
   if(n>=1000) return '₺'+(n/1000).toFixed(0)+'K';
   return '₺'+Math.round(n);
+}
+
+// ── TEMPLATES ────────────────────────────────────────────────────────────────
+var _applyingTplId = null;
+
+function initTemplatesPage(){ loadTplList(); }
+
+function loadTplList(){
+  xhr('/api/templates', null, function(items){
+    var el = document.getElementById('tpl-list');
+    if(!el) return;
+    if(!items||!items.length){
+      el.innerHTML = '<div style="text-align:center;padding:28px 16px;color:var(--txt2);font-size:.85rem">📋 Henüz şablon eklenmedi</div>';
+      return;
+    }
+    el.innerHTML = items.map(function(t){
+      var typeColor = t.type==='gelir' ? 'var(--g)' : 'var(--r)';
+      var typeIcon  = t.type==='gelir' ? '↑' : '↓';
+      return '<div style="display:flex;align-items:center;gap:12px;padding:13px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:13px;margin-bottom:8px">' +
+        '<div style="width:36px;height:36px;border-radius:10px;background:'+typeColor+'22;display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:700;color:'+typeColor+';flex-shrink:0">'+typeIcon+'</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:.88rem;font-weight:700;color:var(--txt)">'+escHtml(t.name)+'</div>' +
+          '<div style="font-size:.72rem;color:var(--txt2);margin-top:2px">'+escHtml(t.category)+(t.description?' · '+escHtml(t.description):'')+'</div>' +
+        '</div>' +
+        '<div style="text-align:right;flex-shrink:0">' +
+          '<div style="font-size:.9rem;font-weight:700;color:'+typeColor+'">'+fmt(t.amount)+'</div>' +
+          '<div style="display:flex;gap:6px;margin-top:6px;justify-content:flex-end">' +
+            '<button onclick="openApplyTpl('+t.id+')" style="background:var(--b);color:#fff;border:none;border-radius:8px;padding:4px 10px;font-size:.72rem;font-weight:700;cursor:pointer" class="tappable">▶ Uygula</button>' +
+            '<button onclick="delTpl('+t.id+')" style="background:none;border:none;font-size:1rem;cursor:pointer;color:var(--txt2);padding:4px" class="tappable">🗑</button>' +
+          '</div>' +
+        '</div>' +
+        '</div>';
+    }).join('');
+    window._tplData = {};
+    items.forEach(function(t){ window._tplData[t.id] = t; });
+  });
+}
+
+function openTplModal(){
+  ['tpl-name','tpl-category','tpl-desc','tpl-amount'].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=''; });
+  document.getElementById('mod-tpl').style.display = 'flex';
+  setTimeout(setupNumInputs, 50);
+}
+
+function saveTpl(){
+  var name = document.getElementById('tpl-name').value.trim();
+  if(!name){ showToast('Ad zorunlu','#ef4444'); return; }
+  var body = {
+    name: name,
+    type: document.getElementById('tpl-type').value,
+    amount: getNumVal(document.getElementById('tpl-amount')),
+    category: document.getElementById('tpl-category').value.trim(),
+    description: document.getElementById('tpl-desc').value.trim()
+  };
+  xhr('/api/templates', body, function(r){
+    if(r&&r.ok){ closeMod('mod-tpl'); toast('Şablon kaydedildi'); loadTplList(); }
+  });
+}
+
+function openApplyTpl(id){
+  var t = window._tplData && window._tplData[id];
+  if(!t) return;
+  _applyingTplId = id;
+  var info = document.getElementById('mod-tpl-apply-info');
+  if(info) info.innerHTML = '<strong>'+escHtml(t.name)+'</strong> — <strong>'+fmt(t.amount)+'</strong><br><span style="font-size:.78rem;color:var(--txt2)">'+escHtml(t.category)+(t.type==='gelir'?' · Gelir':' · Gider')+'</span>';
+  var d = document.getElementById('tpl-apply-date');
+  if(d) d.value = new Date().toISOString().slice(0,10);
+  document.getElementById('mod-tpl-apply').style.display = 'flex';
+}
+
+function confirmApplyTpl(){
+  if(!_applyingTplId) return;
+  var d = document.getElementById('tpl-apply-date');
+  xhr('/api/templates/'+_applyingTplId+'/apply', {date: d?d.value:''}, function(r){
+    if(r&&r.ok){ closeMod('mod-tpl-apply'); toast('İşlem eklendi'); loadDashboard(); }
+  });
+}
+
+function delTpl(id){
+  if(!confirm('Bu şablon silinsin mi?')) return;
+  xhr('/api/templates/'+id, null, function(r){
+    if(r&&r.ok){ toast('Silindi'); loadTplList(); }
+  }, false, true);
+}
+
+// ── PROJECTS ─────────────────────────────────────────────────────────────────
+
+function initProjectsPage(){ loadProjList(); }
+
+function loadProjList(){
+  xhr('/api/projects', null, function(items){
+    var el = document.getElementById('proj-list');
+    if(!el) return;
+    if(!items||!items.length){
+      el.innerHTML = '<div style="text-align:center;padding:28px 16px;color:var(--txt2);font-size:.85rem">📁 Henüz proje eklenmedi</div>';
+      return;
+    }
+    el.innerHTML = items.map(function(p){
+      var pct = p.budget > 0 ? Math.min(100, Math.round(p.spent/p.budget*100)) : 0;
+      var pctColor = pct > 90 ? 'var(--r)' : pct > 70 ? 'var(--y)' : 'var(--g)';
+      return '<div style="padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:13px;margin-bottom:10px">' +
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">' +
+          '<div style="width:14px;height:14px;border-radius:50%;background:'+escHtml(p.color)+';flex-shrink:0"></div>' +
+          '<div style="flex:1;font-size:.9rem;font-weight:700;color:var(--txt)">'+escHtml(p.name)+'</div>' +
+          '<button onclick="delProj('+p.id+')" style="background:none;border:none;font-size:1rem;cursor:pointer;color:var(--txt2)" class="tappable">🗑</button>' +
+        '</div>' +
+        (p.description ? '<div style="font-size:.75rem;color:var(--txt2);margin-bottom:8px">'+escHtml(p.description)+'</div>' : '') +
+        '<div style="display:flex;justify-content:space-between;font-size:.78rem;color:var(--txt2);margin-bottom:6px">' +
+          '<span>Harcanan: <strong style="color:var(--txt)">'+fmt(p.spent)+'</strong></span>' +
+          (p.budget>0 ? '<span>Bütçe: <strong>'+fmt(p.budget)+'</strong></span>' : '') +
+        '</div>' +
+        (p.budget>0 ? '<div style="height:6px;background:var(--bg3);border-radius:3px"><div style="height:6px;border-radius:3px;background:'+pctColor+';width:'+pct+'%"></div></div>' : '') +
+        '</div>';
+    }).join('');
+    window._projData = {};
+    items.forEach(function(p){ window._projData[p.id] = p; });
+  });
+}
+
+function openProjModal(){
+  ['proj-name','proj-desc','proj-budget'].forEach(function(id){ var e=document.getElementById(id); if(e) e.value=''; });
+  var c = document.getElementById('proj-color'); if(c) c.value='#007aff';
+  document.getElementById('mod-proj').style.display = 'flex';
+  setTimeout(setupNumInputs, 50);
+}
+
+function saveProj(){
+  var name = document.getElementById('proj-name').value.trim();
+  if(!name){ showToast('Ad zorunlu','#ef4444'); return; }
+  var body = {
+    name: name,
+    color: document.getElementById('proj-color').value,
+    description: document.getElementById('proj-desc').value.trim(),
+    budget: getNumVal(document.getElementById('proj-budget'))
+  };
+  xhr('/api/projects', body, function(r){
+    if(r&&r.ok){ closeMod('mod-proj'); toast('Proje kaydedildi'); loadProjList(); }
+  });
+}
+
+function delProj(id){
+  if(!confirm('Bu proje silinsin mi? (İşlemler etkilenmez)')) return;
+  xhr('/api/projects/'+id, null, function(r){
+    if(r&&r.ok){ toast('Silindi'); loadProjList(); }
+  }, false, true);
 }
 
 // ── ASSETS ───────────────────────────────────────────────────────────────────

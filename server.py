@@ -456,6 +456,28 @@ def init_db():
             note       TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL
         )""",
+        """CREATE TABLE IF NOT EXISTS transaction_templates (
+            id          SERIAL PRIMARY KEY,
+            user_id     INTEGER NOT NULL,
+            profile_id  INTEGER NOT NULL DEFAULT 1,
+            name        TEXT NOT NULL,
+            type        TEXT NOT NULL DEFAULT 'gider',
+            amount      DOUBLE PRECISION NOT NULL DEFAULT 0,
+            category    TEXT NOT NULL DEFAULT '',
+            description TEXT NOT NULL DEFAULT '',
+            account_id  INTEGER DEFAULT NULL,
+            created_at  TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS projects (
+            id          SERIAL PRIMARY KEY,
+            user_id     INTEGER NOT NULL,
+            profile_id  INTEGER NOT NULL DEFAULT 1,
+            name        TEXT NOT NULL,
+            color       TEXT NOT NULL DEFAULT '#007aff',
+            description TEXT NOT NULL DEFAULT '',
+            budget      DOUBLE PRECISION NOT NULL DEFAULT 0,
+            created_at  TEXT NOT NULL
+        )""",
     ]
     migrations = [
         ("users",        "email",          "TEXT NOT NULL DEFAULT ''"),
@@ -491,6 +513,8 @@ def init_db():
         ("supplier_invoices",      "payment_method",       "TEXT NOT NULL DEFAULT ''"),
         ("supplier_invoices",      "payment_account_id",   "INTEGER DEFAULT NULL"),
         ("supplier_invoices",      "payment_account_name", "TEXT NOT NULL DEFAULT ''"),
+        ("transactions", "project_id", "INTEGER DEFAULT NULL"),
+        ("transactions", "tags",       "TEXT NOT NULL DEFAULT ''"),
     ]
     with pg_connect() as con:
         for stmt in stmts:
@@ -1406,12 +1430,14 @@ def add_transaction():
     cat = d.get("category",""); desc = d.get("description",""); dt = d.get("date", today_str())
     account_id = d.get("account_id") or None
     card_id    = d.get("card_id") or None
+    project_id = d.get("project_id") or None
+    tags       = d.get("tags","")
     if ttype not in ("gelir","gider") or amount <= 0 or not cat:
         return jsonify({"ok": False, "error": "Geçersiz veri"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,card_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
-        (uid, pid, ttype, amount, cat, desc, dt, account_id, card_id, datetime.now().isoformat()))
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,card_id,project_id,tags,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        (uid, pid, ttype, amount, cat, desc, dt, account_id, card_id, project_id, tags, datetime.now().isoformat()))
     # Kart borcu otomatik güncelle
     if card_id:
         if ttype == "gider":
@@ -1431,12 +1457,12 @@ def update_transaction(tid):
     if not old: return jsonify({"ok": False, "error": "İşlem bulunamadı"}), 404
 
     fields, params = [], []
-    for col in ("type","amount","category","description","date","account_id","card_id"):
+    for col in ("type","amount","category","description","date","account_id","card_id","project_id","tags"):
         if col in d:
             fields.append(f"{col}=?")
             if col == "amount":
                 params.append(float(d[col]))
-            elif col in ("account_id","card_id"):
+            elif col in ("account_id","card_id","project_id"):
                 params.append(int(d[col]) if d[col] else None)
             else:
                 params.append(d[col])
@@ -6475,6 +6501,154 @@ def admin_delete_user(username):
             con.execute(f"DELETE FROM {tbl} WHERE user_id=%s", (uid,))
         con.execute("DELETE FROM users WHERE id=%s", (uid,))
     return redirect("/admin")
+
+# ── TRANSACTION TEMPLATES ────────────────────────────────────────────────────
+
+@app.route("/api/templates", methods=["GET"])
+@login_required
+def list_templates():
+    pid = get_pid(); db = get_db()
+    rows = db.execute("SELECT * FROM transaction_templates WHERE profile_id=%s ORDER BY name", (pid,)).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/templates", methods=["POST"])
+@login_required
+def add_template():
+    uid = session["user_id"]; pid = get_pid()
+    d = request.get_json(force=True)
+    name = d.get("name","").strip()
+    if not name: return jsonify({"ok":False,"error":"Ad zorunlu"}), 400
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO transaction_templates (user_id,profile_id,name,type,amount,category,description,account_id,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        (uid, pid, name, d.get("type","gider"), float(d.get("amount",0)),
+         d.get("category",""), d.get("description",""),
+         d.get("account_id") or None, datetime.now().isoformat())
+    )
+    db.commit()
+    return jsonify({"ok":True,"id":cur.lastrowid})
+
+@app.route("/api/templates/<int:tid>", methods=["DELETE"])
+@login_required
+def del_template(tid):
+    pid = get_pid(); db = get_db()
+    db.execute("DELETE FROM transaction_templates WHERE id=%s AND profile_id=%s", (tid, pid))
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/templates/<int:tid>/apply", methods=["POST"])
+@login_required
+def apply_template(tid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    tpl = db.execute("SELECT * FROM transaction_templates WHERE id=%s AND profile_id=%s", (tid, pid)).fetchone()
+    if not tpl: return jsonify({"ok":False,"error":"Şablon bulunamadı"}), 404
+    d = request.get_json(force=True) or {}
+    tx_date = d.get("date", date.today().isoformat())
+    cur = db.execute(
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        (uid, pid, tpl["type"], tpl["amount"], tpl["category"], tpl["description"],
+         tx_date, tpl["account_id"], datetime.now().isoformat())
+    )
+    db.commit()
+    return jsonify({"ok":True,"id":cur.lastrowid})
+
+# ── PROJECTS ─────────────────────────────────────────────────────────────────
+
+@app.route("/api/projects", methods=["GET"])
+@login_required
+def list_projects():
+    pid = get_pid(); db = get_db()
+    rows = db.execute("SELECT * FROM projects WHERE profile_id=%s ORDER BY name", (pid,)).fetchall()
+    result = []
+    for r in rows:
+        p = dict(r)
+        total = db.execute(
+            "SELECT COALESCE(SUM(CASE WHEN type='gider' THEN amount ELSE -amount END),0) as spent FROM transactions WHERE profile_id=%s AND project_id=%s",
+            (pid, r["id"])
+        ).fetchone()
+        p["spent"] = float(total["spent"] or 0)
+        result.append(p)
+    return jsonify(result)
+
+@app.route("/api/projects", methods=["POST"])
+@login_required
+def add_project():
+    uid = session["user_id"]; pid = get_pid()
+    d = request.get_json(force=True)
+    name = d.get("name","").strip()
+    if not name: return jsonify({"ok":False,"error":"Ad zorunlu"}), 400
+    db = get_db()
+    cur = db.execute(
+        "INSERT INTO projects (user_id,profile_id,name,color,description,budget,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s)",
+        (uid, pid, name, d.get("color","#007aff"), d.get("description",""),
+         float(d.get("budget",0)), datetime.now().isoformat())
+    )
+    db.commit()
+    return jsonify({"ok":True,"id":cur.lastrowid})
+
+@app.route("/api/projects/<int:pid_>", methods=["DELETE"])
+@login_required
+def del_project(pid_):
+    pid = get_pid(); db = get_db()
+    db.execute("DELETE FROM projects WHERE id=%s AND profile_id=%s", (pid_, pid))
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/projects/<int:pid_>/transactions", methods=["GET"])
+@login_required
+def project_transactions(pid_):
+    pid = get_pid(); db = get_db()
+    rows = db.execute(
+        "SELECT * FROM transactions WHERE profile_id=%s AND project_id=%s ORDER BY date DESC", (pid, pid_)
+    ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+# ── TAGS (transactions.tags comma-separated) ─────────────────────────────────
+
+@app.route("/api/tags", methods=["GET"])
+@login_required
+def list_tags():
+    pid = get_pid(); db = get_db()
+    rows = db.execute("SELECT tags FROM transactions WHERE profile_id=%s AND tags != ''", (pid,)).fetchall()
+    tag_set = set()
+    for r in rows:
+        for t in r["tags"].split(","):
+            t = t.strip()
+            if t: tag_set.add(t)
+    return jsonify(sorted(tag_set))
+
+# ── CSV IMPORT ────────────────────────────────────────────────────────────────
+
+@app.route("/api/import/csv", methods=["POST"])
+@login_required
+def import_csv():
+    import csv, io
+    uid = session["user_id"]; pid = get_pid()
+    f = request.files.get("file")
+    if not f: return jsonify({"ok":False,"error":"Dosya seçilmedi"}), 400
+    content = f.read().decode("utf-8-sig", errors="replace")
+    reader = csv.DictReader(io.StringIO(content))
+    db = get_db(); count = 0; errors = []
+    for i, row in enumerate(reader):
+        try:
+            tx_date = (row.get("tarih") or row.get("date") or row.get("Tarih","")).strip()
+            tx_type = (row.get("tip") or row.get("type") or row.get("Tip","gelir")).strip().lower()
+            if tx_type not in ("gelir","gider"): tx_type = "gider"
+            raw_amount = (row.get("tutar") or row.get("amount") or row.get("Tutar","0")).strip()
+            raw_amount = raw_amount.replace(".","").replace(",",".").replace("₺","").strip()
+            amount = float(raw_amount)
+            category = (row.get("kategori") or row.get("category") or row.get("Kategori","Diğer")).strip()
+            description = (row.get("aciklama") or row.get("description") or row.get("Açıklama","")).strip()
+            if not tx_date or amount <= 0: continue
+            db.execute(
+                "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                (uid, pid, tx_type, amount, category, description, tx_date, datetime.now().isoformat())
+            )
+            count += 1
+        except Exception as e:
+            errors.append(f"Satır {i+2}: {e}")
+    db.commit()
+    return jsonify({"ok":True,"imported":count,"errors":errors[:10]})
 
 if __name__ == "__main__":
     init_db()
