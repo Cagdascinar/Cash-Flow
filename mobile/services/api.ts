@@ -243,3 +243,59 @@ export const misc = {
     req<any>('/api/projects', { method: 'POST', body: JSON.stringify(d) }),
   deleteProject: (id: number) => req<any>(`/api/projects/${id}`, { method: 'DELETE' }),
 };
+
+// ─── Müşteriler ──────────────────────────────────────────────────────────────
+export const customers = {
+  list:   () => req<any[]>('/api/customers'),
+  create: (d: Record<string, unknown>) =>
+    req<any>('/api/customers', { method: 'POST', body: JSON.stringify(d) }),
+  update: (id: number, d: Record<string, unknown>) =>
+    req<any>(`/api/customers/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  delete: (id: number) => req<any>(`/api/customers/${id}`, { method: 'DELETE' }),
+  invoices: (cid: number) => req<any[]>(`/api/customer-invoices?customer_id=${cid}`),
+  addInvoice: (d: Record<string, unknown>) =>
+    req<any>('/api/customer-invoices', { method: 'POST', body: JSON.stringify(d) }),
+  payInvoice: (id: number) =>
+    req<any>(`/api/customer-invoices/${id}/pay`, { method: 'POST' }),
+  deleteInvoice: (id: number) =>
+    req<any>(`/api/customer-invoices/${id}`, { method: 'DELETE' }),
+};
+
+// ─── Çalışanlar & Bordro ─────────────────────────────────────────────────────
+export const employees = {
+  list:    () => req<any[]>('/api/employees'),
+  create:  (d: Record<string, unknown>) =>
+    req<any>('/api/employees', { method: 'POST', body: JSON.stringify(d) }),
+  update:  (id: number, d: Record<string, unknown>) =>
+    req<any>(`/api/employees/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  delete:  (id: number) => req<any>(`/api/employees/${id}`, { method: 'DELETE' }),
+  payroll: (eid?: number) =>
+    req<any[]>(`/api/payroll${eid ? `?employee_id=${eid}` : ''}`),
+  addPayroll: (d: Record<string, unknown>) =>
+    req<any>('/api/payroll', { method: 'POST', body: JSON.stringify(d) }),
+  calculate: (d: Record<string, unknown>) =>
+    req<any>('/api/payroll/calculate', { method: 'POST', body: JSON.stringify(d) }),
+};
+
+// ─── KDV ──────────────────────────────────────────────────────────────────────
+export const kdv = {
+  summary: (year?: number, month?: number) => {
+    const p = new URLSearchParams();
+    if (year)  p.append('year',  String(year));
+    if (month) p.append('month', String(month));
+    return req<any>(`/api/kdv/summary?${p}`);
+  },
+  records: () => req<any[]>('/api/kdv/records'),
+  add:     (d: Record<string, unknown>) =>
+    req<any>('/api/kdv/records', { method: 'POST', body: JSON.stringify(d) }),
+  delete:  (id: number) => req<any>(`/api/kdv/records/${id}`, { method: 'DELETE' }),
+};
+
+// ─── Kar-Zarar ───────────────────────────────────────────────────────────────
+export const ploss = {
+  get: (year?: number) => {
+    const p = new URLSearchParams();
+    if (year) p.append('year', String(year));
+    return req<any>(`/api/ploss?${p}`);
+  },
+};

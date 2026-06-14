@@ -6937,28 +6937,33 @@ def list_income_sources():
 @login_required
 def add_income_source():
     uid = session["user_id"]; pid = get_pid(); db = get_db()
-    d = request.json or {}
+    d = request.get_json(force=True) or {}
     name      = (d.get("name") or "").strip()
     itype     = d.get("type","maas")
     amount    = float(d.get("amount",0))
     frequency = d.get("frequency","aylik")
     if not name: return jsonify({"ok":False,"error":"Ad zorunlu"}), 400
     cur = db.execute(
-        "INSERT INTO income_sources (user_id,profile_id,name,type,amount,frequency,is_active,created_at) VALUES (%s,%s,%s,%s,%s,%s,1,%s) RETURNING id",
+        "INSERT INTO income_sources (user_id,profile_id,name,type,amount,frequency,is_active,created_at) VALUES (%s,%s,%s,%s,%s,%s,1,%s)",
         (uid, pid, name, itype, amount, frequency, datetime.now().isoformat())
     )
     db.commit()
-    return jsonify({"ok":True,"id":cur.fetchone()["id"]})
+    return jsonify({"ok":True,"id":cur.lastrowid})
 
 @app.route("/api/income-sources/<int:iid>", methods=["PUT"])
 @login_required
 def update_income_source(iid):
     uid = session["user_id"]; pid = get_pid(); db = get_db()
-    d = request.json or {}
-    db.execute(
-        "UPDATE income_sources SET name=%s,type=%s,amount=%s,frequency=%s,is_active=%s WHERE id=%s AND user_id=%s AND profile_id=%s",
-        (d.get("name"), d.get("type"), float(d.get("amount",0)), d.get("frequency"), int(d.get("is_active",1)), iid, uid, pid)
-    )
+    d = request.get_json(force=True) or {}
+    fields, vals = [], []
+    if "name"      in d: fields.append("name=%s");      vals.append(d["name"])
+    if "type"      in d: fields.append("type=%s");      vals.append(d["type"])
+    if "amount"    in d: fields.append("amount=%s");    vals.append(float(d["amount"]))
+    if "frequency" in d: fields.append("frequency=%s"); vals.append(d["frequency"])
+    if "is_active" in d: fields.append("is_active=%s"); vals.append(int(d["is_active"]))
+    if not fields: return jsonify({"ok":True})
+    vals += [iid, uid, pid]
+    db.execute(f"UPDATE income_sources SET {','.join(fields)} WHERE id=%s AND user_id=%s AND profile_id=%s", vals)
     db.commit()
     return jsonify({"ok":True})
 
@@ -6979,7 +6984,16 @@ def list_customers():
     rows = db.execute(
         "SELECT * FROM customers WHERE user_id=%s AND profile_id=%s ORDER BY name", (uid,pid)
     ).fetchall()
-    return jsonify([row_to_dict(r) for r in rows])
+    result = []
+    for r in rows:
+        c = row_to_dict(r)
+        unpaid = db.execute(
+            "SELECT COALESCE(SUM(amount),0) AS s FROM customer_invoices WHERE customer_id=%s AND profile_id=%s AND status!='odendi'",
+            (r["id"], pid)
+        ).fetchone()
+        c["total_unpaid"] = float(unpaid["s"] or 0)
+        result.append(c)
+    return jsonify(result)
 
 @app.route("/api/customers", methods=["POST"])
 @login_required

@@ -5,103 +5,149 @@ AUTH_HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#f2f2f7">
+<meta name="theme-color" content="#0b0e11">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="icon" href="/icon-192.png" sizes="192x192" type="image/png">
-<title>Kirpi — Nakit Akışın Cebinde!</title>
+<title>Kirpi Finans — Nakit Akışın Cebinde!</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
-body{background:#07091f;color:#e8eaff;font-family:'Plus Jakarta Sans',system-ui,sans-serif;
-  min-height:100vh;display:grid;grid-template-columns:1fr 1fr;align-items:stretch}
-@media(max-width:700px){body{grid-template-columns:1fr}}
-.hero{background:linear-gradient(145deg,#10069F 0%,#07091f 100%);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 40px;
-  position:relative;overflow:hidden}
-@media(max-width:700px){.hero{display:none}}
-.hero-title{font-size:2rem;font-weight:900;letter-spacing:-.04em;margin-bottom:8px;color:#fff}
-.hero-sub{font-size:.9rem;color:rgba(255,255,255,.6);text-align:center;max-width:280px;line-height:1.6;margin-bottom:32px}
-.hero-pills{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:300px}
-.pill{background:rgba(213,253,115,.12);border:1px solid rgba(213,253,115,.3);border-radius:20px;padding:6px 14px;
-  font-size:.75rem;color:#d5fd73;display:flex;align-items:center;gap:6px}
-.right{display:flex;align-items:center;justify-content:center;padding:40px 36px;background:#07091f}
-.box{background:#0d1140;border:1px solid #1a2275;border-radius:20px;padding:40px 36px;
-  width:100%;max-width:400px;box-shadow:0 4px 40px rgba(16,6,159,.4)}
-.logo{text-align:center;margin-bottom:32px}
-.logo img{width:64px;height:64px;border-radius:16px;margin-bottom:12px}
-.logo h1{font-size:1.4rem;font-weight:800;letter-spacing:-.02em;color:#fff}
-.logo p{font-size:.82rem;color:rgba(255,255,255,.45);margin-top:4px}
-label{display:block;font-size:.78rem;color:rgba(255,255,255,.5);margin-bottom:5px;font-weight:500}
-input{width:100%;background:#131a5c;border:1px solid #1a2275;color:#e8eaff;
-  padding:12px 14px;border-radius:10px;font-size:.9rem;outline:none;margin-bottom:14px;
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#10069F;--green:#d5fd73;--dark:#0b0e11;--card:#141820;
+  --border:#1e2533;--txt:#ffffff;--txt2:#7a8494;--red:#f6465d;
+}
+body{background:var(--dark);color:var(--txt);
+  font-family:'Plus Jakarta Sans',system-ui,sans-serif;
+  min-height:100vh;display:grid;grid-template-columns:55fr 45fr;align-items:stretch}
+@media(max-width:768px){body{grid-template-columns:1fr}}
+
+/* ─── HERO ─── */
+.hero{
+  background:linear-gradient(135deg,#10069F 0%,#080e6a 50%,#0b0e11 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:48px 40px;position:relative;overflow:hidden;
+}
+@media(max-width:768px){.hero{display:none}}
+
+/* Glowing orbs */
+.hero::before{content:'';position:absolute;width:400px;height:400px;border-radius:50%;
+  background:radial-gradient(circle,rgba(213,253,115,.18) 0%,transparent 70%);
+  top:-100px;right:-80px;pointer-events:none}
+.hero::after{content:'';position:absolute;width:300px;height:300px;border-radius:50%;
+  background:radial-gradient(circle,rgba(16,6,159,.5) 0%,transparent 70%);
+  bottom:-60px;left:-60px;pointer-events:none}
+
+.hero-badge{background:rgba(213,253,115,.12);border:1px solid rgba(213,253,115,.3);
+  border-radius:20px;padding:6px 14px;font-size:.72rem;color:var(--green);font-weight:700;
+  letter-spacing:.04em;margin-bottom:20px;display:inline-block}
+
+.hero-logo{font-size:4rem;margin-bottom:12px;filter:drop-shadow(0 0 20px rgba(213,253,115,.4))}
+.hero-title{font-size:2.4rem;font-weight:900;letter-spacing:-.04em;margin-bottom:6px;
+  background:linear-gradient(135deg,#fff 0%,var(--green) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;text-align:center}
+.hero-sub{font-size:.9rem;color:rgba(255,255,255,.5);text-align:center;max-width:280px;
+  line-height:1.6;margin-bottom:28px}
+
+/* Dashboard card */
+.dash-card{background:rgba(255,255,255,.04);backdrop-filter:blur(10px);border:1px solid rgba(213,253,115,.15);
+  border-radius:16px;padding:18px 20px;width:100%;max-width:320px;margin-bottom:28px}
+.dash-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.dash-lbl{font-size:.72rem;color:rgba(255,255,255,.4)}
+.dash-val{font-size:.82rem;font-weight:700}
+.dash-bars{display:flex;gap:6px;align-items:flex-end;height:60px}
+.bar{border-radius:4px 4px 0 0;flex:1}
+.bar-g{background:linear-gradient(to top,#0ecb81,#d5fd73)}
+.bar-r{background:rgba(246,70,93,.7)}
+
+.hero-feats{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:320px}
+.feat{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  border-radius:8px;padding:5px 10px;font-size:.72rem;color:rgba(255,255,255,.65);
+  display:flex;align-items:center;gap:5px}
+
+/* ─── RIGHT / FORM ─── */
+.right{display:flex;align-items:center;justify-content:center;
+  padding:32px 28px;background:var(--dark)}
+
+.box{background:var(--card);border:1px solid var(--border);border-radius:24px;
+  padding:36px 32px;width:100%;max-width:400px;
+  box-shadow:0 0 0 1px rgba(213,253,115,.06),0 8px 48px rgba(0,0,0,.5)}
+
+.logo{text-align:center;margin-bottom:28px}
+.logo-circle{width:72px;height:72px;border-radius:36px;background:var(--blue);
+  display:flex;align-items:center;justify-content:center;margin:0 auto 12px;
+  box-shadow:0 0 0 4px rgba(16,6,159,.3),0 8px 24px rgba(16,6,159,.5)}
+.logo-ico{font-size:36px}
+.logo h1{font-size:1.5rem;font-weight:800;letter-spacing:-.02em;color:var(--txt)}
+.logo h1 span{color:var(--green)}
+.logo p{font-size:.8rem;color:var(--txt2);margin-top:3px}
+
+label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:5px;
+  font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+input[type=text],input[type=email],input[type=password],input[type=tel]{
+  width:100%;background:#1a2030;border:1px solid #242b3a;color:var(--txt);
+  padding:13px 16px;border-radius:12px;font-size:.95rem;outline:none;margin-bottom:14px;
   font-family:inherit;transition:.15s}
-input:focus{border-color:#d5fd73;background:#1a2275}
-.btn{width:100%;padding:13px;background:#d5fd73;color:#07091f;border:none;border-radius:10px;
-  font-size:.92rem;font-weight:800;cursor:pointer;transition:.2s;margin-top:4px}
-.btn:hover{background:#c8f55a}
-.msg{text-align:center;font-size:.82rem;padding:10px 14px;border-radius:10px;margin-bottom:16px}
-.msg.err{background:rgba(246,70,93,.12);color:#f6465d;border:1px solid rgba(246,70,93,.3)}
-.msg.ok{background:rgba(213,253,115,.1);color:#d5fd73;border:1px solid rgba(213,253,115,.25)}
-.link{text-align:center;margin-top:18px;font-size:.82rem;color:rgba(255,255,255,.45)}
-.link a{color:#d5fd73;text-decoration:none;font-weight:700}
-.link a:hover{color:#c8f55a}
+input:focus{border-color:var(--green);background:#1e2840;
+  box-shadow:0 0 0 3px rgba(213,253,115,.12)}
+input[type=checkbox]{width:auto;margin-bottom:0;accent-color:var(--green)}
+
+.btn{width:100%;padding:14px;background:var(--green);color:#0b0e11;border:none;
+  border-radius:12px;font-size:.95rem;font-weight:800;cursor:pointer;transition:.2s;
+  margin-top:4px;font-family:inherit;letter-spacing:.01em;
+  box-shadow:0 4px 20px rgba(213,253,115,.3)}
+.btn:hover{background:#c8f55a;box-shadow:0 6px 28px rgba(213,253,115,.45);transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+
+.msg{text-align:center;font-size:.83rem;padding:10px 14px;border-radius:10px;margin-bottom:14px}
+.msg.err{background:rgba(246,70,93,.1);color:var(--red);border:1px solid rgba(246,70,93,.25)}
+.msg.ok{background:rgba(213,253,115,.08);color:var(--green);border:1px solid rgba(213,253,115,.2)}
+.link{text-align:center;margin-top:16px;font-size:.82rem;color:var(--txt2)}
+.link a{color:var(--green);text-decoration:none;font-weight:700}
+.link a:hover{color:#c8f55a;text-decoration:underline}
+
+@media(max-width:768px){
+  .right{padding:24px 20px;align-items:flex-start;padding-top:48px}
+  .box{padding:28px 24px}
+}
 </style>
 </head>
 <body>
 
 <!-- HERO (sol taraf) -->
 <div class="hero">
-  <!-- Arka plan parçacıklar -->
-  <svg style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:.12" viewBox="0 0 500 600" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="80" cy="120" r="60" fill="#6366f1"/><circle cx="420" cy="80" r="40" fill="#a855f7"/>
-    <circle cx="350" cy="300" r="80" fill="#6366f1"/><circle cx="60" cy="450" r="50" fill="#8b5cf6"/>
-    <circle cx="450" cy="500" r="35" fill="#a855f7"/>
-  </svg>
+  <div class="hero-badge">✨ Türkiye'nin Akıllı Finans Uygulaması</div>
+  <div class="hero-logo">🦔</div>
+  <div class="hero-title">Kirpi Finans</div>
+  <div class="hero-sub">Paranızın tam kontrolü sizde. Kişisel ve şirket finanslarınız tek uygulamada.</div>
 
-  <!-- Finans dashboard illüstrasyonu -->
-  <svg width="280" height="220" viewBox="0 0 280 220" style="margin-bottom:28px;filter:drop-shadow(0 8px 32px #6366f140)">
-    <!-- Kart arka planı -->
-    <rect x="20" y="10" width="240" height="200" rx="16" fill="#1a1d26" stroke="#2a2f45" stroke-width="1"/>
-    <!-- Gelir bar -->
-    <rect x="40" y="120" width="30" height="70" rx="6" fill="#22c55e" opacity=".8"/>
-    <rect x="80" y="90" width="30" height="100" rx="6" fill="#22c55e" opacity=".9"/>
-    <rect x="120" y="100" width="30" height="90" rx="6" fill="#22c55e"/>
-    <rect x="160" y="70" width="30" height="120" rx="6" fill="#22c55e" opacity=".85"/>
-    <rect x="200" y="85" width="30" height="105" rx="6" fill="#22c55e" opacity=".9"/>
-    <!-- Gider bar overlay -->
-    <rect x="40" y="150" width="30" height="40" rx="6" fill="#ef4444" opacity=".7"/>
-    <rect x="80" y="140" width="30" height="50" rx="6" fill="#ef4444" opacity=".7"/>
-    <rect x="120" y="145" width="30" height="45" rx="6" fill="#ef4444" opacity=".65"/>
-    <rect x="160" y="130" width="30" height="60" rx="6" fill="#ef4444" opacity=".7"/>
-    <rect x="200" y="135" width="30" height="55" rx="6" fill="#ef4444" opacity=".7"/>
-    <!-- Trend çizgi -->
-    <polyline points="55,115 95,82 135,95 175,62 215,78" stroke="#818cf8" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="55" cy="115" r="4" fill="#818cf8"/><circle cx="95" cy="82" r="4" fill="#818cf8"/>
-    <circle cx="135" cy="95" r="4" fill="#818cf8"/><circle cx="175" cy="62" r="4" fill="#818cf8"/>
-    <circle cx="215" cy="78" r="5" fill="#818cf8" stroke="#1a1d26" stroke-width="2"/>
-    <!-- Üst bilgi -->
-    <text x="40" y="42" font-family="system-ui" font-size="11" fill="#64748b">Bu Ay Net</text>
-    <text x="40" y="60" font-family="system-ui" font-size="18" font-weight="800" fill="#22c55e">+₺23.400</text>
-    <!-- Kirpi ikonu sağ üst -->
-    <text x="210" y="48" font-size="28">🦔</text>
-    <!-- Alt göstergeler -->
-    <rect x="40" y="200" width="8" height="8" rx="2" fill="#22c55e"/>
-    <text x="52" y="208" font-family="system-ui" font-size="9" fill="#64748b">Gelir</text>
-    <rect x="95" y="200" width="8" height="8" rx="2" fill="#ef4444"/>
-    <text x="107" y="208" font-family="system-ui" font-size="9" fill="#64748b">Gider</text>
-    <rect x="150" y="200" width="8" height="8" rx="2" fill="#818cf8"/>
-    <text x="162" y="208" font-family="system-ui" font-size="9" fill="#64748b">Trend</text>
-  </svg>
+  <!-- Mini dashboard önizlemesi -->
+  <div class="dash-card">
+    <div class="dash-row">
+      <span class="dash-lbl">Bu Ay Net Tasarruf</span>
+      <span class="dash-val" style="color:#d5fd73">+₺12.400</span>
+    </div>
+    <div class="dash-bars">
+      <div class="bar bar-g" style="height:48px"></div>
+      <div class="bar bar-g" style="height:62px"><div class="bar bar-r" style="height:22px;border-radius:0 0 4px 4px"></div></div>
+      <div class="bar bar-g" style="height:54px"></div>
+      <div class="bar bar-g" style="height:70px"><div class="bar bar-r" style="height:24px;border-radius:0 0 4px 4px"></div></div>
+      <div class="bar bar-g" style="height:58px"><div class="bar bar-r" style="height:18px;border-radius:0 0 4px 4px"></div></div>
+    </div>
+    <div class="dash-row" style="margin-bottom:0;margin-top:10px">
+      <span class="dash-lbl">💳 Kart Borcu: <b style="color:#f6465d">₺3.200</b></span>
+      <span class="dash-lbl">📈 Yatırım: <b style="color:#d5fd73">₺45.000</b></span>
+    </div>
+  </div>
 
-  <div class="hero-title">🦔 Kirpi</div>
-  <div class="hero-sub">Gelirin, giderin, yatırımın ve kartların tek ekranda</div>
-  <div class="hero-pills">
-    <div class="pill">📊 Dashboard</div>
-    <div class="pill">💳 Kart Takibi</div>
-    <div class="pill">📈 Yatırım</div>
-    <div class="pill">🔁 Düzenli İşlem</div>
-    <div class="pill">📂 Banka CSV</div>
-    <div class="pill">🎯 Bütçe</div>
+  <div class="hero-feats">
+    <div class="feat">📊 Gerçek zamanlı dashboard</div>
+    <div class="feat">💳 Kredi kartı takibi</div>
+    <div class="feat">📈 Yatırım portföyü</div>
+    <div class="feat">🎯 Bütçe planlama</div>
+    <div class="feat">🏢 Şirket modülü</div>
+    <div class="feat">👷 Bordro hesaplama</div>
+    <div class="feat">🧾 KDV takibi</div>
+    <div class="feat">💱 Canlı döviz kurları</div>
   </div>
 </div>
 
@@ -109,9 +155,9 @@ input:focus{border-color:#d5fd73;background:#1a2275}
 <div class="right">
 <div class="box">
   <div class="logo">
-    <img src="/icon.svg" alt="Kirpi">
-    <h1>🦔 Kirpi</h1>
-    <p>Nakit Akışı Takibi</p>
+    <div class="logo-circle"><span class="logo-ico">🦔</span></div>
+    <h1>Kirpi <span>Finans</span></h1>
+    <p>Nakit Akışı & Şirket Muhasebesi</p>
   </div>
 
   <!-- __FORM_CONTENT__ -->
