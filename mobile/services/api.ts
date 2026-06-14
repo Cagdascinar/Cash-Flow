@@ -171,6 +171,33 @@ export const me = {
   delete:         () => req<any>('/api/me/delete', { method: 'POST' }),
 };
 
+// ─── Kullanıcı Kategorileri ──────────────────────────────────────────────────
+export const userCategories = {
+  list:   () => req<any>('/api/user-categories'),
+  create: (d: Record<string, unknown>) =>
+    req<any>('/api/user-categories', { method: 'POST', body: JSON.stringify(d) }),
+  delete: (id: number) => req<any>(`/api/user-categories/${id}`, { method: 'DELETE' }),
+};
+
+// ─── Planlanmış İşlemler ─────────────────────────────────────────────────────
+export const scheduled = {
+  list:    (status?: string) => req<any[]>(`/api/scheduled${status ? `?status=${status}` : ''}`),
+  create:  (d: Record<string, unknown>) =>
+    req<any>('/api/scheduled', { method: 'POST', body: JSON.stringify(d) }),
+  execute: (id: number) => req<any>(`/api/scheduled/${id}/execute`, { method: 'POST' }),
+  delete:  (id: number) => req<any>(`/api/scheduled/${id}`, { method: 'DELETE' }),
+};
+
+// ─── Para Kaynakları ─────────────────────────────────────────────────────────
+export const incomeSources = {
+  list:   () => req<any[]>('/api/income-sources'),
+  create: (d: Record<string, unknown>) =>
+    req<any>('/api/income-sources', { method: 'POST', body: JSON.stringify(d) }),
+  update: (id: number, d: Record<string, unknown>) =>
+    req<any>(`/api/income-sources/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  delete: (id: number) => req<any>(`/api/income-sources/${id}`, { method: 'DELETE' }),
+};
+
 // ─── Diğer ───────────────────────────────────────────────────────────────────
 export const misc = {
   categories:     () => req<any>('/api/categories'),

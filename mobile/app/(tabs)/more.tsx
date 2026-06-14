@@ -175,6 +175,17 @@ export default function MoreScreen() {
           <Row ico="📋" label="İşlem Şablonları" sub="Sık işlemleri kaydet, tek tıkla uygula" onPress={() => go('/templates')} />
           <View style={s.sep} />
           <Row ico="📁" label="Projeler" sub="Proje bazlı harcama takibi" onPress={() => go('/projects')} />
+          <View style={s.sep} />
+          <Row ico="📅" label="Planlanmış İşlemler" sub="Gelecek tarihli hatırlatıcılar" onPress={() => go('/scheduled')} />
+        </View>
+
+        <Text style={s.grp}>Organizasyon</Text>
+        <View style={s.group}>
+          <Row ico="🗂️" label="Kategoriler" sub="Özel kategori oluştur ve yönet" onPress={() => go('/categories')} />
+          <View style={s.sep} />
+          <Row ico="🏷️" label="Etiketler" sub="İşlemleri etiketle ve filtrele" onPress={() => go('/tags')} />
+          <View style={s.sep} />
+          <Row ico="💰" label="Para Kaynakları" sub="Aylık gelir kaynaklarını takip et" onPress={() => go('/income-sources')} />
         </View>
 
         <Text style={s.grp}>Araçlar</Text>
@@ -186,6 +197,13 @@ export default function MoreScreen() {
           <Row ico="🧠" label="AI Analiz" sub="Harcama önerileri ve uyarılar" onPress={() => go('/insights')} />
           <View style={s.sep} />
           <Row ico="⚙️" label="Ayarlar" sub="Hesap, profil ve dışa aktarma" onPress={() => go('/settings')} />
+        </View>
+
+        <Text style={s.grp}>Hakkında</Text>
+        <View style={s.group}>
+          <Row ico="📝" label="Değişiklik Günlüğü" sub="Neler yeni?" onPress={() => go('/changelog')} />
+          <View style={s.sep} />
+          <Row ico="❓" label="Yardım & SSS" sub="Sıkça sorulan sorular" onPress={() => go('/help')} />
         </View>
 
         <View style={[s.group, { marginTop: 16 }]}>

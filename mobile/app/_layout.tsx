@@ -89,6 +89,14 @@ function RootLayoutNav() {
         <Stack.Screen name="notifications"  options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="profiles"       options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="insights"       options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="templates"     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="projects"      options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="categories"    options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="tags"          options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="scheduled"     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="income-sources" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="changelog"     options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="help"          options={{ animation: 'slide_from_right' }} />
       </Stack>
     </>
   );
