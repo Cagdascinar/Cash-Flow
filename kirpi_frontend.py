@@ -1366,8 +1366,20 @@ body{top:0!important}
     <div class="nl nl-desktop" data-page="templates" onclick="goPage('templates',this)">
       <span class="ico">📋</span>Şablonlar
     </div>
+    <div class="nl nl-desktop" data-page="scheduled" onclick="goPage('scheduled',this)">
+      <span class="ico">📅</span>Planlanmış
+    </div>
     <div class="nl nl-desktop" data-page="projects" onclick="goPage('projects',this)">
       <span class="ico">📁</span>Projeler
+    </div>
+    <div class="nl nl-desktop" data-page="categories" onclick="goPage('categories',this)">
+      <span class="ico">🗂️</span>Kategoriler
+    </div>
+    <div class="nl nl-desktop" data-page="tags" onclick="goPage('tags',this)">
+      <span class="ico">🏷️</span>Etiketler
+    </div>
+    <div class="nl nl-desktop" data-page="income-sources" onclick="goPage('income-sources',this)">
+      <span class="ico">💰</span>Para Kaynakları
     </div>
     <div class="nl nl-desktop" data-page="import" onclick="goPage('import',this)">
       <span class="ico">📂</span>İçe Aktar
@@ -1391,6 +1403,12 @@ body{top:0!important}
     </div>
 
     <div class="nav-sect">Sistem</div>
+    <div class="nl nl-desktop" data-page="changelog" onclick="goPage('changelog',this)">
+      <span class="ico">📝</span>Değişiklikler
+    </div>
+    <div class="nl nl-desktop" data-page="help" onclick="goPage('help',this)">
+      <span class="ico">❓</span>Yardım
+    </div>
     <div class="nl nl-desktop" data-page="settings" onclick="goPage('settings',this)">
       <span class="ico">⚙️</span>Ayarlar
     </div>
@@ -1431,11 +1449,29 @@ body{top:0!important}
     <div class="more-tile" onclick="goPageFromSheet('templates')">
       <div class="mt-ico">📋</div><div class="mt-lbl">Şablonlar</div>
     </div>
+    <div class="more-tile" onclick="goPageFromSheet('scheduled')">
+      <div class="mt-ico">📅</div><div class="mt-lbl">Planlanmış</div>
+    </div>
     <div class="more-tile" onclick="goPageFromSheet('projects')">
       <div class="mt-ico">📁</div><div class="mt-lbl">Projeler</div>
     </div>
+    <div class="more-tile" onclick="goPageFromSheet('categories')">
+      <div class="mt-ico">🗂️</div><div class="mt-lbl">Kategoriler</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('tags')">
+      <div class="mt-ico">🏷️</div><div class="mt-lbl">Etiketler</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('income-sources')">
+      <div class="mt-ico">💰</div><div class="mt-lbl">Para Kaynakları</div>
+    </div>
     <div class="more-tile" onclick="goPageFromSheet('import')">
       <div class="mt-ico">📂</div><div class="mt-lbl">İçe Aktar</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('changelog')">
+      <div class="mt-ico">📝</div><div class="mt-lbl">Değişiklikler</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('help')">
+      <div class="mt-ico">❓</div><div class="mt-lbl">Yardım</div>
     </div>
     <div class="more-tile" onclick="toggleDarkMode();closeMoreSheet()">
       <div class="mt-ico" id="dark-mode-sheet-ico">🌙</div><div class="mt-lbl" id="dark-mode-sheet-lbl">Karanlık</div>
@@ -2043,6 +2079,195 @@ body{top:0!important}
 
   <button class="btn btn-primary tappable" style="width:100%;margin-bottom:16px" onclick="openProjModal()">＋ Proje Ekle</button>
   <div id="proj-list"></div>
+</div>
+
+<!-- ── KATEGORİLER ───────────────────────────────────────────── -->
+<div class="page" id="page-categories">
+  <div class="page-title">Kategoriler</div>
+  <div class="page-sub">Varsayılan kategorilere ek olarak kendi kategorilerini oluştur</div>
+
+  <div style="display:flex;gap:8px;margin-bottom:16px">
+    <button class="btn tappable" id="cat-tab-gider" onclick="setCatTab('gider')" style="flex:1;background:#d5fd73;color:#07091f;border:none">↓ Gider</button>
+    <button class="btn btn-ghost tappable" id="cat-tab-gelir" onclick="setCatTab('gelir')" style="flex:1">↑ Gelir</button>
+  </div>
+
+  <div style="margin-bottom:14px">
+    <div class="section-title" style="margin-bottom:10px" id="cat-section-lbl">Varsayılan Gider Kategorileri</div>
+    <div id="cat-default-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+  </div>
+
+  <div style="border-top:1px solid var(--border);padding-top:14px">
+    <div class="section-title" style="margin-bottom:10px">Özel Kategorilerim</div>
+    <button class="btn btn-primary tappable" style="width:100%;margin-bottom:12px" onclick="openCatModal()">＋ Kategori Ekle</button>
+    <div id="cat-custom-list"></div>
+  </div>
+</div>
+
+<!-- ── ETİKETLER ─────────────────────────────────────────────── -->
+<div class="page" id="page-tags">
+  <div class="page-title">Etiketler</div>
+  <div class="page-sub">İşlemlerinize etiket ekleyin, etiket bazlı filtreleyin</div>
+
+  <div id="tags-list" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px"></div>
+
+  <div id="tags-tx-section" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="section-title" style="margin-bottom:0" id="tags-tx-title">İşlemler</div>
+      <button onclick="clearTagFilter()" style="background:none;border:none;color:var(--txt2);font-size:.8rem;cursor:pointer">✕ Filtreyi Kaldır</button>
+    </div>
+    <div id="tags-tx-list"></div>
+  </div>
+  <div id="tags-empty" class="empty-state" style="display:none"><div class="icon">🏷️</div>Henüz etiket eklenmedi</div>
+</div>
+
+<!-- ── PLANLANMIŞ İŞLEMLER ───────────────────────────────────── -->
+<div class="page" id="page-scheduled">
+  <div class="page-title">Planlanmış İşlemler</div>
+  <div class="page-sub">Gelecekteki tek seferlik ödeme ve gelirleri önceden kaydet</div>
+
+  <div style="display:flex;gap:8px;margin-bottom:16px">
+    <button class="btn tappable" id="sched-tab-bekliyor" onclick="setSchedTab('bekliyor')" style="flex:1;background:#d5fd73;color:#07091f;border:none">⏳ Bekleyenler</button>
+    <button class="btn btn-ghost tappable" id="sched-tab-yapildi" onclick="setSchedTab('yapildi')" style="flex:1">✓ Yapıldı</button>
+    <button class="btn btn-ghost tappable" id="sched-tab-all" onclick="setSchedTab('all')" style="flex:1">Tümü</button>
+  </div>
+
+  <button class="btn btn-primary tappable" style="width:100%;margin-bottom:16px" onclick="openSchedModal()">＋ Planla</button>
+  <div id="sched-list"></div>
+</div>
+
+<!-- ── GELİR KAYNAKLARI ──────────────────────────────────────── -->
+<div class="page" id="page-income-sources">
+  <div class="page-title">Para Kaynakları</div>
+  <div class="page-sub">Gelir kaynaklarınızı kaydedin — aylık beklenen geliri takip edin</div>
+
+  <button class="btn btn-primary tappable" style="width:100%;margin-bottom:16px" onclick="openIncomeSourceModal()">＋ Kaynak Ekle</button>
+
+  <div id="income-source-summary" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px"></div>
+  <div id="income-source-list"></div>
+</div>
+
+<!-- ── DEĞİŞİKLİK GÜNLÜĞÜ ───────────────────────────────────── -->
+<div class="page" id="page-changelog">
+  <div class="page-title">Değişiklik Günlüğü</div>
+  <div class="page-sub">Uygulama güncelleme geçmişi</div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <span style="background:var(--accent);color:#07091f;font-size:.72rem;font-weight:800;padding:3px 10px;border-radius:8px">v2.6</span>
+      <span style="font-size:.78rem;color:var(--txt2)">Haziran 2026</span>
+    </div>
+    <div style="font-size:.88rem;color:var(--txt);font-weight:700;margin-bottom:8px">Komple Tasarım Yenileme & Tema Sistemi</div>
+    <ul style="font-size:.82rem;color:var(--txt2);line-height:1.9;padding-left:18px;margin:0">
+      <li>Paymaster ilhamlı #10069F/#d5fd73 lacivert/lime paleti</li>
+      <li>Plus Jakarta Sans yazı tipi</li>
+      <li>5 hazır tema + özel renk seçici</li>
+      <li>İşlem Şablonları ve Projeler eklendi</li>
+      <li>Etiket (tag) sistemi</li>
+      <li>CSV içe aktarma iyileştirildi</li>
+      <li>Kategoriler, Planlanmış İşlemler, Para Kaynakları sayfaları</li>
+    </ul>
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <span style="background:var(--bg3);color:var(--txt2);font-size:.72rem;font-weight:800;padding:3px 10px;border-radius:8px">v2.5</span>
+      <span style="font-size:.78rem;color:var(--txt2)">Nisan 2026</span>
+    </div>
+    <div style="font-size:.88rem;color:var(--txt);font-weight:700;margin-bottom:8px">Tedarikçi & Fatura Yönetimi</div>
+    <ul style="font-size:.82rem;color:var(--txt2);line-height:1.9;padding-left:18px;margin:0">
+      <li>Alış/Satış fatura takibi</li>
+      <li>VKN, Vergi Dairesi, Ünvan alanları</li>
+      <li>Ödeme yöntemi (Havale/EFT, Kart, Nakit)</li>
+      <li>Yaşlandırma analizi (0-30, 31-60, 61-90, 90+ gün)</li>
+      <li>Float kazanç hesabı</li>
+    </ul>
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <span style="background:var(--bg3);color:var(--txt2);font-size:.72rem;font-weight:800;padding:3px 10px;border-radius:8px">v2.4</span>
+      <span style="font-size:.78rem;color:var(--txt2)">Şubat 2026</span>
+    </div>
+    <div style="font-size:.88rem;color:var(--txt);font-weight:700;margin-bottom:8px">Varlık Takibi & Kart Raporu</div>
+    <ul style="font-size:.82rem;color:var(--txt2);line-height:1.9;padding-left:18px;margin:0">
+      <li>Demirbaş ve araç amortismanı</li>
+      <li>Bakım takip sistemi</li>
+      <li>Günlük kart bakiyesi raporu</li>
+      <li>Telegram bot entegrasyonu</li>
+    </ul>
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <span style="background:var(--bg3);color:var(--txt2);font-size:.72rem;font-weight:800;padding:3px 10px;border-radius:8px">v2.3</span>
+      <span style="font-size:.78rem;color:var(--txt2)">Aralık 2025</span>
+    </div>
+    <div style="font-size:.88rem;color:var(--txt);font-weight:700;margin-bottom:8px">Yatırım & Çoklu Profil</div>
+    <ul style="font-size:.82rem;color:var(--txt2);line-height:1.9;padding-left:18px;margin:0">
+      <li>Döviz, altın, fon portföyü</li>
+      <li>Canlı kur entegrasyonu</li>
+      <li>Aile/şirket profil geçişi</li>
+      <li>TEFAS fon sorgulama</li>
+    </ul>
+  </div>
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <span style="background:var(--bg3);color:var(--txt2);font-size:.72rem;font-weight:800;padding:3px 10px;border-radius:8px">v2.0</span>
+      <span style="font-size:.78rem;color:var(--txt2)">Ekim 2025</span>
+    </div>
+    <div style="font-size:.88rem;color:var(--txt);font-weight:700;margin-bottom:8px">İlk Sürüm</div>
+    <ul style="font-size:.82rem;color:var(--txt2);line-height:1.9;padding-left:18px;margin:0">
+      <li>Gelir/gider takibi</li>
+      <li>Kredi kartı ve banka hesapları</li>
+      <li>Düzenli işlemler</li>
+      <li>Tasarruf hedefleri</li>
+      <li>PDF/Excel rapor dışa aktarma</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ── YARDIM ─────────────────────────────────────────────────── -->
+<div class="page" id="page-help">
+  <div class="page-title">Yardım & SSS</div>
+  <div class="page-sub">Sık sorulan sorular ve kullanım rehberi</div>
+
+  <div class="card" style="margin-bottom:10px">
+    <div style="font-weight:700;margin-bottom:6px;color:var(--txt)">🏠 Dashboard nasıl çalışır?</div>
+    <div style="font-size:.84rem;color:var(--txt2);line-height:1.7">Ay/Yıl/Tüm dönemler için gelir-gider dengenizi gösterir. Yeşil chip → gelir, kırmızı chip → gider, gri chip → net bakiyeye tıklayarak işlem listesini filtreler.</div>
+  </div>
+  <div class="card" style="margin-bottom:10px">
+    <div style="font-weight:700;margin-bottom:6px;color:var(--txt)">💳 Kredi kartı borcu nasıl takip edilir?</div>
+    <div style="font-size:.84rem;color:var(--txt2);line-height:1.7">Kartlar & Hesaplar sayfasından kartı ekleyin, limit ve kullanılan miktarı girin. Günlük Kart Raporu sayfasıyla her gün bakiyenizi güncelleyebilirsiniz. Hesaplar sayfasından kart ödemesi yapabilirsiniz.</div>
+  </div>
+  <div class="card" style="margin-bottom:10px">
+    <div style="font-weight:700;margin-bottom:6px;color:var(--txt)">🔁 Düzenli işlem ile şablon farkı nedir?</div>
+    <div style="font-size:.84rem;color:var(--txt2);line-height:1.7"><b>Düzenli işlem:</b> Kira, fatura gibi her ay otomatik tekrar eden ödemeler. "Uygula" ile tüm ay kayıtları toplu oluşturulur.<br><b>Şablon:</b> Kahve, market gibi sık ama düzensiz işlemler. Tek tıkla istediğin tarihe eklersin.</div>
+  </div>
+  <div class="card" style="margin-bottom:10px">
+    <div style="font-weight:700;margin-bottom:6px;color:var(--txt)">📈 Yatırım takibi nasıl çalışır?</div>
+    <div style="font-size:.84rem;color:var(--txt2);line-height:1.7">Döviz (USD/EUR/GBP), altın ve TEFAS fonlarını ekleyebilirsiniz. Sistem canlı kurlarla alım fiyatınızı karşılaştırır, kâr/zarar hesaplar. Temettü ve faiz gelirlerini ayrıca kayıt edebilirsiniz.</div>
+  </div>
+  <div class="card" style="margin-bottom:10px">
+    <div style="font-weight:700;margin-bottom:6px;color:var(--txt)">🏦 Hesaplar arası transfer nasıl yapılır?</div>
+    <div style="font-size:.84rem;color:var(--txt2);line-height:1.7">İşlem Ekle sayfasında ↔️ Transfer sekmesini seçin, kaynak ve hedef hesabı belirleyin. Transfer, her iki hesabın bakiyesini otomatik günceller.</div>
+  </div>
+  <div class="card" style="margin-bottom:10px">
+    <div style="font-weight:700;margin-bottom:6px;color:var(--txt)">📂 Banka CSV'sini nasıl aktarırım?</div>
+    <div style="font-size:.84rem;color:var(--txt2);line-height:1.7">Bankanızın mobil uygulamasından "Hesap Hareketleri → Dışa Aktar → CSV" seçin. Garanti, İşbank, Akbank, YKB formatları desteklenir. İçe Aktar sayfasında dosyayı sürükle-bırak yapın, önizlemede kategorileri düzenleyin, onaylayın.</div>
+  </div>
+  <div class="card" style="margin-bottom:10px">
+    <div style="font-weight:700;margin-bottom:6px;color:var(--txt)">🤖 Telegram botu nasıl bağlanır?</div>
+    <div style="font-size:.84rem;color:var(--txt2);line-height:1.7">Ayarlar → Telegram Botu bölümünden bağlantı kodu alın. Telegram'da @KirpiNakitBot'u bulup <code style="background:var(--bg3);padding:2px 5px;border-radius:4px">/link KOD</code> gönderin. Artık mesajla işlem girebilirsiniz: "100 tl kahve" yazmak yeterli.</div>
+  </div>
+  <div class="card" style="margin-bottom:10px">
+    <div style="font-weight:700;margin-bottom:6px;color:var(--txt)">🎨 Tema nasıl değiştirilir?</div>
+    <div style="font-size:.84rem;color:var(--txt2);line-height:1.7">Ayarlar → Uygulama Teması bölümünden hazır 5 tema arasından seçin veya kendi marka/vurgu renginizi belirleyin. Seçim bu cihazda kaydedilir.</div>
+  </div>
+  <div class="card" style="margin-bottom:10px">
+    <div style="font-weight:700;margin-bottom:6px;color:var(--txt)">📱 Android APK var mı?</div>
+    <div style="font-size:.84rem;color:var(--txt2);line-height:1.7">Evet! Google Play Store'da Kirpi Finans uygulaması mevcuttur. Ayrıca bu web uygulaması PWA (Progresif Web Uygulaması) olarak telefona ana ekrana eklenebilir — uygulama gibi çalışır.</div>
+  </div>
+  <div class="card">
+    <div style="font-weight:700;margin-bottom:6px;color:var(--txt)">💬 Sorunum çözülmedi, nasıl ulaşırım?</div>
+    <div style="font-size:.84rem;color:var(--txt2);line-height:1.7">Destek için: <a href="mailto:destek@kirpifinans.com" style="color:var(--accent)">destek@kirpifinans.com</a> adresine e-posta gönderin veya Telegram'da @KirpiNakitBot üzerinden mesaj bırakın.</div>
+  </div>
 </div>
 
 <div class="page" id="page-import">
@@ -2999,6 +3224,115 @@ body{top:0!important}
 </div>
 
 <!-- ── MODALS ──────────────────────────────────────────────────── -->
+
+<!-- Kategori Ekle Modalı -->
+<div id="mod-category" class="mod-backdrop" style="display:none" onclick="if(event.target===this)closeMod('mod-category')">
+  <div class="mod-sheet">
+    <div class="mod-handle"></div>
+    <div class="mod-title">Kategori Ekle</div>
+    <div class="mod-field">
+      <div class="mod-label">Tür</div>
+      <select class="mod-input" id="cat-type-sel">
+        <option value="gider">↓ Gider</option>
+        <option value="gelir">↑ Gelir</option>
+      </select>
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Kategori Adı *</div>
+      <input type="text" class="mod-input" id="cat-name-inp" placeholder="ör. Hobi, Spor, Kırtasiye">
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">İkon Seç</div>
+      <input type="hidden" id="cat-icon-val" value="📌">
+      <div id="cat-icon-grid" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Renk</div>
+      <input type="color" id="cat-color-inp" value="#10069F" style="width:100%;height:40px;border:none;border-radius:10px;cursor:pointer;background:var(--bg3);padding:2px">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="mod-btn cancel" onclick="closeMod('mod-category')">İptal</button>
+      <button class="mod-btn primary" onclick="saveUserCat()">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Planlanmış İşlem Modalı -->
+<div id="mod-scheduled" class="mod-backdrop" style="display:none" onclick="if(event.target===this)closeMod('mod-scheduled')">
+  <div class="mod-sheet">
+    <div class="mod-handle"></div>
+    <div class="mod-title">İşlem Planla</div>
+    <div class="mod-field">
+      <div class="mod-label">Tür</div>
+      <select class="mod-input" id="sched-type-sel">
+        <option value="gider">↓ Gider</option>
+        <option value="gelir">↑ Gelir</option>
+      </select>
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Tutar (₺) *</div>
+      <input type="text" inputmode="decimal" class="mod-input" id="sched-amount-inp" placeholder="0,00">
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Tarih *</div>
+      <input type="date" class="mod-input" id="sched-date-inp">
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Kategori</div>
+      <input type="text" class="mod-input" id="sched-cat-inp" placeholder="ör. Kira, Maaş">
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Açıklama</div>
+      <input type="text" class="mod-input" id="sched-desc-inp" placeholder="İsteğe bağlı">
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="mod-btn cancel" onclick="closeMod('mod-scheduled')">İptal</button>
+      <button class="mod-btn primary" onclick="saveSched()">📅 Planla</button>
+    </div>
+  </div>
+</div>
+
+<!-- Gelir Kaynağı Ekle Modalı -->
+<div id="mod-income-source" class="mod-backdrop" style="display:none" onclick="if(event.target===this)closeMod('mod-income-source')">
+  <div class="mod-sheet">
+    <div class="mod-handle"></div>
+    <div class="mod-title">Gelir Kaynağı Ekle</div>
+    <div class="mod-field">
+      <div class="mod-label">Kaynak Adı *</div>
+      <input type="text" class="mod-input" id="is-name-inp" placeholder="ör. Akbank Maaşı, Kira Geliri">
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Tür</div>
+      <select class="mod-input" id="is-type-sel">
+        <option value="maas">💼 Maaş</option>
+        <option value="serbest">🖥️ Serbest Meslek</option>
+        <option value="kira">🏠 Kira Geliri</option>
+        <option value="yatirim">📈 Yatırım Geliri</option>
+        <option value="emekli">🏅 Emekli Maaşı</option>
+        <option value="diger">📌 Diğer</option>
+      </select>
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Tutar (₺) *</div>
+      <input type="text" inputmode="decimal" class="mod-input" id="is-amount-inp" placeholder="0,00">
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Sıklık</div>
+      <select class="mod-input" id="is-freq-sel">
+        <option value="haftalik">Haftalık</option>
+        <option value="iki_haftada">2 Haftada Bir</option>
+        <option value="aylik" selected>Aylık</option>
+        <option value="uc_aylik">3 Aylık</option>
+        <option value="yillik">Yıllık</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="mod-btn cancel" onclick="closeMod('mod-income-source')">İptal</button>
+      <button class="mod-btn primary" onclick="saveIncomeSource()">💰 Kaydet</button>
+    </div>
+  </div>
+</div>
+
 <!-- Şablon Ekle Modalı -->
 <div id="mod-tpl" class="mod-backdrop" style="display:none" onclick="if(event.target===this)closeMod('mod-tpl')">
   <div class="mod-sheet">
@@ -3770,6 +4104,10 @@ function goPage(id, el){
     if(id==='templates') initTemplatesPage();
     if(id==='projects') initProjectsPage();
     if(id==='cardreport') loadCardReport();
+    if(id==='categories') initCategoriesPage();
+    if(id==='tags') initTagsPage();
+    if(id==='scheduled') initScheduledPage();
+    if(id==='income-sources') initIncomeSourcesPage();
   }
 
   if(prev){
@@ -7651,6 +7989,321 @@ function delProj(id){
   if(!confirm('Bu proje silinsin mi? (İşlemler etkilenmez)')) return;
   xhr('/api/projects/'+id, null, function(r){
     if(r&&r.ok){ toast('Silindi'); loadProjList(); }
+  }, false, true);
+}
+
+// ── KATEGORİLER ──────────────────────────────────────────────────────────────
+var _catTab = 'gider';
+var _defaultCats = {
+  gelir: ['Maaş','Serbest Meslek','Kira Geliri','Yatırım Geliri / Satış','Yatırım / Temettü','Hediye / İkramiye','Diğer Gelir'],
+  gider: ['Kira / Mortgage','Market / Gıda','Faturalar','Ulaşım','Yemek / Restoran','Eğlence','Sağlık','Giyim','Eğitim','Abonelikler','Elektronik','Sigorta','Vergi / Harç','Diğer Gider']
+};
+
+function initCategoriesPage(){ setCatTab('gider'); }
+
+function setCatTab(tab){
+  _catTab = tab;
+  var tg = document.getElementById('cat-tab-gider');
+  var tgl = document.getElementById('cat-tab-gelir');
+  var lbl = document.getElementById('cat-section-lbl');
+  if(tg) tg.style.cssText = tab==='gider' ? 'flex:1;background:#d5fd73;color:#07091f;border:none' : 'flex:1;background:transparent;border:1px solid var(--border2);color:var(--txt)';
+  if(tgl) tgl.style.cssText = tab==='gelir' ? 'flex:1;background:#d5fd73;color:#07091f;border:none' : 'flex:1;background:transparent;border:1px solid var(--border2);color:var(--txt)';
+  if(lbl) lbl.textContent = (tab==='gider' ? 'Varsayılan Gider' : 'Varsayılan Gelir') + ' Kategorileri';
+  var dl = document.getElementById('cat-default-list');
+  if(dl){
+    var cats = _defaultCats[tab] || [];
+    dl.innerHTML = cats.map(function(c){
+      return '<span style="background:var(--bg3);border:1px solid var(--border2);border-radius:20px;padding:5px 12px;font-size:.78rem;color:var(--txt2)">'+c+'</span>';
+    }).join('');
+  }
+  loadCustomCats();
+}
+
+function loadCustomCats(){
+  xhr('/api/user-categories', null, function(items){
+    var el = document.getElementById('cat-custom-list');
+    if(!el) return;
+    var filtered = (items||[]).filter(function(c){ return c.type===_catTab; });
+    if(!filtered.length){
+      el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--txt2);font-size:.84rem">Henüz özel kategori eklenmedi</div>';
+      return;
+    }
+    el.innerHTML = filtered.map(function(c){
+      return '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:8px">'
+        +'<span style="font-size:1.3rem">'+c.icon+'</span>'
+        +'<div style="flex:1">'
+          +'<div style="font-size:.9rem;font-weight:600;color:var(--txt)">'+c.name+'</div>'
+          +'<div style="font-size:.72rem;color:var(--txt2);margin-top:1px">'+(c.type==='gelir'?'↑ Gelir':'↓ Gider')+'</div>'
+        +'</div>'
+        +'<div style="width:16px;height:16px;border-radius:50%;background:'+c.color+';flex-shrink:0"></div>'
+        +'<button onclick="delUserCat('+c.id+')" style="background:none;border:none;color:var(--txt2);cursor:pointer;font-size:1rem;padding:4px">✕</button>'
+      +'</div>';
+    }).join('');
+  });
+}
+
+var _CAT_ICONS = ['📌','🏠','🍕','🚗','💊','📚','🎮','✈️','💼','🎁','⚡','📱','🏥','🛒','💰','🎵','🏋️','🐾','👕','🏦','💡','🔧','🎓','📊'];
+
+function openCatModal(){
+  var icons = _CAT_ICONS.map(function(i){
+    return '<button type="button" onclick="this.parentElement.querySelectorAll(\'button\').forEach(function(b){b.style.background=\'var(--bg3)\'});this.style.background=\'var(--accent)\';document.getElementById(\'cat-icon-val\').value=this.textContent" '
+      +'style="font-size:1.2rem;padding:6px 8px;border:none;border-radius:8px;cursor:pointer;background:var(--bg3)">'+i+'</button>';
+  }).join('');
+  openMod('mod-category');
+  document.getElementById('cat-icon-val').value='📌';
+  document.getElementById('cat-name-inp').value='';
+  document.getElementById('cat-color-inp').value='#10069F';
+  document.getElementById('cat-type-sel').value=_catTab;
+  var igrid = document.getElementById('cat-icon-grid');
+  if(igrid) igrid.innerHTML = icons;
+}
+
+function saveUserCat(){
+  var name  = (document.getElementById('cat-name-inp').value||'').trim();
+  var icon  = document.getElementById('cat-icon-val').value||'📌';
+  var color = document.getElementById('cat-color-inp').value||'#10069F';
+  var type  = document.getElementById('cat-type-sel').value||'gider';
+  if(!name){ toast('Ad zorunlu'); return; }
+  xhr('/api/user-categories', {name:name,icon:icon,color:color,type:type}, function(r){
+    if(r&&r.ok){ closeMod('mod-category'); toast('Kategori eklendi ✓'); loadCustomCats(); }
+  }, false, false, 'POST');
+}
+
+function delUserCat(id){
+  if(!confirm('Bu kategori silinsin mi?')) return;
+  xhr('/api/user-categories/'+id, null, function(r){
+    if(r&&r.ok){ toast('Silindi'); loadCustomCats(); }
+  }, false, true);
+}
+
+// ── ETİKETLER ─────────────────────────────────────────────────────────────────
+var _activeTag = null;
+
+function initTagsPage(){
+  _activeTag = null;
+  xhr('/api/tags', null, function(tags){
+    var el = document.getElementById('tags-list');
+    var empty = document.getElementById('tags-empty');
+    if(!tags||!tags.length){
+      if(el) el.innerHTML='';
+      if(empty) empty.style.display='';
+      return;
+    }
+    if(empty) empty.style.display='none';
+    if(!el) return;
+    el.innerHTML = tags.map(function(t){
+      return '<div class="tappable" onclick="filterByTag(\''+t.replace(/'/g,"\\'")+'\')" '
+        +'style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--bg2);border:1.5px solid var(--border2);border-radius:22px;cursor:pointer;font-size:.84rem;font-weight:600;color:var(--txt);transition:.15s">'
+        +'<span style="color:var(--accent);font-size:.7rem">🏷️</span>'+t
+        +'</div>';
+    }).join('');
+  });
+}
+
+function filterByTag(tag){
+  _activeTag = tag;
+  var sec = document.getElementById('tags-tx-section');
+  var title = document.getElementById('tags-tx-title');
+  if(sec) sec.style.display='';
+  if(title) title.textContent = '🏷️ "'+tag+'" Etiketli İşlemler';
+  xhr('/api/transactions?tags='+encodeURIComponent(tag), null, function(items){
+    var el = document.getElementById('tags-tx-list');
+    if(!el) return;
+    var list = (items||[]).filter(function(tx){ return tx.tags && tx.tags.split(',').map(function(s){return s.trim();}).indexOf(tag)>=0; });
+    if(!list.length){ el.innerHTML='<div style="text-align:center;padding:20px;color:var(--txt2)">Bu etiketle işlem bulunamadı</div>'; return; }
+    el.innerHTML = list.map(function(tx){
+      var sign = tx.type==='gelir'?'+':'-';
+      var col  = tx.type==='gelir'?'var(--g)':'var(--r)';
+      return '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:8px">'
+        +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:.88rem;font-weight:600;color:var(--txt)">'+tx.category+'</div>'
+          +'<div style="font-size:.75rem;color:var(--txt2);margin-top:2px">'+tx.date+(tx.description?' · '+tx.description:'')+'</div>'
+        +'</div>'
+        +'<div style="font-size:.95rem;font-weight:800;color:'+col+'">'+sign+fmt(tx.amount)+'</div>'
+      +'</div>';
+    }).join('');
+  });
+}
+
+function clearTagFilter(){
+  _activeTag = null;
+  var sec = document.getElementById('tags-tx-section');
+  if(sec) sec.style.display='none';
+}
+
+// ── PLANLANMIŞ İŞLEMLER ───────────────────────────────────────────────────────
+var _schedTab = 'bekliyor';
+
+function initScheduledPage(){ setSchedTab('bekliyor'); }
+
+function setSchedTab(tab){
+  _schedTab = tab;
+  var tabs = {bekliyor:'sched-tab-bekliyor', yapildi:'sched-tab-yapildi', all:'sched-tab-all'};
+  Object.keys(tabs).forEach(function(k){
+    var btn = document.getElementById(tabs[k]);
+    if(!btn) return;
+    btn.style.cssText = k===tab ? 'flex:1;background:#d5fd73;color:#07091f;border:none' : 'flex:1;background:transparent;border:1px solid var(--border2);color:var(--txt)';
+  });
+  loadSchedList();
+}
+
+function loadSchedList(){
+  var url = '/api/scheduled' + (_schedTab==='all' ? '?status=all' : '?status='+_schedTab);
+  xhr(url, null, function(items){
+    var el = document.getElementById('sched-list');
+    if(!el) return;
+    if(!items||!items.length){
+      el.innerHTML='<div style="text-align:center;padding:28px 16px;color:var(--txt2);font-size:.85rem">📅 '
+        +(_schedTab==='bekliyor'?'Bekleyen planlanmış işlem yok':_schedTab==='yapildi'?'Yapılmış işlem yok':'Planlanmış işlem yok')+'</div>';
+      return;
+    }
+    el.innerHTML = items.map(function(s){
+      var isGelir = s.type==='gelir';
+      var isPending = s.status==='bekliyor';
+      var today = new Date().toISOString().slice(0,10);
+      var isOverdue = isPending && s.scheduled_date < today;
+      var dateColor = isOverdue ? 'var(--r)' : isPending ? 'var(--y)' : 'var(--txt2)';
+      return '<div style="background:var(--bg2);border:1px solid '+(isOverdue?'rgba(246,70,93,.3)':'var(--border)')+';border-radius:14px;padding:14px;margin-bottom:10px">'
+        +'<div style="display:flex;align-items:flex-start;gap:12px">'
+          +'<div style="width:36px;height:36px;border-radius:10px;background:'+(isGelir?'rgba(213,253,115,.12)':'rgba(246,70,93,.12)')+';display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">'+(isGelir?'📈':'📉')+'</div>'
+          +'<div style="flex:1;min-width:0">'
+            +'<div style="font-size:.92rem;font-weight:700;color:var(--txt)">'+s.category+(s.description?' <span style="font-weight:400;color:var(--txt2)">· '+s.description+'</span>':'')+'</div>'
+            +'<div style="font-size:.75rem;margin-top:3px;color:'+dateColor+'">📅 '+s.scheduled_date+(isOverdue?' · Gecikmiş!':'')+(s.account_name?' · '+s.account_name:'')+'</div>'
+          +'</div>'
+          +'<div style="text-align:right;flex-shrink:0">'
+            +'<div style="font-size:1rem;font-weight:800;color:'+(isGelir?'var(--g)':'var(--r)')+'">'+(isGelir?'+':'-')+fmt(s.amount)+'</div>'
+            +(isPending?'<button onclick="execSched('+s.id+')" style="margin-top:6px;background:#d5fd73;color:#07091f;border:none;border-radius:8px;padding:4px 10px;font-size:.72rem;font-weight:700;cursor:pointer" class="tappable">▶ Uygula</button>':'<span style="font-size:.7rem;color:var(--g)">✓ Yapıldı</span>')
+          +'</div>'
+        +'</div>'
+        +'<button onclick="delSched('+s.id+')" style="background:none;border:none;color:var(--txt2);font-size:.75rem;cursor:pointer;margin-top:8px;padding:0">✕ Sil</button>'
+      +'</div>';
+    }).join('');
+  });
+}
+
+function openSchedModal(){
+  var today = new Date().toISOString().slice(0,10);
+  document.getElementById('sched-date-inp').value = today;
+  document.getElementById('sched-amount-inp').value = '';
+  document.getElementById('sched-cat-inp').value = '';
+  document.getElementById('sched-desc-inp').value = '';
+  document.getElementById('sched-type-sel').value = 'gider';
+  openMod('mod-scheduled');
+}
+
+function saveSched(){
+  var type   = document.getElementById('sched-type-sel').value;
+  var amount = parseFloat((document.getElementById('sched-amount-inp').value||'0').replace(',','.'));
+  var cat    = (document.getElementById('sched-cat-inp').value||'').trim();
+  var desc   = (document.getElementById('sched-desc-inp').value||'').trim();
+  var sdate  = document.getElementById('sched-date-inp').value;
+  if(!sdate||!amount){ toast('Tarih ve tutar zorunlu'); return; }
+  xhr('/api/scheduled', {type:type,amount:amount,category:cat,description:desc,scheduled_date:sdate}, function(r){
+    if(r&&r.ok){ closeMod('mod-scheduled'); toast('Planlandı ✓'); loadSchedList(); }
+  }, false, false, 'POST');
+}
+
+function execSched(id){
+  var today = new Date().toISOString().slice(0,10);
+  if(!confirm('Bu planlanmış işlem bugün ('+today+') uygulanıp işleme dönüştürülsün mü?')) return;
+  xhr('/api/scheduled/'+id+'/execute', {date:today}, function(r){
+    if(r&&r.ok){ toast('İşlem eklendi ✓'); loadSchedList(); }
+  }, false, false, 'POST');
+}
+
+function delSched(id){
+  xhr('/api/scheduled/'+id, null, function(r){
+    if(r&&r.ok){ toast('Silindi'); loadSchedList(); }
+  }, false, true);
+}
+
+// ── GELİR KAYNAKLARI ──────────────────────────────────────────────────────────
+var _IS_TYPES = {maas:'💼 Maaş',serbest:'🖥️ Serbest Meslek',kira:'🏠 Kira Geliri',yatirim:'📈 Yatırım',emekli:'🏅 Emekli Maaşı',diger:'📌 Diğer'};
+var _IS_FREQ  = {haftalik:'Haftalık',iki_haftada:'2 Haftada Bir',aylik:'Aylık',uc_aylik:'3 Aylık',yillik:'Yıllık'};
+
+function initIncomeSourcesPage(){ loadIncomeSources(); }
+
+function loadIncomeSources(){
+  xhr('/api/income-sources', null, function(items){
+    var el    = document.getElementById('income-source-list');
+    var sumEl = document.getElementById('income-source-summary');
+    if(!el) return;
+    if(!items||!items.length){
+      el.innerHTML='<div style="text-align:center;padding:28px 16px;color:var(--txt2)">💰 Henüz gelir kaynağı eklenmedi</div>';
+      if(sumEl) sumEl.innerHTML='';
+      return;
+    }
+    var active = items.filter(function(s){return s.is_active;});
+    var totalMonth = active.reduce(function(sum,s){
+      var m = s.amount;
+      if(s.frequency==='haftalik') m*=4.33;
+      else if(s.frequency==='iki_haftada') m*=2.17;
+      else if(s.frequency==='uc_aylik') m/=3;
+      else if(s.frequency==='yillik') m/=12;
+      return sum+m;
+    },0);
+    var totalYear = totalMonth * 12;
+    if(sumEl){
+      sumEl.innerHTML = [
+        ['💰','Aylık Beklenen',fmt(totalMonth),'var(--g)'],
+        ['📅','Yıllık Beklenen',fmt(totalYear),'var(--b)'],
+        ['✅','Aktif Kaynak',active.length+' adet','var(--accent)']
+      ].map(function(s){
+        return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center">'
+          +'<div style="font-size:1.2rem;margin-bottom:4px">'+s[0]+'</div>'
+          +'<div style="font-size:.68rem;color:var(--txt2);margin-bottom:3px">'+s[1]+'</div>'
+          +'<div style="font-size:.95rem;font-weight:800;color:'+s[3]+'">'+s[2]+'</div>'
+        +'</div>';
+      }).join('');
+    }
+    el.innerHTML = items.map(function(s){
+      var typeLabel = _IS_TYPES[s.type]||s.type;
+      var freqLabel = _IS_FREQ[s.frequency]||s.frequency;
+      return '<div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--bg2);border:1px solid '+(s.is_active?'var(--border)':'var(--border2)')+';border-radius:14px;margin-bottom:10px;opacity:'+(s.is_active?'1':'.5')+'">'
+        +'<div style="font-size:1.4rem">'+typeLabel.split(' ')[0]+'</div>'
+        +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:.92rem;font-weight:700;color:var(--txt)">'+s.name+'</div>'
+          +'<div style="font-size:.75rem;color:var(--txt2);margin-top:2px">'+typeLabel.slice(typeLabel.indexOf(' ')+1)+' · '+freqLabel+'</div>'
+        +'</div>'
+        +'<div style="text-align:right">'
+          +'<div style="font-size:1rem;font-weight:800;color:var(--g)">'+fmt(s.amount)+'</div>'
+          +'<button onclick="toggleIncomeSource('+s.id+','+(s.is_active?0:1)+')" style="background:none;border:none;font-size:.7rem;color:var(--txt2);cursor:pointer;margin-top:3px">'+(s.is_active?'⏸ Duraklat':'▶ Aktif Et')+'</button>'
+        +'</div>'
+        +'<button onclick="delIncomeSource('+s.id+')" style="background:none;border:none;color:var(--txt2);cursor:pointer;font-size:1rem;padding:4px 8px">✕</button>'
+      +'</div>';
+    }).join('');
+  });
+}
+
+function openIncomeSourceModal(){
+  document.getElementById('is-name-inp').value='';
+  document.getElementById('is-amount-inp').value='';
+  document.getElementById('is-type-sel').value='maas';
+  document.getElementById('is-freq-sel').value='aylik';
+  openMod('mod-income-source');
+}
+
+function saveIncomeSource(){
+  var name   = (document.getElementById('is-name-inp').value||'').trim();
+  var amount = parseFloat((document.getElementById('is-amount-inp').value||'0').replace(',','.'));
+  var itype  = document.getElementById('is-type-sel').value;
+  var freq   = document.getElementById('is-freq-sel').value;
+  if(!name||!amount){ toast('Ad ve tutar zorunlu'); return; }
+  xhr('/api/income-sources', {name:name,amount:amount,type:itype,frequency:freq}, function(r){
+    if(r&&r.ok){ closeMod('mod-income-source'); toast('Kaynak eklendi ✓'); loadIncomeSources(); }
+  }, false, false, 'POST');
+}
+
+function toggleIncomeSource(id, val){
+  xhr('/api/income-sources/'+id, {is_active:val}, function(r){
+    if(r&&r.ok){ loadIncomeSources(); }
+  }, false, false, 'PUT');
+}
+
+function delIncomeSource(id){
+  if(!confirm('Bu gelir kaynağı silinsin mi?')) return;
+  xhr('/api/income-sources/'+id, null, function(r){
+    if(r&&r.ok){ toast('Silindi'); loadIncomeSources(); }
   }, false, true);
 }
 

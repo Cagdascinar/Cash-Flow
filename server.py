@@ -478,6 +478,40 @@ def init_db():
             budget      DOUBLE PRECISION NOT NULL DEFAULT 0,
             created_at  TEXT NOT NULL
         )""",
+        """CREATE TABLE IF NOT EXISTS user_categories (
+            id          SERIAL PRIMARY KEY,
+            user_id     INTEGER NOT NULL,
+            profile_id  INTEGER NOT NULL DEFAULT 1,
+            type        TEXT NOT NULL DEFAULT 'gider',
+            name        TEXT NOT NULL,
+            icon        TEXT NOT NULL DEFAULT '📌',
+            color       TEXT NOT NULL DEFAULT '#10069F',
+            created_at  TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS scheduled_transactions (
+            id          SERIAL PRIMARY KEY,
+            user_id     INTEGER NOT NULL,
+            profile_id  INTEGER NOT NULL DEFAULT 1,
+            type        TEXT NOT NULL DEFAULT 'gider',
+            amount      DOUBLE PRECISION NOT NULL DEFAULT 0,
+            category    TEXT NOT NULL DEFAULT '',
+            description TEXT NOT NULL DEFAULT '',
+            account_id  INTEGER DEFAULT NULL,
+            scheduled_date TEXT NOT NULL,
+            status      TEXT NOT NULL DEFAULT 'bekliyor',
+            created_at  TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS income_sources (
+            id          SERIAL PRIMARY KEY,
+            user_id     INTEGER NOT NULL,
+            profile_id  INTEGER NOT NULL DEFAULT 1,
+            name        TEXT NOT NULL,
+            type        TEXT NOT NULL DEFAULT 'maas',
+            amount      DOUBLE PRECISION NOT NULL DEFAULT 0,
+            frequency   TEXT NOT NULL DEFAULT 'aylik',
+            is_active   INTEGER NOT NULL DEFAULT 1,
+            created_at  TEXT NOT NULL
+        )""",
     ]
     migrations = [
         ("users",        "email",          "TEXT NOT NULL DEFAULT ''"),
@@ -4306,7 +4340,17 @@ def goals_analysis():
 @app.route("/api/categories")
 @login_required
 def categories():
-    return jsonify({"gelir":GELIR_CATS,"gider":GIDER_CATS,"all":ALL_CATS})
+    pid = get_pid(); db = get_db()
+    uid = session["user_id"]
+    user_cats = db.execute(
+        "SELECT type, name FROM user_categories WHERE user_id=%s AND profile_id=%s ORDER BY name",
+        (uid, pid)
+    ).fetchall()
+    extra_gelir = [r["name"] for r in user_cats if r["type"] == "gelir"]
+    extra_gider = [r["name"] for r in user_cats if r["type"] == "gider"]
+    gelir = GELIR_CATS + extra_gelir
+    gider = GIDER_CATS + extra_gider
+    return jsonify({"gelir": gelir, "gider": gider, "all": gelir + gider})
 
 @app.route("/api/init")
 @login_required
@@ -6649,6 +6693,155 @@ def import_csv():
             errors.append(f"Satır {i+2}: {e}")
     db.commit()
     return jsonify({"ok":True,"imported":count,"errors":errors[:10]})
+
+# ── ÖZEL KATEGORİLER ─────────────────────────────────────────────────────────
+
+@app.route("/api/user-categories", methods=["GET"])
+@login_required
+def list_user_categories():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    rows = db.execute(
+        "SELECT * FROM user_categories WHERE user_id=%s AND profile_id=%s ORDER BY type, name",
+        (uid, pid)
+    ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/user-categories", methods=["POST"])
+@login_required
+def add_user_category():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    d = request.json or {}
+    name  = (d.get("name") or "").strip()
+    ctype = d.get("type","gider")
+    icon  = d.get("icon","📌")
+    color = d.get("color","#10069F")
+    if not name: return jsonify({"ok":False,"error":"Ad zorunlu"}), 400
+    cur = db.execute(
+        "INSERT INTO user_categories (user_id,profile_id,type,name,icon,color,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+        (uid, pid, ctype, name, icon, color, datetime.now().isoformat())
+    )
+    db.commit()
+    return jsonify({"ok":True,"id":cur.fetchone()["id"]})
+
+@app.route("/api/user-categories/<int:cid>", methods=["DELETE"])
+@login_required
+def del_user_category(cid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    db.execute("DELETE FROM user_categories WHERE id=%s AND user_id=%s AND profile_id=%s", (cid,uid,pid))
+    db.commit()
+    return jsonify({"ok":True})
+
+# ── PLANLANMIŞ İŞLEMLER ───────────────────────────────────────────────────────
+
+@app.route("/api/scheduled", methods=["GET"])
+@login_required
+def list_scheduled():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    status = request.args.get("status","bekliyor")
+    if status == "all":
+        rows = db.execute(
+            "SELECT s.*, a.name as account_name FROM scheduled_transactions s LEFT JOIN accounts a ON a.id=s.account_id WHERE s.user_id=%s AND s.profile_id=%s ORDER BY s.scheduled_date",
+            (uid, pid)
+        ).fetchall()
+    else:
+        rows = db.execute(
+            "SELECT s.*, a.name as account_name FROM scheduled_transactions s LEFT JOIN accounts a ON a.id=s.account_id WHERE s.user_id=%s AND s.profile_id=%s AND s.status=%s ORDER BY s.scheduled_date",
+            (uid, pid, status)
+        ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/scheduled", methods=["POST"])
+@login_required
+def add_scheduled():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    d = request.json or {}
+    stype  = d.get("type","gider")
+    amount = float(d.get("amount",0))
+    cat    = (d.get("category") or "").strip()
+    desc   = (d.get("description") or "").strip()
+    acc_id = d.get("account_id") or None
+    sdate  = (d.get("scheduled_date") or "").strip()
+    if not sdate: return jsonify({"ok":False,"error":"Tarih zorunlu"}), 400
+    cur = db.execute(
+        "INSERT INTO scheduled_transactions (user_id,profile_id,type,amount,category,description,account_id,scheduled_date,status,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'bekliyor',%s) RETURNING id",
+        (uid, pid, stype, amount, cat, desc, acc_id, sdate, datetime.now().isoformat())
+    )
+    db.commit()
+    return jsonify({"ok":True,"id":cur.fetchone()["id"]})
+
+@app.route("/api/scheduled/<int:sid>", methods=["DELETE"])
+@login_required
+def del_scheduled(sid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    db.execute("DELETE FROM scheduled_transactions WHERE id=%s AND user_id=%s AND profile_id=%s", (sid,uid,pid))
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/scheduled/<int:sid>/execute", methods=["POST"])
+@login_required
+def execute_scheduled(sid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    s = db.execute("SELECT * FROM scheduled_transactions WHERE id=%s AND user_id=%s AND profile_id=%s", (sid,uid,pid)).fetchone()
+    if not s: return jsonify({"ok":False,"error":"Bulunamadı"}), 404
+    d = request.json or {}
+    tx_date = d.get("date") or s["scheduled_date"]
+    cur = db.execute(
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+        (uid, pid, s["type"], s["amount"], s["category"], s["description"], tx_date, s["account_id"], datetime.now().isoformat())
+    )
+    tx_id = cur.fetchone()["id"]
+    db.execute("UPDATE scheduled_transactions SET status='yapildi' WHERE id=%s", (sid,))
+    db.commit()
+    return jsonify({"ok":True,"tx_id":tx_id})
+
+# ── GELİR KAYNAKLARI ─────────────────────────────────────────────────────────
+
+@app.route("/api/income-sources", methods=["GET"])
+@login_required
+def list_income_sources():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    rows = db.execute(
+        "SELECT * FROM income_sources WHERE user_id=%s AND profile_id=%s ORDER BY is_active DESC, name",
+        (uid, pid)
+    ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/income-sources", methods=["POST"])
+@login_required
+def add_income_source():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    d = request.json or {}
+    name      = (d.get("name") or "").strip()
+    itype     = d.get("type","maas")
+    amount    = float(d.get("amount",0))
+    frequency = d.get("frequency","aylik")
+    if not name: return jsonify({"ok":False,"error":"Ad zorunlu"}), 400
+    cur = db.execute(
+        "INSERT INTO income_sources (user_id,profile_id,name,type,amount,frequency,is_active,created_at) VALUES (%s,%s,%s,%s,%s,%s,1,%s) RETURNING id",
+        (uid, pid, name, itype, amount, frequency, datetime.now().isoformat())
+    )
+    db.commit()
+    return jsonify({"ok":True,"id":cur.fetchone()["id"]})
+
+@app.route("/api/income-sources/<int:iid>", methods=["PUT"])
+@login_required
+def update_income_source(iid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    d = request.json or {}
+    db.execute(
+        "UPDATE income_sources SET name=%s,type=%s,amount=%s,frequency=%s,is_active=%s WHERE id=%s AND user_id=%s AND profile_id=%s",
+        (d.get("name"), d.get("type"), float(d.get("amount",0)), d.get("frequency"), int(d.get("is_active",1)), iid, uid, pid)
+    )
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/income-sources/<int:iid>", methods=["DELETE"])
+@login_required
+def del_income_source(iid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    db.execute("DELETE FROM income_sources WHERE id=%s AND user_id=%s AND profile_id=%s", (iid,uid,pid))
+    db.commit()
+    return jsonify({"ok":True})
 
 if __name__ == "__main__":
     init_db()
