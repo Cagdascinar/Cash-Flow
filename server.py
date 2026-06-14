@@ -513,6 +513,88 @@ def init_db():
             is_active   INTEGER NOT NULL DEFAULT 1,
             created_at  TEXT NOT NULL
         )""",
+        # ── ŞİRKET: Müşteri & Alacak Takibi ──────────────────────────────────
+        """CREATE TABLE IF NOT EXISTS customers (
+            id              SERIAL PRIMARY KEY,
+            user_id         INTEGER NOT NULL,
+            profile_id      INTEGER NOT NULL DEFAULT 1,
+            name            TEXT NOT NULL,
+            contact_name    TEXT NOT NULL DEFAULT '',
+            phone           TEXT NOT NULL DEFAULT '',
+            email           TEXT NOT NULL DEFAULT '',
+            tax_id          TEXT NOT NULL DEFAULT '',
+            address         TEXT NOT NULL DEFAULT '',
+            credit_limit    DOUBLE PRECISION NOT NULL DEFAULT 0,
+            notes           TEXT NOT NULL DEFAULT '',
+            created_at      TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS customer_invoices (
+            id              SERIAL PRIMARY KEY,
+            user_id         INTEGER NOT NULL,
+            profile_id      INTEGER NOT NULL DEFAULT 1,
+            customer_id     INTEGER NOT NULL DEFAULT 0,
+            customer_name   TEXT NOT NULL DEFAULT '',
+            invoice_no      TEXT NOT NULL DEFAULT '',
+            invoice_date    TEXT NOT NULL,
+            due_date        TEXT NOT NULL DEFAULT '',
+            amount          DOUBLE PRECISION NOT NULL DEFAULT 0,
+            kdv_rate        DOUBLE PRECISION NOT NULL DEFAULT 20,
+            kdv_amount      DOUBLE PRECISION NOT NULL DEFAULT 0,
+            total_amount    DOUBLE PRECISION NOT NULL DEFAULT 0,
+            paid_amount     DOUBLE PRECISION NOT NULL DEFAULT 0,
+            status          TEXT NOT NULL DEFAULT 'bekliyor',
+            description     TEXT NOT NULL DEFAULT '',
+            created_at      TEXT NOT NULL
+        )""",
+        # ── ŞİRKET: Çalışan & Bordro ──────────────────────────────────────────
+        """CREATE TABLE IF NOT EXISTS employees (
+            id              SERIAL PRIMARY KEY,
+            user_id         INTEGER NOT NULL,
+            profile_id      INTEGER NOT NULL DEFAULT 1,
+            name            TEXT NOT NULL,
+            title           TEXT NOT NULL DEFAULT '',
+            department      TEXT NOT NULL DEFAULT '',
+            tc_no           TEXT NOT NULL DEFAULT '',
+            start_date      TEXT NOT NULL DEFAULT '',
+            gross_salary    DOUBLE PRECISION NOT NULL DEFAULT 0,
+            employment_type TEXT NOT NULL DEFAULT 'tam',
+            is_active       INTEGER NOT NULL DEFAULT 1,
+            notes           TEXT NOT NULL DEFAULT '',
+            created_at      TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS payroll (
+            id              SERIAL PRIMARY KEY,
+            user_id         INTEGER NOT NULL,
+            profile_id      INTEGER NOT NULL DEFAULT 1,
+            employee_id     INTEGER NOT NULL,
+            employee_name   TEXT NOT NULL DEFAULT '',
+            period          TEXT NOT NULL,
+            gross_salary    DOUBLE PRECISION NOT NULL DEFAULT 0,
+            sgk_employee    DOUBLE PRECISION NOT NULL DEFAULT 0,
+            income_tax      DOUBLE PRECISION NOT NULL DEFAULT 0,
+            net_salary      DOUBLE PRECISION NOT NULL DEFAULT 0,
+            sgk_employer    DOUBLE PRECISION NOT NULL DEFAULT 0,
+            total_cost      DOUBLE PRECISION NOT NULL DEFAULT 0,
+            paid            INTEGER NOT NULL DEFAULT 0,
+            paid_date       TEXT NOT NULL DEFAULT '',
+            notes           TEXT NOT NULL DEFAULT '',
+            created_at      TEXT NOT NULL
+        )""",
+        # ── ŞİRKET: KDV Takibi ────────────────────────────────────────────────
+        """CREATE TABLE IF NOT EXISTS kdv_records (
+            id              SERIAL PRIMARY KEY,
+            user_id         INTEGER NOT NULL,
+            profile_id      INTEGER NOT NULL DEFAULT 1,
+            period          TEXT NOT NULL,
+            kdv_type        TEXT NOT NULL DEFAULT 'tahsil',
+            source_type     TEXT NOT NULL DEFAULT 'fatura',
+            source_id       INTEGER DEFAULT NULL,
+            amount_base     DOUBLE PRECISION NOT NULL DEFAULT 0,
+            kdv_rate        DOUBLE PRECISION NOT NULL DEFAULT 20,
+            kdv_amount      DOUBLE PRECISION NOT NULL DEFAULT 0,
+            description     TEXT NOT NULL DEFAULT '',
+            created_at      TEXT NOT NULL
+        )""",
     ]
     migrations = [
         ("users",        "email",          "TEXT NOT NULL DEFAULT ''"),
@@ -6887,6 +6969,461 @@ def del_income_source(iid):
     db.execute("DELETE FROM income_sources WHERE id=%s AND user_id=%s AND profile_id=%s", (iid,uid,pid))
     db.commit()
     return jsonify({"ok":True})
+
+# ── MÜŞTERİ & ALACAK TAKİBİ ─────────────────────────────────────────────────
+
+@app.route("/api/customers", methods=["GET"])
+@login_required
+def list_customers():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    rows = db.execute(
+        "SELECT * FROM customers WHERE user_id=%s AND profile_id=%s ORDER BY name", (uid,pid)
+    ).fetchall()
+    return jsonify([row_to_dict(r) for r in rows])
+
+@app.route("/api/customers", methods=["POST"])
+@login_required
+def add_customer():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    d = request.get_json(force=True)
+    if not d.get("name","").strip():
+        return jsonify({"ok":False,"error":"Ad zorunlu"}), 400
+    db.execute(
+        """INSERT INTO customers (user_id,profile_id,name,contact_name,phone,email,tax_id,address,credit_limit,notes,created_at)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+        (uid,pid,d["name"].strip(),d.get("contact_name",""),d.get("phone",""),
+         d.get("email",""),d.get("tax_id",""),d.get("address",""),
+         float(d.get("credit_limit",0)),d.get("notes",""),today_str())
+    )
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/customers/<int:cid>", methods=["PUT"])
+@login_required
+def update_customer(cid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    d = request.get_json(force=True)
+    db.execute(
+        """UPDATE customers SET name=%s,contact_name=%s,phone=%s,email=%s,
+           tax_id=%s,address=%s,credit_limit=%s,notes=%s
+           WHERE id=%s AND user_id=%s AND profile_id=%s""",
+        (d.get("name",""),d.get("contact_name",""),d.get("phone",""),d.get("email",""),
+         d.get("tax_id",""),d.get("address",""),float(d.get("credit_limit",0)),
+         d.get("notes",""),cid,uid,pid)
+    )
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/customers/<int:cid>", methods=["DELETE"])
+@login_required
+def del_customer(cid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    db.execute("DELETE FROM customers WHERE id=%s AND user_id=%s AND profile_id=%s",(cid,uid,pid))
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/customer-invoices", methods=["GET"])
+@login_required
+def list_customer_invoices():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    status = request.args.get("status","")
+    cid    = request.args.get("customer_id","")
+    q      = "SELECT * FROM customer_invoices WHERE user_id=%s AND profile_id=%s"
+    args   = [uid, pid]
+    if status: q += " AND status=%s"; args.append(status)
+    if cid:    q += " AND customer_id=%s"; args.append(int(cid))
+    q += " ORDER BY invoice_date DESC"
+    rows = db.execute(q, args).fetchall()
+    return jsonify([row_to_dict(r) for r in rows])
+
+@app.route("/api/customer-invoices", methods=["POST"])
+@login_required
+def add_customer_invoice():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    d = request.get_json(force=True)
+    base_amt   = float(d.get("amount", 0))
+    kdv_rate   = float(d.get("kdv_rate", 20))
+    kdv_amt    = round(base_amt * kdv_rate / 100, 2)
+    total_amt  = round(base_amt + kdv_amt, 2)
+    cust_id    = int(d.get("customer_id", 0))
+    cust_name  = d.get("customer_name","")
+    if cust_id and not cust_name:
+        row = db.execute("SELECT name FROM customers WHERE id=%s",(cust_id,)).fetchone()
+        if row: cust_name = row["name"]
+    db.execute(
+        """INSERT INTO customer_invoices
+           (user_id,profile_id,customer_id,customer_name,invoice_no,invoice_date,
+            due_date,amount,kdv_rate,kdv_amount,total_amount,paid_amount,
+            status,description,created_at)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+        (uid,pid,cust_id,cust_name,d.get("invoice_no",""),
+         d.get("invoice_date",today_str()),d.get("due_date",""),
+         base_amt,kdv_rate,kdv_amt,total_amt,
+         float(d.get("paid_amount",0)),d.get("status","bekliyor"),
+         d.get("description",""),today_str())
+    )
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/customer-invoices/<int:iid>", methods=["PUT"])
+@login_required
+def update_customer_invoice(iid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    d = request.get_json(force=True)
+    base_amt  = float(d.get("amount", 0))
+    kdv_rate  = float(d.get("kdv_rate", 20))
+    kdv_amt   = round(base_amt * kdv_rate / 100, 2)
+    total_amt = round(base_amt + kdv_amt, 2)
+    db.execute(
+        """UPDATE customer_invoices SET customer_id=%s,customer_name=%s,invoice_no=%s,
+           invoice_date=%s,due_date=%s,amount=%s,kdv_rate=%s,kdv_amount=%s,
+           total_amount=%s,paid_amount=%s,status=%s,description=%s
+           WHERE id=%s AND user_id=%s AND profile_id=%s""",
+        (int(d.get("customer_id",0)),d.get("customer_name",""),d.get("invoice_no",""),
+         d.get("invoice_date",today_str()),d.get("due_date",""),
+         base_amt,kdv_rate,kdv_amt,total_amt,float(d.get("paid_amount",0)),
+         d.get("status","bekliyor"),d.get("description",""),iid,uid,pid)
+    )
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/customer-invoices/<int:iid>", methods=["DELETE"])
+@login_required
+def del_customer_invoice(iid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    db.execute("DELETE FROM customer_invoices WHERE id=%s AND user_id=%s AND profile_id=%s",(iid,uid,pid))
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/customer-invoices/<int:iid>/pay", methods=["POST"])
+@login_required
+def pay_customer_invoice(iid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    d = request.get_json(force=True)
+    paid = float(d.get("paid_amount", 0))
+    inv  = db.execute("SELECT * FROM customer_invoices WHERE id=%s AND user_id=%s AND profile_id=%s",(iid,uid,pid)).fetchone()
+    if not inv: return jsonify({"ok":False,"error":"Fatura bulunamadı"}), 404
+    new_paid  = float(inv["paid_amount"]) + paid
+    new_status = "odendi" if new_paid >= float(inv["total_amount"]) else "kismi"
+    db.execute(
+        "UPDATE customer_invoices SET paid_amount=%s, status=%s WHERE id=%s",
+        (new_paid, new_status, iid)
+    )
+    db.commit()
+    return jsonify({"ok":True, "status": new_status, "paid_amount": new_paid})
+
+@app.route("/api/customer-invoices/aging", methods=["GET"])
+@login_required
+def customer_invoices_aging():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    rows = db.execute(
+        """SELECT *, (total_amount - paid_amount) AS balance, due_date
+           FROM customer_invoices
+           WHERE user_id=%s AND profile_id=%s AND status != 'odendi'
+           ORDER BY due_date""", (uid,pid)
+    ).fetchall()
+    today = datetime.now().date()
+    buckets = {"0_30": 0, "31_60": 0, "61_90": 0, "90plus": 0}
+    for r in rows:
+        try:
+            dd   = datetime.strptime(r["due_date"] or r["invoice_date"], "%Y-%m-%d").date()
+            diff = (today - dd).days
+            bal  = float(r["balance"])
+            if diff <= 30:   buckets["0_30"]   += bal
+            elif diff <= 60: buckets["31_60"]  += bal
+            elif diff <= 90: buckets["61_90"]  += bal
+            else:            buckets["90plus"] += bal
+        except Exception:
+            pass
+    return jsonify(buckets)
+
+@app.route("/api/customers/summary", methods=["GET"])
+@login_required
+def customer_summary():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    total_r = db.execute(
+        "SELECT COALESCE(SUM(total_amount),0) AS s FROM customer_invoices WHERE user_id=%s AND profile_id=%s",(uid,pid)
+    ).fetchone()
+    paid_r  = db.execute(
+        "SELECT COALESCE(SUM(paid_amount),0) AS s FROM customer_invoices WHERE user_id=%s AND profile_id=%s",(uid,pid)
+    ).fetchone()
+    count_r = db.execute(
+        "SELECT COUNT(*) AS n FROM customers WHERE user_id=%s AND profile_id=%s",(uid,pid)
+    ).fetchone()
+    total    = float(total_r["s"]) if total_r else 0
+    paid     = float(paid_r["s"])  if paid_r  else 0
+    overdue_r = db.execute(
+        """SELECT COALESCE(SUM(total_amount - paid_amount),0) AS s
+           FROM customer_invoices WHERE user_id=%s AND profile_id=%s
+           AND status != 'odendi' AND due_date < %s""", (uid,pid,today_str())
+    ).fetchone()
+    return jsonify({
+        "total_invoiced":  total,
+        "total_collected": paid,
+        "receivable":      round(total - paid, 2),
+        "overdue":         float(overdue_r["s"]) if overdue_r else 0,
+        "customer_count":  int(count_r["n"]) if count_r else 0,
+    })
+
+# ── ÇALIŞAN & BORDRO ──────────────────────────────────────────────────────────
+
+@app.route("/api/employees", methods=["GET"])
+@login_required
+def list_employees():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    rows = db.execute(
+        "SELECT * FROM employees WHERE user_id=%s AND profile_id=%s ORDER BY name",(uid,pid)
+    ).fetchall()
+    return jsonify([row_to_dict(r) for r in rows])
+
+@app.route("/api/employees", methods=["POST"])
+@login_required
+def add_employee():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    d = request.get_json(force=True)
+    if not d.get("name","").strip():
+        return jsonify({"ok":False,"error":"Ad zorunlu"}), 400
+    db.execute(
+        """INSERT INTO employees (user_id,profile_id,name,title,department,tc_no,
+           start_date,gross_salary,employment_type,is_active,notes,created_at)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+        (uid,pid,d["name"].strip(),d.get("title",""),d.get("department",""),
+         d.get("tc_no",""),d.get("start_date",""),float(d.get("gross_salary",0)),
+         d.get("employment_type","tam"),int(d.get("is_active",1)),
+         d.get("notes",""),today_str())
+    )
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/employees/<int:eid>", methods=["PUT"])
+@login_required
+def update_employee(eid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    d = request.get_json(force=True)
+    db.execute(
+        """UPDATE employees SET name=%s,title=%s,department=%s,tc_no=%s,
+           start_date=%s,gross_salary=%s,employment_type=%s,is_active=%s,notes=%s
+           WHERE id=%s AND user_id=%s AND profile_id=%s""",
+        (d.get("name",""),d.get("title",""),d.get("department",""),d.get("tc_no",""),
+         d.get("start_date",""),float(d.get("gross_salary",0)),
+         d.get("employment_type","tam"),int(d.get("is_active",1)),d.get("notes",""),
+         eid,uid,pid)
+    )
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/employees/<int:eid>", methods=["DELETE"])
+@login_required
+def del_employee(eid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    db.execute("DELETE FROM employees WHERE id=%s AND user_id=%s AND profile_id=%s",(eid,uid,pid))
+    db.commit()
+    return jsonify({"ok":True})
+
+def _calc_payroll(gross):
+    """Türk bordro hesabı (2025 parametreleri)."""
+    sgk_emp  = round(gross * 0.14, 2)   # SGK işçi: %14
+    isizlik  = round(gross * 0.01, 2)   # İşsizlik işçi: %1
+    gelir_mat = gross - sgk_emp - isizlik
+    # Gelir vergisi kümülatif hesap yerine aylık basit dilim (örnek)
+    if gelir_mat <= 110000:
+        gv = round(gelir_mat * 0.15, 2)
+    elif gelir_mat <= 230000:
+        gv = round(16500 + (gelir_mat - 110000) * 0.20, 2)
+    elif gelir_mat <= 580000:
+        gv = round(40500 + (gelir_mat - 230000) * 0.27, 2)
+    elif gelir_mat <= 3000000:
+        gv = round(135000 + (gelir_mat - 580000) * 0.35, 2)
+    else:
+        gv = round(982000 + (gelir_mat - 3000000) * 0.40, 2)
+    damga      = round(gross * 0.00759, 2)
+    net        = round(gross - sgk_emp - isizlik - gv - damga, 2)
+    sgk_emp_c  = round(gross * 0.205, 2)  # SGK işveren: %20.5
+    isizlik_c  = round(gross * 0.02, 2)   # İşsizlik işveren: %2
+    total_cost = round(gross + sgk_emp_c + isizlik_c, 2)
+    return {
+        "gross_salary": gross,
+        "sgk_employee": sgk_emp + isizlik,
+        "income_tax":   gv + damga,
+        "net_salary":   net,
+        "sgk_employer": sgk_emp_c + isizlik_c,
+        "total_cost":   total_cost,
+    }
+
+@app.route("/api/payroll/calculate", methods=["POST"])
+@login_required
+def calculate_payroll():
+    d = request.get_json(force=True)
+    gross = float(d.get("gross_salary", 0))
+    return jsonify(_calc_payroll(gross))
+
+@app.route("/api/payroll", methods=["GET"])
+@login_required
+def list_payroll():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    period = request.args.get("period","")
+    q    = "SELECT * FROM payroll WHERE user_id=%s AND profile_id=%s"
+    args = [uid, pid]
+    if period: q += " AND period=%s"; args.append(period)
+    q += " ORDER BY period DESC, employee_name"
+    rows = db.execute(q, args).fetchall()
+    return jsonify([row_to_dict(r) for r in rows])
+
+@app.route("/api/payroll", methods=["POST"])
+@login_required
+def add_payroll():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    d = request.get_json(force=True)
+    eid   = int(d.get("employee_id", 0))
+    ename = d.get("employee_name","")
+    if eid and not ename:
+        row = db.execute("SELECT name FROM employees WHERE id=%s",(eid,)).fetchone()
+        if row: ename = row["name"]
+    gross = float(d.get("gross_salary", 0))
+    calc  = _calc_payroll(gross)
+    db.execute(
+        """INSERT INTO payroll (user_id,profile_id,employee_id,employee_name,period,
+           gross_salary,sgk_employee,income_tax,net_salary,sgk_employer,total_cost,
+           paid,paid_date,notes,created_at)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+        (uid,pid,eid,ename,d.get("period",""),
+         calc["gross_salary"],calc["sgk_employee"],calc["income_tax"],
+         calc["net_salary"],calc["sgk_employer"],calc["total_cost"],
+         int(d.get("paid",0)),d.get("paid_date",""),d.get("notes",""),today_str())
+    )
+    db.commit()
+    return jsonify({"ok":True, **calc})
+
+@app.route("/api/payroll/<int:rid>", methods=["DELETE"])
+@login_required
+def del_payroll(rid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    db.execute("DELETE FROM payroll WHERE id=%s AND user_id=%s AND profile_id=%s",(rid,uid,pid))
+    db.commit()
+    return jsonify({"ok":True})
+
+@app.route("/api/payroll/<int:rid>/pay", methods=["POST"])
+@login_required
+def mark_payroll_paid(rid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    db.execute(
+        "UPDATE payroll SET paid=1, paid_date=%s WHERE id=%s AND user_id=%s AND profile_id=%s",
+        (today_str(), rid, uid, pid)
+    )
+    db.commit()
+    return jsonify({"ok":True})
+
+# ── KDV TAKİBİ ────────────────────────────────────────────────────────────────
+
+@app.route("/api/kdv/summary", methods=["GET"])
+@login_required
+def kdv_summary():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    period = request.args.get("period", datetime.now().strftime("%Y-%m"))
+    # KDV tahsil (satış faturalarından)
+    sinv = db.execute(
+        """SELECT COALESCE(SUM(kdv_amount),0) AS s
+           FROM customer_invoices WHERE user_id=%s AND profile_id=%s
+           AND substr(invoice_date,1,7)=%s""", (uid,pid,period)
+    ).fetchone()
+    # KDV ödenecek (alış faturalarından)
+    pinv = db.execute(
+        """SELECT COALESCE(SUM(kdv_amount),0) AS s
+           FROM supplier_invoices WHERE user_id=%s AND profile_id=%s
+           AND substr(invoice_date,1,7)=%s""", (uid,pid,period)
+    ).fetchone()
+    tahsil  = float(sinv["s"]) if sinv else 0
+    odenen  = float(pinv["s"]) if pinv else 0
+    return jsonify({
+        "period":       period,
+        "kdv_tahsil":   tahsil,
+        "kdv_indirilen": odenen,
+        "kdv_odenecek": max(round(tahsil - odenen, 2), 0),
+        "kdv_iadesi":   max(round(odened - tahsil, 2), 0) if (odened := odenen) else 0,
+    })
+
+@app.route("/api/kdv/records", methods=["GET"])
+@login_required
+def list_kdv_records():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    period = request.args.get("period", "")
+    q    = "SELECT * FROM kdv_records WHERE user_id=%s AND profile_id=%s"
+    args = [uid, pid]
+    if period: q += " AND period=%s"; args.append(period)
+    q += " ORDER BY created_at DESC"
+    rows = db.execute(q, args).fetchall()
+    return jsonify([row_to_dict(r) for r in rows])
+
+@app.route("/api/kdv/records", methods=["POST"])
+@login_required
+def add_kdv_record():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    d = request.get_json(force=True)
+    base = float(d.get("amount_base", 0))
+    rate = float(d.get("kdv_rate", 20))
+    kdv  = round(base * rate / 100, 2)
+    db.execute(
+        """INSERT INTO kdv_records (user_id,profile_id,period,kdv_type,source_type,
+           amount_base,kdv_rate,kdv_amount,description,created_at)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+        (uid,pid,d.get("period",datetime.now().strftime("%Y-%m")),
+         d.get("kdv_type","tahsil"),d.get("source_type","manuel"),
+         base,rate,kdv,d.get("description",""),today_str())
+    )
+    db.commit()
+    return jsonify({"ok":True, "kdv_amount": kdv})
+
+# ── KAR-ZARAR RAPORU ──────────────────────────────────────────────────────────
+
+@app.route("/api/ploss", methods=["GET"])
+@login_required
+def profit_loss():
+    uid  = session["user_id"]; pid = get_pid(); db = get_db()
+    year = request.args.get("year", str(datetime.now().year))
+    rows = db.execute(
+        """SELECT type, category, SUM(amount) AS total, substr(date,1,7) AS period
+           FROM transactions WHERE user_id=%s AND profile_id=%s
+           AND substr(date,1,4)=%s
+           GROUP BY type, category, substr(date,1,7)
+           ORDER BY period, type, category""", (uid,pid,year)
+    ).fetchall()
+    months  = {}
+    cat_sum = {"gelir":{}, "gider":{}}
+    for r in rows:
+        m   = r["period"]
+        t   = r["type"]
+        cat = r["category"]
+        amt = float(r["total"])
+        if m not in months:
+            months[m] = {"gelir":0,"gider":0}
+        months[m][t] = months[m].get(t,0) + amt
+        if cat not in cat_sum[t]: cat_sum[t][cat] = 0
+        cat_sum[t][cat] += amt
+    # Bordro maliyeti ekle
+    payroll_rows = db.execute(
+        """SELECT period, SUM(total_cost) AS tc FROM payroll
+           WHERE user_id=%s AND profile_id=%s AND substr(period,1,4)=%s
+           GROUP BY period""", (uid,pid,year)
+    ).fetchall()
+    for pr in payroll_rows:
+        m = pr["period"]
+        if m not in months: months[m] = {"gelir":0,"gider":0}
+        months[m]["gider"] = months[m].get("gider",0) + float(pr["tc"])
+        if "Bordro" not in cat_sum["gider"]: cat_sum["gider"]["Bordro"] = 0
+        cat_sum["gider"]["Bordro"] += float(pr["tc"])
+    monthly = [{"period":k,"gelir":v["gelir"],"gider":v["gider"],"net":round(v["gelir"]-v["gider"],2)}
+               for k,v in sorted(months.items())]
+    total_g = sum(m["gelir"] for m in monthly)
+    total_e = sum(m["gider"] for m in monthly)
+    return jsonify({
+        "year":    year,
+        "monthly": monthly,
+        "gelir_cats": sorted(cat_sum["gelir"].items(), key=lambda x:-x[1]),
+        "gider_cats": sorted(cat_sum["gider"].items(), key=lambda x:-x[1]),
+        "total_gelir": round(total_g, 2),
+        "total_gider": round(total_e, 2),
+        "net_kar":     round(total_g - total_e, 2),
+    })
 
 if __name__ == "__main__":
     init_db()
