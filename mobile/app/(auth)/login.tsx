@@ -24,7 +24,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={s.logo}>
         <Text style={s.logoIco}>🦔</Text>
         <Text style={s.logoTxt}>Kirpi</Text>

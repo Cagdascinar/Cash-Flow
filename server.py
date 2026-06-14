@@ -7221,11 +7221,12 @@ def del_employee(eid):
     return jsonify({"ok":True})
 
 def _calc_payroll(gross):
-    """Türk bordro hesabı (2025 parametreleri)."""
-    sgk_emp  = round(gross * 0.14, 2)   # SGK işçi: %14
-    isizlik  = round(gross * 0.01, 2)   # İşsizlik işçi: %1
+    """Türk bordro hesabı (2025 parametreleri — aylık kümülatif hariç basit dilim)."""
+    # İşçi kesintileri
+    sgk_emp   = round(gross * 0.14, 2)   # SGK işçi: %14
+    isizlik   = round(gross * 0.01, 2)   # İşsizlik sigortası işçi: %1
     gelir_mat = gross - sgk_emp - isizlik
-    # Gelir vergisi kümülatif hesap yerine aylık basit dilim (örnek)
+    # Gelir vergisi dilimi (aylık matrah)
     if gelir_mat <= 110000:
         gv = round(gelir_mat * 0.15, 2)
     elif gelir_mat <= 230000:
@@ -7236,24 +7237,49 @@ def _calc_payroll(gross):
         gv = round(135000 + (gelir_mat - 580000) * 0.35, 2)
     else:
         gv = round(982000 + (gelir_mat - 3000000) * 0.40, 2)
-    damga      = round(gross * 0.00759, 2)
+    damga      = round(gross * 0.00759, 2)  # Damga vergisi: %0,759
     net        = round(gross - sgk_emp - isizlik - gv - damga, 2)
-    sgk_emp_c  = round(gross * 0.205, 2)  # SGK işveren: %20.5
+    # İşveren kesintileri
+    sgk_emp_c  = round(gross * 0.205, 2)  # SGK işveren: %20,5
     isizlik_c  = round(gross * 0.02, 2)   # İşsizlik işveren: %2
     total_cost = round(gross + sgk_emp_c + isizlik_c, 2)
     return {
-        "gross_salary": gross,
-        "sgk_employee": sgk_emp + isizlik,
-        "income_tax":   gv + damga,
-        "net_salary":   net,
-        "sgk_employer": sgk_emp_c + isizlik_c,
-        "total_cost":   total_cost,
+        "gross_salary":   gross,
+        "sgk_employee":   sgk_emp,
+        "isizlik":        isizlik,
+        "gelir_matrahi":  round(gelir_mat, 2),
+        "gelir_vergisi":  gv,
+        "damga_vergisi":  damga,
+        "net_salary":     net,
+        "sgk_employer":   sgk_emp_c,
+        "isizlik_employer": isizlik_c,
+        "total_cost":     total_cost,
+        # Özet toplamlar (backward compat)
+        "total_employee_deductions": round(sgk_emp + isizlik + gv + damga, 2),
     }
+
+def _gross_from_net(target_net):
+    """Net maaştan brüte ters hesaplama (ikili arama)."""
+    if target_net <= 0:
+        return _calc_payroll(0)
+    lo, hi = target_net, target_net * 2.5
+    for _ in range(60):
+        mid = (lo + hi) / 2
+        r   = _calc_payroll(mid)
+        if abs(r["net_salary"] - target_net) < 0.10:
+            return r
+        if r["net_salary"] < target_net:
+            lo = mid
+        else:
+            hi = mid
+    return _calc_payroll((lo + hi) / 2)
 
 @app.route("/api/payroll/calculate", methods=["POST"])
 @login_required
 def calculate_payroll():
     d = request.get_json(force=True)
+    if d.get("net_salary"):
+        return jsonify(_gross_from_net(float(d["net_salary"])))
     gross = float(d.get("gross_salary", 0))
     return jsonify(_calc_payroll(gross))
 
@@ -7287,8 +7313,12 @@ def add_payroll():
            paid,paid_date,notes,created_at)
            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
         (uid,pid,eid,ename,d.get("period",""),
-         calc["gross_salary"],calc["sgk_employee"],calc["income_tax"],
-         calc["net_salary"],calc["sgk_employer"],calc["total_cost"],
+         calc["gross_salary"],
+         calc["sgk_employee"] + calc["isizlik"],
+         calc["gelir_vergisi"] + calc["damga_vergisi"],
+         calc["net_salary"],
+         calc["sgk_employer"] + calc["isizlik_employer"],
+         calc["total_cost"],
          int(d.get("paid",0)),d.get("paid_date",""),d.get("notes",""),today_str())
     )
     db.commit()
@@ -7312,6 +7342,105 @@ def mark_payroll_paid(rid):
     )
     db.commit()
     return jsonify({"ok":True})
+
+@app.route("/api/payroll/<int:rid>/pdf", methods=["GET"])
+@login_required
+def payroll_pdf(rid):
+    """Bordro fişi — HTML olarak döner, browser print diyalogu açılır."""
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    row = db.execute(
+        "SELECT * FROM payroll WHERE id=%s AND user_id=%s AND profile_id=%s", (rid,uid,pid)
+    ).fetchone()
+    if not row:
+        return "Bordro bulunamadı", 404
+    p = row_to_dict(row)
+    user = db.execute("SELECT report_name, report_contact, report_logo FROM users WHERE id=%s",(uid,)).fetchone()
+    company = (user["report_name"] or "Şirket Adı") if user else "Şirket Adı"
+    logo    = user["report_logo"] if user else ""
+    def m(v): return f"₺{float(v or 0):,.2f}".replace(",","X").replace(".",",").replace("X",".")
+    html = f"""<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Bordro — {p['employee_name']} — {p['period']}</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:'Segoe UI',sans-serif;background:#fff;color:#111;font-size:13px;padding:24px}}
+  .header{{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #10069F;padding-bottom:14px;margin-bottom:20px}}
+  .company{{font-size:18px;font-weight:800;color:#10069F}}
+  .badge{{background:#10069F;color:#d5fd73;font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;margin-top:4px;display:inline-block}}
+  h2{{font-size:15px;font-weight:700;margin-bottom:14px;color:#10069F}}
+  table{{width:100%;border-collapse:collapse;margin-bottom:16px}}
+  th,td{{border:1px solid #e2e8f0;padding:8px 12px;text-align:left;font-size:12.5px}}
+  th{{background:#f1f5f9;font-weight:600;color:#475569}}
+  .total-row td{{font-weight:800;background:#f8fafc}}
+  .net-row td{{background:#10069F;color:#fff;font-weight:800;font-size:14px}}
+  .footer{{margin-top:28px;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px;text-align:center}}
+  .sign-row{{display:flex;justify-content:space-between;margin-top:40px;gap:20px}}
+  .sign-box{{flex:1;border-top:1px solid #94a3b8;padding-top:6px;text-align:center;font-size:11px;color:#475569}}
+  @media print{{
+    body{{padding:12px}}
+    button{{display:none!important}}
+  }}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    {('<img src="'+logo+'" style="height:40px;margin-bottom:8px"><br>') if logo else ''}
+    <div class="company">{company}</div>
+    <span class="badge">BORDRO FİŞİ</span>
+  </div>
+  <div style="text-align:right">
+    <div style="font-weight:700">{p['employee_name']}</div>
+    <div style="color:#64748b;margin-top:2px">Dönem: {p['period']}</div>
+    <div style="color:{'#166534' if p.get('paid') else '#dc2626'};font-weight:700;margin-top:4px">
+      {'✅ ÖDENDİ · '+str(p.get('paid_date','')) if p.get('paid') else '⏳ ÖDEME BEKLİYOR'}
+    </div>
+  </div>
+</div>
+
+<h2>Gelir Unsurları</h2>
+<table>
+  <tr><th>Açıklama</th><th style="text-align:right">Tutar</th></tr>
+  <tr><td>Brüt Maaş</td><td style="text-align:right;font-weight:700">{m(p['gross_salary'])}</td></tr>
+</table>
+
+<h2>İşçi Kesintileri</h2>
+<table>
+  <tr><th>Kesinti Türü</th><th style="text-align:right">Tutar</th></tr>
+  <tr><td>SGK Primi İşçi Payı (%14)</td><td style="text-align:right;color:#dc2626">{m(float(p.get('sgk_employee',0))*0.14/0.15 if p.get('sgk_employee') else 0)}</td></tr>
+  <tr><td>İşsizlik Sigortası İşçi Payı (%1)</td><td style="text-align:right;color:#dc2626">{m(float(p.get('sgk_employee',0))*0.01/0.15 if p.get('sgk_employee') else 0)}</td></tr>
+  <tr><td>Gelir Vergisi</td><td style="text-align:right;color:#dc2626">{m(float(p.get('income_tax',0))*0.99241 if p.get('income_tax') else 0)}</td></tr>
+  <tr><td>Damga Vergisi (%0,759)</td><td style="text-align:right;color:#dc2626">{m(float(p.get('gross_salary',0))*0.00759)}</td></tr>
+  <tr class="total-row"><td><b>Toplam Kesinti</b></td><td style="text-align:right;color:#dc2626"><b>{m(float(p.get('sgk_employee',0)) + float(p.get('income_tax',0)))}</b></td></tr>
+  <tr class="net-row"><td><b>NET MAAŞ</b></td><td style="text-align:right"><b>{m(p['net_salary'])}</b></td></tr>
+</table>
+
+<h2>İşveren Maliyeti</h2>
+<table>
+  <tr><th>Kalem</th><th style="text-align:right">Tutar</th></tr>
+  <tr><td>Brüt Maaş</td><td style="text-align:right">{m(p['gross_salary'])}</td></tr>
+  <tr><td>SGK Primi İşveren Payı (%20,5)</td><td style="text-align:right;color:#dc2626">{m(float(p.get('sgk_employer',0))*0.205/0.225 if p.get('sgk_employer') else 0)}</td></tr>
+  <tr><td>İşsizlik Sigortası İşveren Payı (%2)</td><td style="text-align:right;color:#dc2626">{m(float(p.get('sgk_employer',0))*0.02/0.225 if p.get('sgk_employer') else 0)}</td></tr>
+  <tr class="net-row"><td><b>TOPLAM İŞVEREN MALİYETİ</b></td><td style="text-align:right"><b>{m(p['total_cost'])}</b></td></tr>
+</table>
+
+{('<div style="margin-top:8px;padding:10px;background:#fefce8;border:1px solid #fbbf24;border-radius:8px;font-size:11.5px;color:#92400e">'+p.get('notes','')+'</div>') if p.get('notes') else ''}
+
+<div class="sign-row">
+  <div class="sign-box">İşveren / Yetkili İmza<br><br><br></div>
+  <div class="sign-box">Çalışan İmzası<br><br><br></div>
+</div>
+
+<div class="footer">Bu bordro Kirpi Finans tarafından oluşturulmuştur · {p['period']} dönemi</div>
+
+<div style="text-align:center;margin-top:20px">
+  <button onclick="window.print()" style="background:#10069F;color:#d5fd73;border:none;border-radius:10px;padding:12px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Yazdır / PDF İndir</button>
+</div>
+</body>
+</html>"""
+    return html, 200, {"Content-Type": "text/html; charset=utf-8"}
 
 # ── KDV TAKİBİ ────────────────────────────────────────────────────────────────
 

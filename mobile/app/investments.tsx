@@ -214,8 +214,8 @@ export default function InvestmentsScreen() {
       {/* Yatırım Ekle Modal */}
       <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={s.modal} edges={['top']}>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <ScrollView showsVerticalScrollIndicator={false}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
               <View style={s.mHeader}>
                 <Text style={s.mTitle}>Yatırım Ekle</Text>
                 <TouchableOpacity onPress={() => { setModal(false); setTefasRes(null); setTefasKod(''); }}><Text style={s.close}>✕</Text></TouchableOpacity>

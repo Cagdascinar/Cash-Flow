@@ -149,7 +149,7 @@ export default function AssetsScreen() {
       {/* Varlık Ekle Modal */}
       <Modal visible={addModal} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={s.bg} edges={['top']}>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
             <View style={s.mHeader}>
               <Text style={s.mTitle}>Varlık Ekle</Text>
               <TouchableOpacity onPress={() => setAddModal(false)}><Text style={s.close}>✕</Text></TouchableOpacity>
@@ -187,7 +187,7 @@ export default function AssetsScreen() {
       {/* Bakım Kayıtları Modal */}
       <Modal visible={maintModal} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={s.bg} edges={['top']}>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
             <View style={s.mHeader}>
               <Text style={s.mTitle}>🔧 {selAsset?.name}</Text>
               <TouchableOpacity onPress={() => setMaintModal(false)}><Text style={s.close}>✕</Text></TouchableOpacity>

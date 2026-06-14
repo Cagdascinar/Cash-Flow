@@ -149,7 +149,7 @@ export default function SuppliersScreen() {
       {/* Tedarikçi Ekle Modal */}
       <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={s.bg} edges={['top']}>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
             <View style={s.mHeader}>
               <Text style={s.mTitle}>Tedarikçi Ekle</Text>
               <TouchableOpacity onPress={() => setModal(false)}><Text style={s.close}>✕</Text></TouchableOpacity>

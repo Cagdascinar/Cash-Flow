@@ -57,7 +57,7 @@ export default function HelpScreen() {
         <TouchableOpacity onPress={() => router.back()}><Text style={s.back}>←</Text></TouchableOpacity>
         <Text style={s.title}>Yardım & SSS</Text>
       </View>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
         <Text style={s.sub}>Sık sorulan sorular</Text>
         {FAQS.map((faq, i) => (
           <TouchableOpacity key={i} style={s.card} activeOpacity={0.8} onPress={() => setOpen(open === i ? null : i)}>

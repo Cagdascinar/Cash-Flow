@@ -66,7 +66,7 @@ export default function MoreScreen() {
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={s.header}><Text style={s.title}>Daha Fazla</Text></View>
 
         {/* Profil */}

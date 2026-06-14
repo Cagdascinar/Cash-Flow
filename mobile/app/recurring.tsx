@@ -127,8 +127,8 @@ export default function RecurringScreen() {
       {/* Ekle Modal */}
       <Modal visible={modal} animationType="slide" presentationStyle="pageSheet">
         <SafeAreaView style={s.modal} edges={['top']}>
-          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <ScrollView showsVerticalScrollIndicator={false}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
               <View style={s.modalHeader}>
                 <Text style={s.modalTitle}>{editTarget ? 'Tekrarlayan Düzenle' : 'Tekrarlayan Ekle'}</Text>
                 <TouchableOpacity onPress={() => setModal(false)}><Text style={s.close}>✕</Text></TouchableOpacity>

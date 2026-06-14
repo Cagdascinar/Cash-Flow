@@ -25,7 +25,7 @@ export default function RegisterScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <TouchableOpacity onPress={() => router.back()} style={s.back}><Text style={s.backIco}>←</Text></TouchableOpacity>
         <Text style={s.title}>Hesap Oluştur</Text>

@@ -86,7 +86,7 @@ export default function ProfilesScreen() {
 
       {loading
         ? <View style={s.center}><ActivityIndicator color={C.blue} /></View>
-        : <ScrollView showsVerticalScrollIndicator={false}>
+        : <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
             <Text style={s.hint}>Her profilin verileri birbirinden bağımsızdır.</Text>
             <View style={s.group}>
               {list.map((p, i) => {

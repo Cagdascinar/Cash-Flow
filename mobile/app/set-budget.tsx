@@ -43,7 +43,7 @@ export default function SetBudgetScreen() {
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()}><Text style={s.back}>←</Text></TouchableOpacity>
           <View style={{ flex: 1 }}>
@@ -52,7 +52,7 @@ export default function SetBudgetScreen() {
           </View>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
           <Text style={s.info}>💡 Limit koyduğunuz kategoriler bütçe ekranında takip edilir. Boş bıraktıklarınız gösterilmez.</Text>
           {CATS.map(cat => (
             <View key={cat} style={s.row}>

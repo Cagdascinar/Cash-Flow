@@ -3369,30 +3369,33 @@ body{top:0!important}
 <!-- ÇALIŞANLAR & BORDRO -->
 <div class="page" id="page-employees">
   <div class="page-title">Çalışanlar & Bordro</div>
-  <div class="page-sub">Bordro hesaplama, SGK ve maliyet takibi</div>
+  <div class="page-sub">SGK, gelir vergisi, net maaş ve işveren maliyeti takibi</div>
+
+  <!-- İstatistik satırı -->
+  <div id="emp-stats-row" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px"></div>
 
   <div style="display:flex;gap:8px;margin-bottom:14px">
-    <button class="btn tappable" id="emp-tab-list" onclick="setEmpTab('list')" style="flex:1;background:var(--accent);color:#07091f;border:none">Çalışanlar</button>
-    <button class="btn btn-ghost tappable" id="emp-tab-payroll" onclick="setEmpTab('payroll')" style="flex:1">Bordro</button>
-    <button class="btn btn-ghost tappable" id="emp-tab-calc" onclick="setEmpTab('calc')" style="flex:1">Hesaplayıcı</button>
+    <button class="btn tappable" id="emp-tab-list" onclick="setEmpTab('list')" style="flex:1;background:var(--accent);color:#07091f;border:none;font-size:.82rem">👥 Çalışanlar</button>
+    <button class="btn btn-ghost tappable" id="emp-tab-payroll" onclick="setEmpTab('payroll')" style="flex:1;font-size:.82rem">📋 Bordro</button>
+    <button class="btn btn-ghost tappable" id="emp-tab-calc" onclick="setEmpTab('calc')" style="flex:1;font-size:.82rem">🧮 Hesaplayıcı</button>
   </div>
 
   <!-- Çalışan listesi -->
   <div id="emp-list-panel">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt2)">Personel</div>
-      <button class="btn btn-ghost tappable" onclick="openEmpModal()" style="padding:5px 12px;font-size:.8rem">＋ Ekle</button>
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt2)">Aktif Personel</div>
+      <button class="btn btn-ghost tappable" onclick="openEmpModal()" style="padding:5px 12px;font-size:.8rem">＋ Personel Ekle</button>
     </div>
     <div id="emp-list"></div>
   </div>
 
   <!-- Bordro listesi -->
   <div id="emp-payroll-panel" style="display:none">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <select id="payroll-period-sel"
-        style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:8px 12px;font-size:.9rem;color:var(--txt)">
+        style="flex:1;min-width:130px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:8px 12px;font-size:.88rem;color:var(--txt)">
       </select>
-      <button class="btn btn-ghost tappable" onclick="loadPayrollList()" style="padding:8px 14px">↻</button>
+      <button class="btn btn-ghost tappable" onclick="loadPayrollList()" style="padding:8px 12px">↻</button>
       <button class="btn btn-primary tappable" onclick="openPayrollModal()" style="padding:8px 14px;font-size:.82rem">＋ Bordro Ekle</button>
     </div>
     <div id="payroll-list"></div>
@@ -3401,34 +3404,59 @@ body{top:0!important}
 
   <!-- Bordro Hesaplayıcı -->
   <div id="emp-calc-panel" style="display:none">
-    <div class="card" style="max-width:500px">
-      <div class="section-title">Brüt → Net Hesaplayıcı</div>
-      <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:16px">
-        <div style="flex:1">
-          <div style="font-size:.72rem;font-weight:700;color:var(--txt2);margin-bottom:6px">Brüt Maaş (₺)</div>
-          <input id="calc-gross" type="number" placeholder="50.000" oninput="calcPayroll()"
-            style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;font-size:1rem;color:var(--txt)">
-        </div>
+    <div class="card" style="max-width:560px">
+      <div class="section-title">Maaş Hesaplayıcı</div>
+      <div style="display:flex;gap:0;margin-bottom:16px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+        <button id="calc-dir-brut" onclick="setCalcDir('brut')"
+          style="flex:1;padding:10px;font-size:.82rem;font-weight:700;background:var(--b);color:#fff;border:none;cursor:pointer">
+          Brüt → Net
+        </button>
+        <button id="calc-dir-net" onclick="setCalcDir('net')"
+          style="flex:1;padding:10px;font-size:.82rem;font-weight:700;background:var(--bg3);color:var(--txt2);border:none;cursor:pointer">
+          Net → Brüt
+        </button>
       </div>
+      <div id="calc-dir-label" style="font-size:.72rem;font-weight:700;color:var(--txt2);margin-bottom:6px">BRÜT MAAŞ (₺)</div>
+      <input id="calc-input" type="number" placeholder="50.000" oninput="calcPayrollUI()"
+        style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;font-size:1.1rem;color:var(--txt);margin-bottom:16px">
+
       <div id="calc-result" style="display:none">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div style="background:var(--bg3);border-radius:10px;padding:12px">
-            <div style="font-size:.65rem;color:var(--txt2);margin-bottom:4px">SGK İşçi + İşsizlik</div>
-            <div style="font-size:.95rem;font-weight:700;color:var(--r)" id="cr-sgk-emp">—</div>
+        <div style="background:linear-gradient(135deg,#052e16,#14532d);border:1px solid #166534;border-radius:12px;padding:16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:.65rem;color:#86efac;margin-bottom:4px">NET MAAŞ</div>
+            <div style="font-size:1.6rem;font-weight:800;color:#4ade80" id="cr-net">—</div>
           </div>
-          <div style="background:var(--bg3);border-radius:10px;padding:12px">
-            <div style="font-size:.65rem;color:var(--txt2);margin-bottom:4px">Gelir Vergisi + Damga</div>
-            <div style="font-size:.95rem;font-weight:700;color:var(--r)" id="cr-gv">—</div>
-          </div>
-          <div style="background:linear-gradient(135deg,#052e16,#14532d);border:1px solid #166534;border-radius:10px;padding:12px">
-            <div style="font-size:.65rem;color:#86efac;margin-bottom:4px">Net Maaş</div>
-            <div style="font-size:1.1rem;font-weight:800;color:#4ade80" id="cr-net">—</div>
-          </div>
-          <div style="background:var(--bg3);border-radius:10px;padding:12px">
-            <div style="font-size:.65rem;color:var(--txt2);margin-bottom:4px">İşveren Toplam Maliyeti</div>
-            <div style="font-size:.95rem;font-weight:700;color:var(--b)" id="cr-total">—</div>
+          <div style="text-align:right">
+            <div style="font-size:.65rem;color:#86efac;margin-bottom:4px">BRÜT MAAŞ</div>
+            <div style="font-size:1rem;font-weight:700;color:#bbf7d0" id="cr-gross">—</div>
           </div>
         </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div style="background:var(--bg3);border-radius:10px;padding:12px">
+            <div style="font-size:.6rem;color:var(--txt2);margin-bottom:4px;font-weight:600">SGK İŞÇİ (%14)</div>
+            <div style="font-size:.9rem;font-weight:700;color:#f87171" id="cr-sgk-emp">—</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:10px;padding:12px">
+            <div style="font-size:.6rem;color:var(--txt2);margin-bottom:4px;font-weight:600">İŞSİZLİK İŞÇİ (%1)</div>
+            <div style="font-size:.9rem;font-weight:700;color:#f87171" id="cr-isizlik">—</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:10px;padding:12px">
+            <div style="font-size:.6rem;color:var(--txt2);margin-bottom:4px;font-weight:600">GELİR VERGİSİ</div>
+            <div style="font-size:.9rem;font-weight:700;color:#f87171" id="cr-gv">—</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:10px;padding:12px">
+            <div style="font-size:.6rem;color:var(--txt2);margin-bottom:4px;font-weight:600">DAMGA VERGİSİ (%0,759)</div>
+            <div style="font-size:.9rem;font-weight:700;color:#f87171" id="cr-damga">—</div>
+          </div>
+        </div>
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:4px">
+          <div style="font-size:.65rem;color:var(--txt2);margin-bottom:6px;font-weight:600">İŞVEREN MALİYETİ</div>
+          <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:4px">
+            <span style="color:var(--txt2)">Brüt + SGK İşveren (%20,5) + İşsizlik İşveren (%2)</span>
+          </div>
+          <div style="font-size:1.1rem;font-weight:800;color:var(--b)" id="cr-total">—</div>
+        </div>
+        <div style="font-size:.72rem;color:var(--txt2);margin-top:8px">* 2025 takvim yılı parametreleri kullanılmıştır. Kümülatif vergi etkisi dahil değildir.</div>
       </div>
     </div>
   </div>
@@ -9265,117 +9293,224 @@ function loadKDV(){
 }
 
 // ── ÇALIŞANLAR & BORDRO ──────────────────────────────────────────────────────
-function initEmployeesPage(){ setEmpTab('list'); }
+var _calcDir = 'brut';  // 'brut' veya 'net'
+
+function initEmployeesPage(){
+  loadEmpStats();
+  setEmpTab('list');
+}
+
+function loadEmpStats(){
+  xhr('/api/employees', null, function(items){
+    var el = document.getElementById('emp-stats-row');
+    if(!el || !items) return;
+    var active  = (items||[]).filter(function(e){ return e.is_active; });
+    var totalG  = active.reduce(function(s,e){ return s+(e.gross_salary||0); },0);
+    var totalC  = active.reduce(function(s,e){ return s+(e.gross_salary||0)*1.225; },0);
+    function fmt(v){ return '₺'+(v||0).toLocaleString('tr-TR',{minimumFractionDigits:0,maximumFractionDigits:0}); }
+    el.innerHTML = [
+      {ico:'👥',lbl:'Aktif Personel',  val:active.length,       color:'var(--txt)'},
+      {ico:'💼',lbl:'Toplam Brüt',     val:fmt(totalG),          color:'var(--txt)'},
+      {ico:'📊',lbl:'Toplam İşv. Mal.',val:fmt(totalC),          color:'var(--b)'},
+      {ico:'📅',lbl:'Aylık Net Toplam',val:fmt(totalG*0.75),     color:'#4ade80'},
+    ].map(function(s){
+      return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px">'+
+        '<div style="font-size:1.4rem;margin-bottom:4px">'+s.ico+'</div>'+
+        '<div style="font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--txt2);margin-bottom:3px">'+s.lbl+'</div>'+
+        '<div style="font-size:.9rem;font-weight:800;color:'+s.color+'">'+s.val+'</div>'+
+      '</div>';
+    }).join('');
+  });
+}
 
 function setEmpTab(tab){
   ['list','payroll','calc'].forEach(function(t){
-    document.getElementById('emp-'+t+'-panel').style.display = t===tab ? 'block' : 'none';
+    var panel = document.getElementById('emp-'+t+'-panel');
+    if(panel) panel.style.display = t===tab ? 'block' : 'none';
     var btn = document.getElementById('emp-tab-'+t);
-    if(btn){ btn.style.background=t===tab?'var(--accent)':''; btn.style.color=t===tab?'#07091f':''; }
+    if(btn){
+      btn.style.background = t===tab ? 'var(--accent)' : '';
+      btn.style.color      = t===tab ? '#07091f' : '';
+      btn.className        = t===tab ? 'btn tappable' : 'btn btn-ghost tappable';
+    }
   });
   if(tab==='list')    loadEmpList();
   if(tab==='payroll') initPayrollPeriod();
-  if(tab==='calc')    document.getElementById('calc-gross').focus();
+  if(tab==='calc')    setCalcDir(_calcDir);
 }
 
 function loadEmpList(){
   xhr('/api/employees', null, function(items){
     var el = document.getElementById('emp-list');
     if(!items||!items.length){
-      el.innerHTML='<div style="text-align:center;padding:28px;color:var(--txt2)">👷 Henüz çalışan eklenmedi</div>';
+      el.innerHTML='<div style="text-align:center;padding:40px;color:var(--txt2)">'+
+        '<div style="font-size:3rem;margin-bottom:12px">👷</div>'+
+        '<div style="font-size:.95rem;font-weight:600">Henüz personel eklenmedi</div>'+
+        '<div style="font-size:.8rem;margin-top:6px;color:var(--muted)">Sağ üstteki "+ Personel Ekle" butonu ile başlayın</div></div>';
       return;
     }
     function fmt(v){ return '₺'+(v||0).toLocaleString('tr-TR',{minimumFractionDigits:0,maximumFractionDigits:0}); }
     el.innerHTML = items.map(function(e){
-      var calc = calcBrut(e.gross_salary||0);
-      return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px">'+
+      var g   = e.gross_salary||0;
+      var sgk = g*0.14;
+      var isz = g*0.01;
+      var mat = g - sgk - isz;
+      var gv  = mat<=110000 ? mat*0.15 : mat<=230000 ? 16500+(mat-110000)*0.20 :
+                mat<=580000 ? 40500+(mat-230000)*0.27 : 135000+(mat-580000)*0.35;
+      var dmp = g*0.00759;
+      var net = Math.round(g - sgk - isz - gv - dmp);
+      var cost= Math.round(g * 1.225);
+      var tenure=''; var days=0;
+      if(e.start_date){
+        days=Math.floor((Date.now()-new Date(e.start_date).getTime())/(86400000));
+        var yrs=Math.floor(days/365);
+        var mos=Math.floor((days%365)/30);
+        tenure=(yrs?yrs+' yıl ':'')+mos+' ay';
+      }
+      return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:10px">'+
         '<div style="display:flex;align-items:center;gap:12px">'+
-          '<div style="width:40px;height:40px;border-radius:12px;background:var(--b20);display:flex;align-items:center;justify-content:center;font-size:1.3rem">👤</div>'+
-          '<div style="flex:1">'+
-            '<div style="font-size:.9rem;font-weight:700;color:var(--txt)">'+e.name+'</div>'+
-            '<div style="font-size:.75rem;color:var(--txt2)">'+(e.title||'')+(e.department?' · '+e.department:'')+'</div>'+
+          '<div style="width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,var(--b),#818cf8);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">👤</div>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-size:.95rem;font-weight:700;color:var(--txt)">'+e.name+'</div>'+
+            '<div style="font-size:.75rem;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+
+              (e.title||'')+(e.department?' · '+e.department:'')+(tenure?' · Kıdem: '+tenure:'')+'</div>'+
           '</div>'+
-          '<div style="text-align:right">'+
-            '<div style="font-size:.82rem;font-weight:700;color:var(--txt)">Brüt: '+fmt(e.gross_salary)+'</div>'+
-            '<div style="font-size:.78rem;color:#4ade80">Net: '+fmt(calc.net)+'</div>'+
+          '<div style="display:flex;gap:6px;flex-shrink:0">'+
+            '<button onclick="openEmpModal('+JSON.stringify(e)+')" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--txt2);cursor:pointer;padding:6px 10px;font-size:.78rem">✏️</button>'+
+            '<button onclick="delEmp('+e.id+',\''+e.name+'\')" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--txt2);cursor:pointer;padding:6px 10px;font-size:.78rem">✕</button>'+
           '</div>'+
         '</div>'+
-        '<div style="display:flex;gap:8px;margin-top:10px">'+
-          '<div style="flex:1;background:var(--bg3);border-radius:8px;padding:8px;text-align:center">'+
-            '<div style="font-size:.62rem;color:var(--txt2)">SGK İşçi</div>'+
-            '<div style="font-size:.8rem;font-weight:700;color:#f87171">'+fmt(calc.sgkEmp)+'</div></div>'+
-          '<div style="flex:1;background:var(--bg3);border-radius:8px;padding:8px;text-align:center">'+
-            '<div style="font-size:.62rem;color:var(--txt2)">Gelir V.</div>'+
-            '<div style="font-size:.8rem;font-weight:700;color:#f87171">'+fmt(calc.gv)+'</div></div>'+
-          '<div style="flex:1;background:var(--bg3);border-radius:8px;padding:8px;text-align:center">'+
-            '<div style="font-size:.62rem;color:var(--txt2)">İşveren Maliyeti</div>'+
-            '<div style="font-size:.8rem;font-weight:700;color:var(--b)">'+fmt(calc.total)+'</div></div>'+
-          '<button onclick="delEmp('+e.id+',\''+e.name+'\')" style="background:none;border:none;color:var(--txt2);cursor:pointer;font-size:1rem;padding:0 4px">✕</button>'+
-        '</div></div>';
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px">'+
+          _empCell('Brüt',fmt(g),'var(--txt)')+
+          _empCell('Net',fmt(net),'#4ade80')+
+          _empCell('SGK+GV',fmt(Math.round(sgk+isz+gv+dmp)),'#f87171')+
+          _empCell('İşv. Mal.',fmt(cost),'var(--b)')+
+        '</div>'+
+        '<div style="margin-top:8px">'+
+          '<button onclick="openPayrollModalFor('+e.id+',\''+e.name.replace(/'/g,"\\'")+"',"+g+')" class="btn btn-ghost tappable" style="width:100%;font-size:.78rem;padding:7px">📋 Bu ay bordro oluştur</button>'+
+        '</div>'+
+      '</div>';
     }).join('');
   });
 }
 
-function calcBrut(gross){
-  var sgkEmp = gross*0.15;
-  var gvMat  = gross - sgkEmp;
-  var gv     = gvMat<=110000 ? gvMat*0.15 : gvMat<=230000 ? 16500+(gvMat-110000)*0.20 :
-               gvMat<=580000 ? 40500+(gvMat-230000)*0.27 : 135000+(gvMat-580000)*0.35;
-  gv = Math.round(gv);
-  var net    = Math.round(gross - sgkEmp - gv);
-  var total  = Math.round(gross * 1.225);
-  return {net:net, sgkEmp:Math.round(sgkEmp), gv:gv, total:total};
+function _empCell(lbl,val,col){
+  return '<div style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">'+
+    '<div style="font-size:.6rem;color:var(--txt2);margin-bottom:2px">'+lbl+'</div>'+
+    '<div style="font-size:.78rem;font-weight:700;color:'+col+'">'+val+'</div>'+
+  '</div>';
 }
 
-function calcPayroll(){
-  var gross = parseFloat(document.getElementById('calc-gross').value)||0;
-  var res = document.getElementById('calc-result');
-  if(!gross){ res.style.display='none'; return; }
-  xhr('/api/payroll/calculate',{gross_salary:gross},function(d){
-    if(!d) return;
-    res.style.display='block';
-    function fmt(v){ return '₺'+(v||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-    document.getElementById('cr-sgk-emp').textContent = fmt(d.sgk_employee);
-    document.getElementById('cr-gv').textContent      = fmt(d.income_tax);
-    document.getElementById('cr-net').textContent     = fmt(d.net_salary);
-    document.getElementById('cr-total').textContent   = fmt(d.total_cost);
-  },'POST');
-}
-
-function openEmpModal(){
+function openEmpModal(emp){
+  var edit   = emp && emp.id;
+  var title  = edit ? 'Personel Düzenle' : 'Personel Ekle';
+  var salary = edit ? (emp.gross_salary||0) : '';
+  // Maaş tipi seçimi
   var html='<div class="mod-backdrop" id="mod-emp" onclick="if(event.target===this)this.remove()" style="display:flex">'+
-    '<div class="mod-sheet" style="max-height:85vh;overflow-y:auto">'+
-      '<div class="mod-handle"></div><div class="mod-title">Çalışan Ekle</div>'+
-      '<div class="mod-field"><div class="mod-label">Ad Soyad *</div><input type="text" class="mod-input" id="emp-name-i"></div>'+
-      '<div class="mod-field"><div class="mod-label">Unvan / Pozisyon</div><input type="text" class="mod-input" id="emp-title-i" placeholder="Yazılım Geliştirici"></div>'+
-      '<div class="mod-field"><div class="mod-label">Departman</div><input type="text" class="mod-input" id="emp-dept-i" placeholder="Teknoloji"></div>'+
-      '<div class="mod-field"><div class="mod-label">İşe Başlama Tarihi</div><input type="date" class="mod-input" id="emp-start-i"></div>'+
-      '<div class="mod-field"><div class="mod-label">Brüt Maaş (₺)</div><input type="number" class="mod-input" id="emp-gross-i" placeholder="50000"></div>'+
+    '<div class="mod-sheet" style="max-height:90vh;overflow-y:auto">'+
+      '<div class="mod-handle"></div><div class="mod-title">'+title+'</div>'+
+      '<div class="mod-field"><div class="mod-label">Ad Soyad *</div>'+
+        '<input type="text" class="mod-input" id="emp-name-i" value="'+(edit?emp.name:'')+'" placeholder="Ahmet Yılmaz"></div>'+
+      '<div class="mod-field"><div class="mod-label">Unvan / Pozisyon</div>'+
+        '<input type="text" class="mod-input" id="emp-title-i" value="'+(edit?emp.title||'':'')+'" placeholder="Yazılım Geliştirici"></div>'+
+      '<div class="mod-field"><div class="mod-label">Departman</div>'+
+        '<input type="text" class="mod-input" id="emp-dept-i" value="'+(edit?emp.department||'':'')+'" placeholder="Teknoloji, Muhasebe…"></div>'+
+      '<div class="mod-field"><div class="mod-label">İşe Başlama Tarihi</div>'+
+        '<input type="date" class="mod-input" id="emp-start-i" value="'+(edit?emp.start_date||'':'')+'"></div>'+
+      '<div style="margin-bottom:6px">'+
+        '<div class="mod-label" style="margin-bottom:8px">Maaş Türü</div>'+
+        '<div style="display:flex;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden">'+
+          '<button id="emp-sal-brut" onclick="empToggleSalType(\'brut\')" style="flex:1;padding:9px;font-size:.8rem;font-weight:700;background:var(--b);color:#fff;border:none;cursor:pointer">Brüt Gir</button>'+
+          '<button id="emp-sal-net"  onclick="empToggleSalType(\'net\')" style="flex:1;padding:9px;font-size:.8rem;font-weight:700;background:var(--bg3);color:var(--txt2);border:none;cursor:pointer">Net Gir</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="mod-field" id="emp-sal-field">'+
+        '<div class="mod-label" id="emp-sal-lbl">Brüt Maaş (₺) *</div>'+
+        '<input type="number" class="mod-input" id="emp-gross-i" value="'+salary+'" placeholder="50000" oninput="empSalPreview()">'+
+        '<div id="emp-sal-preview" style="font-size:.78rem;color:var(--txt2);margin-top:6px"></div>'+
+      '</div>'+
       '<div style="display:flex;gap:10px;margin-top:16px">'+
         '<button class="mod-btn cancel" onclick="document.getElementById(\'mod-emp\').remove()">İptal</button>'+
-        '<button class="mod-btn primary" onclick="saveEmp()">Kaydet</button>'+
+        '<button class="mod-btn primary" onclick="saveEmp('+(edit?emp.id:'null')+')">'+
+          (edit?'Güncelle':'Kaydet')+'</button>'+
       '</div></div></div>';
   document.body.insertAdjacentHTML('beforeend', html);
+  window._empSalType = 'brut';
+  if(salary) empSalPreview();
 }
 
-function saveEmp(){
-  var d={name:document.getElementById('emp-name-i').value.trim(),
-         title:document.getElementById('emp-title-i').value,
-         department:document.getElementById('emp-dept-i').value,
-         start_date:document.getElementById('emp-start-i').value,
-         gross_salary:parseFloat(document.getElementById('emp-gross-i').value)||0};
-  if(!d.name){alert('Ad zorunlu');return;}
-  xhr('/api/employees',d,function(r){
-    if(r&&r.ok){document.getElementById('mod-emp').remove();loadEmpList();}
-    else alert(r&&r.error||'Hata');
+function empToggleSalType(t){
+  window._empSalType = t;
+  document.getElementById('emp-sal-brut').style.background = t==='brut' ? 'var(--b)' : 'var(--bg3)';
+  document.getElementById('emp-sal-brut').style.color      = t==='brut' ? '#fff' : 'var(--txt2)';
+  document.getElementById('emp-sal-net').style.background  = t==='net'  ? 'var(--b)' : 'var(--bg3)';
+  document.getElementById('emp-sal-net').style.color       = t==='net'  ? '#fff' : 'var(--txt2)';
+  document.getElementById('emp-sal-lbl').textContent = t==='net' ? 'Net Maaş (₺) *' : 'Brüt Maaş (₺) *';
+  document.getElementById('emp-gross-i').placeholder = t==='net' ? '35000 (net)' : '50000';
+  document.getElementById('emp-gross-i').value='';
+  document.getElementById('emp-sal-preview').textContent='';
+}
+
+function empSalPreview(){
+  var v = parseFloat(document.getElementById('emp-gross-i').value)||0;
+  if(!v){ document.getElementById('emp-sal-preview').textContent=''; return; }
+  var payload = window._empSalType==='net' ? {net_salary:v} : {gross_salary:v};
+  xhr('/api/payroll/calculate', payload, function(d){
+    if(!d) return;
+    function fmt(x){ return '₺'+Math.round(x||0).toLocaleString('tr-TR'); }
+    var lbl = window._empSalType==='net'
+      ? 'Brüt: '+fmt(d.gross_salary)+' — İşv. Maliyeti: '+fmt(d.total_cost)
+      : 'Net: '+fmt(d.net_salary)+' — İşv. Maliyeti: '+fmt(d.total_cost);
+    var el = document.getElementById('emp-sal-preview');
+    if(el) el.textContent = lbl;
   },'POST');
+}
+
+function saveEmp(editId){
+  var nameVal  = document.getElementById('emp-name-i').value.trim();
+  var salVal   = parseFloat(document.getElementById('emp-gross-i').value)||0;
+  if(!nameVal){alert('Ad zorunlu');return;}
+  if(!salVal) {alert('Maaş zorunlu');return;}
+  var payload = {
+    name:        nameVal,
+    title:       document.getElementById('emp-title-i').value,
+    department:  document.getElementById('emp-dept-i').value,
+    start_date:  document.getElementById('emp-start-i').value,
+  };
+  // Net veya brüt — sunucu tarafa payload
+  if(window._empSalType==='net'){
+    payload.net_salary  = salVal;
+    payload.gross_salary = 0;  // sunucu yok sayar, calculate ile hesaplar
+  } else {
+    payload.gross_salary = salVal;
+  }
+
+  function doSave(gross){
+    payload.gross_salary = gross;
+    var url    = editId ? '/api/employees/'+editId : '/api/employees';
+    var method = editId ? 'PUT' : 'POST';
+    xhr(url, payload, function(r){
+      if(r&&r.ok){ document.getElementById('mod-emp').remove(); loadEmpList(); loadEmpStats(); }
+      else alert(r&&r.error||'Hata');
+    }, method);
+  }
+
+  if(window._empSalType==='net'){
+    xhr('/api/payroll/calculate',{net_salary:salVal},function(d){
+      if(!d){alert('Hesaplama hatası');return;}
+      doSave(d.gross_salary);
+    },'POST');
+  } else {
+    doSave(salVal);
+  }
 }
 
 function delEmp(id, name){
-  if(!confirm('"'+name+'" silinsin mi?')) return;
-  xhr('/api/employees/'+id, null, function(){ loadEmpList(); }, 'DELETE');
+  if(!confirm('"'+name+'" silinsin mi? Bu işlem geri alınamaz.')) return;
+  xhr('/api/employees/'+id, null, function(){ loadEmpList(); loadEmpStats(); }, 'DELETE');
 }
 
+// ── BORDRO ────────────────────────────────────────────────────────────────────
 function initPayrollPeriod(){
   var sel = document.getElementById('payroll-period-sel');
   var now = new Date();
@@ -9383,8 +9518,8 @@ function initPayrollPeriod(){
     for(var i=0;i<12;i++){
       var d = new Date(now.getFullYear(), now.getMonth()-i, 1);
       var v = d.getFullYear()+'-'+(String(d.getMonth()+1).padStart(2,'0'));
-      var txt = d.getFullYear()+' '+['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Kas','Ara'][d.getMonth()];
-      sel.add(new Option(txt, v, i===0, i===0));
+      var mn= ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'][d.getMonth()];
+      sel.add(new Option(mn+' '+d.getFullYear(), v, i===0, i===0));
     }
   }
   loadPayrollList();
@@ -9393,74 +9528,176 @@ function initPayrollPeriod(){
 function loadPayrollList(){
   var period = document.getElementById('payroll-period-sel').value;
   xhr('/api/payroll?period='+period, null, function(items){
-    var el = document.getElementById('payroll-list');
+    var el    = document.getElementById('payroll-list');
     var sumEl = document.getElementById('payroll-cost-summary');
     if(!items||!items.length){
-      el.innerHTML='<div style="text-align:center;padding:28px;color:var(--txt2)">Bu döneme ait bordro kaydı yok</div>';
+      el.innerHTML='<div style="text-align:center;padding:32px;color:var(--txt2)">'+
+        '<div style="font-size:2rem;margin-bottom:10px">📋</div>'+
+        'Bu döneme ait bordro kaydı yok</div>';
       sumEl.innerHTML=''; return;
     }
     function fmt(v){ return '₺'+(v||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-    var totalCost = 0, totalNet = 0;
+    var totalCost=0, totalNet=0, totalGross=0;
     el.innerHTML = items.map(function(p){
-      totalCost += p.total_cost||0;
-      totalNet  += p.net_salary||0;
-      return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px">'+
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'+
-          '<div style="font-size:.88rem;font-weight:700;color:var(--txt)">'+p.employee_name+'</div>'+
-          '<div style="display:flex;align-items:center;gap:8px">'+
-            (p.paid ? '<span style="background:#166534;color:#bbf7d0;font-size:.68rem;font-weight:700;padding:3px 8px;border-radius:6px">✅ Ödendi</span>' :
-                      '<button class="btn btn-ghost tappable" onclick="markPayrollPaid('+p.id+')" style="padding:4px 10px;font-size:.72rem">💸 Öde</button>')+
-            '<button onclick="delPayroll('+p.id+')" style="background:none;border:none;color:var(--txt2);cursor:pointer">✕</button>'+
+      totalCost  += p.total_cost||0;
+      totalNet   += p.net_salary||0;
+      totalGross += p.gross_salary||0;
+      return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'+
+          '<div>'+
+            '<div style="font-size:.9rem;font-weight:700;color:var(--txt)">'+p.employee_name+'</div>'+
+            '<div style="font-size:.7rem;color:var(--txt2)">'+p.period+'</div>'+
+          '</div>'+
+          '<div style="display:flex;align-items:center;gap:6px">'+
+            (p.paid
+              ? '<span style="background:#166534;color:#bbf7d0;font-size:.68rem;font-weight:700;padding:3px 8px;border-radius:6px">✅ Ödendi</span>'
+              : '<button class="btn tappable" onclick="markPayrollPaid('+p.id+')" style="padding:5px 10px;font-size:.72rem;background:var(--b);color:#fff;border:none;border-radius:8px;cursor:pointer">💸 Öde</button>')+
+            '<button onclick="window.open(\'/api/payroll/'+p.id+'/pdf\',\'_blank\')" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--txt2);cursor:pointer;padding:5px 8px;font-size:.72rem" title="PDF / Yazdır">🖨️</button>'+
+            '<button onclick="delPayroll('+p.id+')" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.9rem;padding:4px">✕</button>'+
           '</div>'+
         '</div>'+
-        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:.72rem">'+
-          '<div><div style="color:var(--txt2)">Brüt</div><div style="font-weight:700;color:var(--txt)">'+fmt(p.gross_salary)+'</div></div>'+
-          '<div><div style="color:var(--txt2)">Net</div><div style="font-weight:700;color:#4ade80">'+fmt(p.net_salary)+'</div></div>'+
-          '<div><div style="color:var(--txt2)">SGK İşçi</div><div style="font-weight:700;color:#f87171">'+fmt(p.sgk_employee)+'</div></div>'+
-          '<div><div style="color:var(--txt2)">İşv. Maliyeti</div><div style="font-weight:700;color:var(--b)">'+fmt(p.total_cost)+'</div></div>'+
-        '</div></div>';
-    }).join('');
-    sumEl.innerHTML='<div style="background:var(--bg3);border-radius:12px;padding:12px;display:flex;justify-content:space-between;font-size:.85rem">'+
-      '<span style="color:var(--txt2)">Toplam İşveren Maliyeti</span>'+
-      '<span style="font-weight:800;color:var(--b)">'+fmt(totalCost)+'</span>'+
+        '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;font-size:.75rem">'+
+          '<div style="display:flex;justify-content:space-between;background:var(--bg3);border-radius:8px;padding:8px 10px">'+
+            '<span style="color:var(--txt2)">Brüt</span><span style="font-weight:700;color:var(--txt)">'+fmt(p.gross_salary)+'</span></div>'+
+          '<div style="display:flex;justify-content:space-between;background:linear-gradient(90deg,#052e16,#14532d);border-radius:8px;padding:8px 10px">'+
+            '<span style="color:#86efac">Net</span><span style="font-weight:800;color:#4ade80">'+fmt(p.net_salary)+'</span></div>'+
+          '<div style="display:flex;justify-content:space-between;background:var(--bg3);border-radius:8px;padding:8px 10px">'+
+            '<span style="color:var(--txt2)">SGK+GV (İşçi)</span><span style="font-weight:700;color:#f87171">'+fmt((p.sgk_employee||0)+(p.income_tax||0))+'</span></div>'+
+          '<div style="display:flex;justify-content:space-between;background:var(--bg3);border-radius:8px;padding:8px 10px">'+
+            '<span style="color:var(--txt2)">İşv. Maliyeti</span><span style="font-weight:700;color:var(--b)">'+fmt(p.total_cost)+'</span></div>'+
+        '</div>'+
       '</div>';
+    }).join('');
+    sumEl.innerHTML='<div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px">'+
+      '<div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--txt2);margin-bottom:10px">'+period+' Dönemi Özeti</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:.78rem">'+
+        '<div><div style="color:var(--txt2)">Toplam Brüt</div><div style="font-weight:800;color:var(--txt)">'+fmt(totalGross)+'</div></div>'+
+        '<div><div style="color:#86efac">Toplam Net</div><div style="font-weight:800;color:#4ade80">'+fmt(totalNet)+'</div></div>'+
+        '<div><div style="color:var(--txt2)">İşv. Top. Mal.</div><div style="font-weight:800;color:var(--b)">'+fmt(totalCost)+'</div></div>'+
+      '</div></div>';
   });
 }
 
 function openPayrollModal(){
-  xhr('/api/employees?active=1', null, function(emps){
-    var opts=(emps||[]).map(function(e){return '<option value="'+e.id+'" data-gross="'+e.gross_salary+'">'+e.name+'</option>';}).join('');
-    var html='<div class="mod-backdrop" id="mod-payroll" onclick="if(event.target===this)this.remove()" style="display:flex">'+
-      '<div class="mod-sheet">'+
-        '<div class="mod-handle"></div><div class="mod-title">Bordro Ekle</div>'+
-        '<div class="mod-field"><div class="mod-label">Çalışan *</div>'+
-          '<select class="mod-input" id="pr-emp-sel" onchange="prFillGross(this)"><option value="">Seçin...</option>'+opts+'</select></div>'+
-        '<div class="mod-field"><div class="mod-label">Brüt Maaş</div><input type="number" class="mod-input" id="pr-gross-i"></div>'+
-        '<div class="mod-field"><div class="mod-label">Dönem (YYYY-AA)</div><input type="month" class="mod-input" id="pr-period-i" value="'+(new Date().toISOString().slice(0,7))+'"></div>'+
-        '<div style="display:flex;gap:10px;margin-top:16px">'+
-          '<button class="mod-btn cancel" onclick="document.getElementById(\'mod-payroll\').remove()">İptal</button>'+
-          '<button class="mod-btn primary" onclick="savePayroll()">Hesapla & Kaydet</button>'+
-        '</div></div></div>';
-    document.body.insertAdjacentHTML('beforeend', html);
+  xhr('/api/employees', null, function(emps){
+    _openPayrollModalInner(emps||[]);
   });
+}
+
+function openPayrollModalFor(empId, empName, gross){
+  xhr('/api/employees', null, function(emps){
+    _openPayrollModalInner(emps||[], empId, empName, gross);
+  });
+}
+
+function _openPayrollModalInner(emps, selId, selName, selGross){
+  var opts = emps.map(function(e){
+    return '<option value="'+e.id+'" data-gross="'+e.gross_salary+'" '+(e.id===selId?'selected':'')+'>'+e.name+'</option>';
+  }).join('');
+  var html='<div class="mod-backdrop" id="mod-payroll" onclick="if(event.target===this)this.remove()" style="display:flex">'+
+    '<div class="mod-sheet" style="max-height:90vh;overflow-y:auto">'+
+      '<div class="mod-handle"></div><div class="mod-title">Bordro Oluştur</div>'+
+      '<div class="mod-field"><div class="mod-label">Çalışan *</div>'+
+        '<select class="mod-input" id="pr-emp-sel" onchange="prFillGross(this)"><option value="">— Seçin —</option>'+opts+'</select></div>'+
+      '<div style="margin-bottom:6px">'+
+        '<div class="mod-label" style="margin-bottom:8px">Maaş Türü</div>'+
+        '<div style="display:flex;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden">'+
+          '<button id="pr-sal-brut" onclick="prToggleSalType(\'brut\')" style="flex:1;padding:9px;font-size:.8rem;font-weight:700;background:var(--b);color:#fff;border:none;cursor:pointer">Brüt</button>'+
+          '<button id="pr-sal-net"  onclick="prToggleSalType(\'net\')"  style="flex:1;padding:9px;font-size:.8rem;font-weight:700;background:var(--bg3);color:var(--txt2);border:none;cursor:pointer">Net</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="mod-field">'+
+        '<div class="mod-label" id="pr-sal-lbl">Brüt Maaş (₺) *</div>'+
+        '<input type="number" class="mod-input" id="pr-gross-i" value="'+(selGross||'')+'" placeholder="50000" oninput="prSalPreview()">'+
+        '<div id="pr-sal-preview" style="font-size:.78rem;color:var(--txt2);margin-top:6px"></div>'+
+      '</div>'+
+      '<div id="pr-calc-preview" style="display:none;background:var(--bg3);border-radius:12px;padding:12px;margin-bottom:8px">'+
+        '<div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--txt2);margin-bottom:8px">HESAPLAMA ÖNİZLEMESİ</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;font-size:.78rem">'+
+          '<div><div style="color:var(--txt2)">Brüt</div><div id="prp-gross" style="font-weight:700;color:var(--txt)">—</div></div>'+
+          '<div><div style="color:#86efac">Net</div><div id="prp-net" style="font-weight:700;color:#4ade80">—</div></div>'+
+          '<div><div style="color:var(--txt2)">SGK+GV (İşçi)</div><div id="prp-deduct" style="font-weight:700;color:#f87171">—</div></div>'+
+          '<div><div style="color:var(--txt2)">İşv. Maliyeti</div><div id="prp-cost" style="font-weight:700;color:var(--b)">—</div></div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="mod-field"><div class="mod-label">Dönem</div>'+
+        '<input type="month" class="mod-input" id="pr-period-i" value="'+(new Date().toISOString().slice(0,7))+'"></div>'+
+      '<div class="mod-field"><div class="mod-label">Not (opsiyonel)</div>'+
+        '<input type="text" class="mod-input" id="pr-notes-i" placeholder="Ocak ikramiyesi vs."></div>'+
+      '<div style="display:flex;gap:10px;margin-top:16px">'+
+        '<button class="mod-btn cancel" onclick="document.getElementById(\'mod-payroll\').remove()">İptal</button>'+
+        '<button class="mod-btn primary" id="pr-save-btn" onclick="savePayroll()">💾 Oluştur & Kaydet</button>'+
+      '</div>'+
+    '</div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+  window._prSalType = 'brut';
+  if(selGross) prSalPreview();
 }
 
 function prFillGross(sel){
   var opt = sel.options[sel.selectedIndex];
-  if(opt) document.getElementById('pr-gross-i').value = opt.dataset.gross||'';
+  if(opt && opt.dataset.gross){
+    document.getElementById('pr-gross-i').value = opt.dataset.gross;
+    prSalPreview();
+  }
+}
+
+function prToggleSalType(t){
+  window._prSalType = t;
+  document.getElementById('pr-sal-brut').style.background = t==='brut'?'var(--b)':'var(--bg3)';
+  document.getElementById('pr-sal-brut').style.color      = t==='brut'?'#fff':'var(--txt2)';
+  document.getElementById('pr-sal-net').style.background  = t==='net' ?'var(--b)':'var(--bg3)';
+  document.getElementById('pr-sal-net').style.color       = t==='net' ?'#fff':'var(--txt2)';
+  document.getElementById('pr-sal-lbl').textContent = t==='net' ? 'Net Maaş (₺) *' : 'Brüt Maaş (₺) *';
+  document.getElementById('pr-gross-i').value='';
+  document.getElementById('pr-calc-preview').style.display='none';
+}
+
+function prSalPreview(){
+  var v = parseFloat(document.getElementById('pr-gross-i').value)||0;
+  var prev = document.getElementById('pr-calc-preview');
+  if(!v){ if(prev) prev.style.display='none'; return; }
+  var payload = window._prSalType==='net' ? {net_salary:v} : {gross_salary:v};
+  xhr('/api/payroll/calculate', payload, function(d){
+    if(!d || !prev) return;
+    prev.style.display='block';
+    function fmt(x){ return '₺'+Math.round(x||0).toLocaleString('tr-TR'); }
+    document.getElementById('prp-gross').textContent  = fmt(d.gross_salary);
+    document.getElementById('prp-net').textContent    = fmt(d.net_salary);
+    document.getElementById('prp-deduct').textContent = fmt((d.sgk_employee||0)+(d.isizlik||0)+(d.gelir_vergisi||0)+(d.damga_vergisi||0));
+    document.getElementById('prp-cost').textContent   = fmt(d.total_cost);
+  },'POST');
 }
 
 function savePayroll(){
-  var empSel=document.getElementById('pr-emp-sel');
-  var d={employee_id:empSel.value,
-         employee_name:empSel.options[empSel.selectedIndex]?.text||'',
-         gross_salary:parseFloat(document.getElementById('pr-gross-i').value)||0,
-         period:document.getElementById('pr-period-i').value};
-  if(!d.employee_id||!d.gross_salary){alert('Çalışan ve brüt maaş zorunlu');return;}
-  xhr('/api/payroll',d,function(r){
-    if(r&&r.ok){document.getElementById('mod-payroll').remove();loadPayrollList();}
-    else alert(r&&r.error||'Hata');
-  },'POST');
+  var empSel  = document.getElementById('pr-emp-sel');
+  var salVal  = parseFloat(document.getElementById('pr-gross-i').value)||0;
+  var period  = document.getElementById('pr-period-i').value;
+  var notes   = document.getElementById('pr-notes-i').value;
+  var empName = empSel.options[empSel.selectedIndex]?.text||'';
+  if(!empSel.value){ alert('Çalışan seçiniz'); return; }
+  if(!salVal)       { alert('Maaş giriniz'); return; }
+  if(!period)       { alert('Dönem seçiniz'); return; }
+
+  var btn = document.getElementById('pr-save-btn');
+  if(btn) btn.disabled=true;
+
+  function doSave(gross){
+    xhr('/api/payroll',{employee_id:empSel.value,employee_name:empName,
+         gross_salary:gross,period:period,notes:notes},function(r){
+      if(r&&r.ok){document.getElementById('mod-payroll').remove();loadPayrollList();}
+      else{ alert(r&&r.error||'Hata'); if(btn) btn.disabled=false; }
+    },'POST');
+  }
+
+  if(window._prSalType==='net'){
+    xhr('/api/payroll/calculate',{net_salary:salVal},function(d){
+      if(!d){alert('Hesaplama hatası');if(btn)btn.disabled=false;return;}
+      doSave(d.gross_salary);
+    },'POST');
+  } else {
+    doSave(salVal);
+  }
 }
 
 function markPayrollPaid(id){
@@ -9469,6 +9706,43 @@ function markPayrollPaid(id){
 function delPayroll(id){
   if(!confirm('Bu bordro kaydı silinsin mi?')) return;
   xhr('/api/payroll/'+id, null, function(){ loadPayrollList(); }, 'DELETE');
+}
+
+// ── BORDRO HESAPLAYICI ────────────────────────────────────────────────────────
+function setCalcDir(dir){
+  _calcDir = dir;
+  var bBtn = document.getElementById('calc-dir-brut');
+  var nBtn = document.getElementById('calc-dir-net');
+  var lbl  = document.getElementById('calc-dir-label');
+  var inp  = document.getElementById('calc-input');
+  if(!bBtn) return;
+  bBtn.style.background = dir==='brut' ? 'var(--b)'   : 'var(--bg3)';
+  bBtn.style.color      = dir==='brut' ? '#fff'        : 'var(--txt2)';
+  nBtn.style.background = dir==='net'  ? 'var(--b)'   : 'var(--bg3)';
+  nBtn.style.color      = dir==='net'  ? '#fff'        : 'var(--txt2)';
+  if(lbl) lbl.textContent = dir==='net' ? 'NET MAAŞ (₺)' : 'BRÜT MAAŞ (₺)';
+  if(inp) { inp.placeholder = dir==='net' ? '35000 (elinize geçen)' : '50000'; inp.value=''; }
+  var res = document.getElementById('calc-result');
+  if(res) res.style.display='none';
+}
+
+function calcPayrollUI(){
+  var v   = parseFloat(document.getElementById('calc-input').value)||0;
+  var res = document.getElementById('calc-result');
+  if(!v){ if(res) res.style.display='none'; return; }
+  var payload = _calcDir==='net' ? {net_salary:v} : {gross_salary:v};
+  xhr('/api/payroll/calculate', payload, function(d){
+    if(!d||!res) return;
+    res.style.display='block';
+    function fmt(x){ return '₺'+(x||0).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+    document.getElementById('cr-gross').textContent   = fmt(d.gross_salary);
+    document.getElementById('cr-net').textContent     = fmt(d.net_salary);
+    document.getElementById('cr-sgk-emp').textContent = fmt(d.sgk_employee);
+    document.getElementById('cr-isizlik').textContent = fmt(d.isizlik);
+    document.getElementById('cr-gv').textContent      = fmt(d.gelir_vergisi);
+    document.getElementById('cr-damga').textContent   = fmt(d.damga_vergisi);
+    document.getElementById('cr-total').textContent   = fmt(d.total_cost);
+  },'POST');
 }
 
 // ── DÖVİZ KURLARI ────────────────────────────────────────────────────────────
