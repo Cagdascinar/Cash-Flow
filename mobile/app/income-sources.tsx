@@ -103,7 +103,7 @@ export default function IncomeSourcesScreen() {
                 <Text style={s.sumLbl}>Yıllık Gelir</Text>
               </View>
               <View style={s.sumCard}>
-                <Text style={[s.sumVal, { color: C.green }]}>{list.filter(x => x.is_active).length}</Text>
+                <Text style={[s.sumVal, { color: '#4ade80' }]}>{list.filter(x => x.is_active).length}</Text>
                 <Text style={s.sumLbl}>Aktif Kaynak</Text>
               </View>
             </View>
@@ -122,7 +122,7 @@ export default function IncomeSourcesScreen() {
                       </Text>
                     </View>
                     <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                      <Text style={[s.amount, { color: item.is_active ? C.green : C.muted }]}>
+                      <Text style={[s.amount, { color: item.is_active ? '#4ade80' : C.muted }]}>
                         {money(item.amount)}
                       </Text>
                       <TouchableOpacity style={[s.toggleBtn, item.is_active && s.toggleBtnActive]}
@@ -208,7 +208,7 @@ const s = StyleSheet.create({
   sub:         { fontSize: 12, color: C.txt2, marginTop: 2 },
   amount:      { fontSize: 14, fontWeight: '800' },
   toggleBtn:   { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: C.input, borderWidth: 1, borderColor: C.border },
-  toggleBtnActive: { backgroundColor: C.green, borderColor: C.green },
+  toggleBtnActive: { backgroundColor: '#166534', borderColor: '#4ade80' },
   empty:       { alignItems: 'center', paddingVertical: 48 },
   emptyIco:    { fontSize: 48, marginBottom: 12 },
   emptyTxt:    { fontSize: 15, color: C.txt2 },

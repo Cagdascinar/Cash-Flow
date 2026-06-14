@@ -24,6 +24,7 @@ export default function AddScreen() {
   const [accountId, setAccountId] = useState<number|null>(null);
   const [cardId,    setCardId]    = useState<number|null>(null);
   const [projectId, setProjectId] = useState<number|null>(null);
+  const [tags,      setTags]      = useState('');
   const [accounts,  setAccounts]  = useState<any[]>([]);
   const [cards,     setCards]     = useState<any[]>([]);
   const [projects,  setProjects]  = useState<any[]>([]);
@@ -47,13 +48,14 @@ export default function AddScreen() {
     if (payMethod === 'hesap' && accountId) payload.account_id = accountId;
     if (payMethod === 'kart'  && cardId)    payload.card_id    = cardId;
     if (type === 'gider' && projectId)      payload.project_id  = projectId;
+    if (tags.trim())                        payload.tags        = tags.trim();
 
     setLoading(true);
     try {
       await transactions.create(payload);
       Alert.alert('✅ Kaydedildi', '', [
         { text: 'Ana Sayfa', onPress: () => router.replace('/(tabs)') },
-        { text: 'Yeni Ekle', onPress: () => { setAmount(''); setDesc(''); setProjectId(null); } },
+        { text: 'Yeni Ekle', onPress: () => { setAmount(''); setDesc(''); setProjectId(null); setTags(''); } },
       ]);
     } catch (e: any) { Alert.alert('Hata', e.message); }
     finally { setLoading(false); }
@@ -125,6 +127,12 @@ export default function AddScreen() {
           <View style={s.field}>
             <Text style={s.lbl}>Tarih</Text>
             <TextInput style={s.input} placeholder="YYYY-MM-DD" placeholderTextColor={C.muted} value={date} onChangeText={setDate} />
+          </View>
+
+          <View style={s.field}>
+            <Text style={s.lbl}>Etiketler <Text style={s.optional}>(virgülle ayırın)</Text></Text>
+            <TextInput style={s.input} value={tags} onChangeText={setTags}
+              placeholder="market, aidat, düzenli…" placeholderTextColor={C.muted} />
           </View>
 
           {/* Proje — gider türünde proje varsa göster */}

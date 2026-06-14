@@ -81,9 +81,9 @@ export default function BudgetScreen() {
           <View style={s.monthCard}>
             <View style={s.row}>
               <Text style={s.monthLbl}>Bu Ay Net Tasarruf</Text>
-              <Text style={[s.monthVal, { color: net >= 0 ? C.green : C.red }]}>{money(net)}</Text>
+              <Text style={[s.monthVal, { color: net >= 0 ? '#4ade80' : '#f87171' }]}>{money(net)}</Text>
             </View>
-            <Bar v={Math.max(net, 0)} max={sum.gelir || 1} color={net >= 0 ? C.green : C.red} />
+            <Bar v={Math.max(net, 0)} max={sum.gelir || 1} color={net >= 0 ? '#4ade80' : '#f87171'} />
             <Text style={s.monthSub}>
               Gelirinizin %{sum.gelir > 0 ? Math.round((Math.max(net, 0) / sum.gelir) * 100) : 0}'ini tasarruf ettiniz
             </Text>
@@ -93,13 +93,13 @@ export default function BudgetScreen() {
         {/* Hedefler */}
         <Text style={s.sectLbl}>Aylık Hedefler</Text>
         {goals.length === 0
-          ? <View style={s.emptyCard}><Text style={s.emptyIco}>🎯</Text><Text style={s.emptyTxt}>Hedef eklenmedi</Text><Text style={s.emptySub}>Web'den ekleyebilirsiniz</Text></View>
+          ? <View style={s.emptyCard}><Text style={s.emptyIco}>🎯</Text><Text style={s.emptyTxt}>Hedef eklenmedi</Text><TouchableOpacity onPress={() => router.push('/add-goal' as any)} style={s.emptyBtn}><Text style={s.emptyBtnTxt}>+ İlk Hedefi Ekle</Text></TouchableOpacity></View>
           : <View style={s.cards}>
               {goals.map((g: any) => {
                 const target = g.monthly_target ?? 0;
                 const reached = Math.min(Math.max(net, 0), target);
                 const pct = target > 0 ? (reached / target) * 100 : 0;
-                const color = pct >= 100 ? C.green : pct >= 50 ? C.yellow : C.red;
+                const color = pct >= 100 ? '#4ade80' : pct >= 50 ? '#fbbf24' : '#f87171';
                 return (
                   <View key={g.id} style={s.card}>
                     <View style={s.row}>
@@ -128,7 +128,7 @@ export default function BudgetScreen() {
                 const limit = Number(lim);
                 const spent = giderCats[cat] ?? 0;
                 const pct   = limit > 0 ? (spent / limit) * 100 : 0;
-                const color = pct > 100 ? C.red : pct > 75 ? C.yellow : C.green;
+                const color = pct > 100 ? '#f87171' : pct > 75 ? '#fbbf24' : '#4ade80';
                 return (
                   <View key={i} style={s.card}>
                     <View style={s.row}>
@@ -171,6 +171,8 @@ const s = StyleSheet.create({
   over:      { fontSize: 12, color: C.red, marginTop: 6 },
   emptyCard: { marginHorizontal: 16, backgroundColor: C.card, borderRadius: 14, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: C.border },
   emptyIco:  { fontSize: 36, marginBottom: 8 },
-  emptyTxt:  { fontSize: 15, fontWeight: '600', color: C.txt },
+  emptyTxt:  { fontSize: 15, fontWeight: '600', color: C.txt, marginBottom: 12 },
   emptySub:  { fontSize: 13, color: C.txt2, marginTop: 4 },
+  emptyBtn:  { backgroundColor: C.blue, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9 },
+  emptyBtnTxt: { fontSize: 14, fontWeight: '700', color: C.white },
 });

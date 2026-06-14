@@ -122,7 +122,7 @@ export default function ScheduledScreen() {
                         </TouchableOpacity>
                       )}
                       {item.status === 'yapildi' && (
-                        <View style={s.doneBadge}><Text style={s.doneTxt}>✓</Text></View>
+                        <View style={s.doneBadge}><Text style={s.doneTxt}>✓ Yapıldı</Text></View>
                       )}
                       <TouchableOpacity onPress={() => del(item.id)}>
                         <Text style={{ color: C.muted, fontSize: 16 }}>✕</Text>
@@ -203,8 +203,8 @@ const s = StyleSheet.create({
   amount:      { fontSize: 15, fontWeight: '800' },
   execBtn:     { backgroundColor: C.blue, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   execTxt:     { color: C.white, fontWeight: '700', fontSize: 14 },
-  doneBadge:   { backgroundColor: 'rgba(14,203,129,0.15)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  doneTxt:     { color: C.green, fontWeight: '700', fontSize: 13 },
+  doneBadge:   { backgroundColor: '#166534', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  doneTxt:     { color: '#bbf7d0', fontWeight: '700', fontSize: 11 },
   empty:       { alignItems: 'center', paddingVertical: 48 },
   emptyIco:    { fontSize: 48, marginBottom: 12 },
   emptyTxt:    { fontSize: 15, color: C.txt2 },
