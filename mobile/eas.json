@@ -4,11 +4,23 @@
     "appVersionSource": "local"
   },
   "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "ios": { "simulator": false }
+    },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleDebug"
+      },
+      "ios": {
+        "resourceClass": "m-medium"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://web-production-ba700.up.railway.app"
       }
     },
     "production": {
@@ -31,6 +43,11 @@
         "track": "internal",
         "releaseStatus": "draft",
         "changesNotSentForReview": false
+      },
+      "ios": {
+        "appleId": "cagdascnr2441@gmail.com",
+        "ascAppId": "",
+        "appleTeamId": ""
       }
     }
   }
