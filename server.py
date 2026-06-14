@@ -25,6 +25,7 @@ app.config.update(
     SESSION_COOKIE_SAMESITE='Lax',
     SESSION_COOKIE_SECURE=_is_prod,
     PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+    MAX_CONTENT_LENGTH=10 * 1024 * 1024,  # 10MB max request size
 )
 
 limiter = Limiter(
@@ -1087,9 +1088,8 @@ _ensure_mobile_tokens_table()
 
 @app.before_request
 def inject_mobile_session():
-    """X-Mobile-Token header veya ?mobile_token= query param varsa doğrula ve session'a yükle."""
-    token = (request.headers.get("X-Mobile-Token", "")
-             or request.args.get("mobile_token", "")).strip()
+    """X-Mobile-Token header ile doğrula ve session'a yükle. Query param kabul edilmez (log sızıntısı riski)."""
+    token = request.headers.get("X-Mobile-Token", "").strip()
     if not token or session.get("user_id"):
         return
     with pg_connect() as con:
@@ -1267,6 +1267,8 @@ def api_me_update():
                          "data:image/jpg;base64,", "data:image/webp;base64,")
         if avatar and not any(avatar.startswith(p) for p in safe_prefixes):
             return jsonify({"ok": False, "error": "Geçersiz resim formatı"}), 400
+        if avatar and len(avatar) > 700_000:  # ~500KB base64 limit
+            return jsonify({"ok": False, "error": "Resim çok büyük (max 500KB)"}), 400
         db.execute("UPDATE users SET avatar=? WHERE id=?", (avatar, uid))
     db.commit()
     return jsonify({"ok": True})
@@ -1334,7 +1336,7 @@ def api_report_settings_save():
     contact = (data.get("report_contact") or "")[:200]
     logo    = data.get("report_logo") or ""
     if logo:
-        safe_prefixes = ("data:image/png;base64,","data:image/jpeg;base64,","data:image/jpg;base64,","data:image/webp;base64,","data:image/svg+xml;base64,")
+        safe_prefixes = ("data:image/png;base64,","data:image/jpeg;base64,","data:image/jpg;base64,","data:image/webp;base64,")
         if not any(logo.startswith(p) for p in safe_prefixes):
             return jsonify({"ok":False,"error":"Geçersiz logo formatı"}),400
         if len(logo) > 500_000:
@@ -1402,6 +1404,8 @@ def update_profile_avatar(pid):
                      "data:image/jpg;base64,", "data:image/webp;base64,")
     if avatar and not any(avatar.startswith(p) for p in safe_prefixes):
         return jsonify({"ok": False, "error": "Geçersiz resim formatı"}), 400
+    if avatar and len(avatar) > 700_000:
+        return jsonify({"ok": False, "error": "Resim çok büyük (max 500KB)"}), 400
     db = get_db()
     db.execute("UPDATE profiles SET avatar=? WHERE id=? AND user_id=?", (avatar, pid, uid))
     db.commit()
@@ -5128,7 +5132,10 @@ def _detect_cols(header):
 def import_preview():
     f = request.files.get("file")
     if not f: return jsonify({"ok":False,"error":"Dosya yüklenmedi"}),400
-    raw = f.read().decode("utf-8-sig",errors="replace")
+    content = f.read(6_000_000)  # max 6MB read
+    if f.read(1):  # if there's more data, file is too large
+        return jsonify({"ok":False,"error":"Dosya çok büyük (max 6MB)"}),400
+    raw = content.decode("utf-8-sig",errors="replace")
     dialect = "excel"
     if raw.count(";")>raw.count(","):
         csv.register_dialect("excel-semicolon",delimiter=";"); dialect="excel-semicolon"
@@ -5594,13 +5601,40 @@ def apply_recurring():
 @app.route("/api/backup/download")
 @login_required
 def backup_download():
-    """Download the full DB as a SQL dump."""
+    """Download only the current user's own data as CSV."""
+    uid = session["user_id"]; pid = get_pid()
     try:
-        dump = _pg_dump_csv()
+        import csv as _csv, io as _io
+        out = _io.StringIO()
+        w   = _csv.writer(out)
+        db  = get_db()
+        # Export only user-owned tables filtered by user_id
+        user_tables = [
+            ("transactions",  "user_id"),
+            ("accounts",      "user_id"),
+            ("cards",         "user_id"),
+            ("investments",   "user_id"),
+            ("recurring",     "user_id"),
+            ("goals",         "user_id"),
+            ("todos",         "user_id"),
+            ("projects",      "user_id"),
+        ]
+        for tbl, col in user_tables:
+            try:
+                rows = db.execute(f"SELECT * FROM {tbl} WHERE {col}=?", (uid,)).fetchall()
+                if not rows: continue
+                cols = list(rows[0].keys())
+                out.write(f"-- {tbl} --\n")
+                w.writerow(cols)
+                for r in rows:
+                    w.writerow([r[c] for c in cols])
+                out.write("\n")
+            except Exception:
+                pass
         now_str  = datetime.now().strftime("%Y-%m-%d_%H-%M")
-        filename = f"kirpi_backup_{now_str}.csv"
-        return dump, 200, {
-            "Content-Type":        "application/octet-stream",
+        filename = f"kirpi_yedek_{now_str}.csv"
+        return out.getvalue(), 200, {
+            "Content-Type":        "text/csv; charset=utf-8",
             "Content-Disposition": f'attachment; filename="{filename}"',
         }
     except Exception as exc:
@@ -6670,7 +6704,10 @@ def import_csv():
     uid = session["user_id"]; pid = get_pid()
     f = request.files.get("file")
     if not f: return jsonify({"ok":False,"error":"Dosya seçilmedi"}), 400
-    content = f.read().decode("utf-8-sig", errors="replace")
+    raw = f.read(6_000_000)
+    if f.read(1):
+        return jsonify({"ok":False,"error":"Dosya çok büyük (max 6MB)"}), 400
+    content = raw.decode("utf-8-sig", errors="replace")
     reader = csv.DictReader(io.StringIO(content))
     db = get_db(); count = 0; errors = []
     for i, row in enumerate(reader):
