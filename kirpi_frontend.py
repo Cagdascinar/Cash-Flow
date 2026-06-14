@@ -1336,9 +1336,9 @@ body{top:0!important}
     <div class="sub">Gelir · Gider · Yatırım</div>
   </div>
   <div class="nav-links">
-    <div class="nav-sect">Ana</div>
+    <!-- Mobil alt nav (5 sabit buton) -->
     <div class="nl active" data-page="dashboard" onclick="goPage('dashboard',this)">
-      <span class="ico">🏠</span>Ana
+      <span class="ico">🏠</span>Ana Sayfa
     </div>
     <div class="nl" data-page="ledger" onclick="goPage('ledger',this)">
       <span class="ico">📋</span>İşlemler
@@ -1346,8 +1346,8 @@ body{top:0!important}
     <div class="nl nl-add" data-page="add" onclick="goPage('add',this)">
       <span class="ico">➕</span>Ekle
     </div>
-    <div class="nl" data-page="todos" onclick="goPage('todos',this)">
-      <span class="ico">✅</span>Görevler
+    <div class="nl" data-page="budget" onclick="goPage('budget',this)">
+      <span class="ico">🎯</span>Bütçe
     </div>
     <div class="nl nl-menu" onclick="openMoreSheet()">
       <span class="ico">☰</span>Menü
@@ -1356,56 +1356,72 @@ body{top:0!important}
       <span class="ico">⋯</span>Daha
     </div>
 
-    <div class="nav-sect">Araçlar</div>
-    <div class="nl nl-desktop" data-page="recurring" onclick="goPage('recurring',this)">
-      <span class="ico">🔁</span>Düzenli
+    <!-- Masaüstü yan menü -->
+    <div class="nav-sect">Ana</div>
+    <div class="nl nl-desktop" data-page="dashboard" onclick="goPage('dashboard',this)">
+      <span class="ico">🏠</span>Ana Sayfa
     </div>
-    <div class="nl nl-desktop" data-page="budget" onclick="goPage('budget',this)">
-      <span class="ico">🎯</span>Tasarruf
+    <div class="nl nl-desktop" data-page="ledger" onclick="goPage('ledger',this)">
+      <span class="ico">📋</span>İşlemler
+    </div>
+    <div class="nl nl-desktop" data-page="hesaplar" onclick="goPage('hesaplar',this)">
+      <span class="ico">🏦</span>Hesaplar & Kartlar
+    </div>
+    <div class="nl nl-desktop" data-page="invest" onclick="goPage('invest',this)">
+      <span class="ico">📈</span>Yatırımlar
+    </div>
+
+    <div class="nav-sect">Planlama</div>
+    <div class="nl nl-desktop" data-page="scheduled" onclick="goPage('scheduled',this)">
+      <span class="ico">📅</span>Planlanmış İşlemler
     </div>
     <div class="nl nl-desktop" data-page="templates" onclick="goPage('templates',this)">
-      <span class="ico">📋</span>Şablonlar
+      <span class="ico">📋</span>İşlem Şablonları
     </div>
-    <div class="nl nl-desktop" data-page="scheduled" onclick="goPage('scheduled',this)">
-      <span class="ico">📅</span>Planlanmış
+    <div class="nl nl-desktop" data-page="recurring" onclick="goPage('recurring',this)">
+      <span class="ico">🔁</span>Düzenli İşlemler
     </div>
-    <div class="nl nl-desktop" data-page="projects" onclick="goPage('projects',this)">
-      <span class="ico">📁</span>Projeler
-    </div>
-    <div class="nl nl-desktop" data-page="categories" onclick="goPage('categories',this)">
-      <span class="ico">🗂️</span>Kategoriler
-    </div>
-    <div class="nl nl-desktop" data-page="tags" onclick="goPage('tags',this)">
-      <span class="ico">🏷️</span>Etiketler
+    <div class="nl nl-desktop" data-page="budget" onclick="goPage('budget',this)">
+      <span class="ico">🎯</span>Bütçe & Hedefler
     </div>
     <div class="nl nl-desktop" data-page="income-sources" onclick="goPage('income-sources',this)">
       <span class="ico">💰</span>Para Kaynakları
     </div>
+    <div class="nl nl-desktop" data-page="projects" onclick="goPage('projects',this)">
+      <span class="ico">📁</span>Projeler
+    </div>
+
+    <div class="nav-sect">Analiz</div>
+    <div class="nl nl-desktop" data-page="rates" onclick="goPage('rates',this)">
+      <span class="ico">💱</span>Döviz Kurları
+    </div>
+    <div class="nl nl-desktop" data-page="todos" onclick="goPage('todos',this)">
+      <span class="ico">✅</span>Görevler
+    </div>
+
+    <div class="nav-sect">Organizasyon</div>
+    <div class="nl nl-desktop" data-page="categories" onclick="goPage('categories',this)">
+      <span class="ico">🗂️</span>Kategoriler
+    </div>
+    <div class="nl nl-desktop" data-page="tags" onclick="goPage('tags',this)">
+      <span class="ico">🏷️</span>Etiketler & Filtre
+    </div>
     <div class="nl nl-desktop" data-page="import" onclick="goPage('import',this)">
-      <span class="ico">📂</span>İçe Aktar
-    </div>
-    <div class="nl nl-desktop" data-page="invest" onclick="goPage('invest',this)">
-      <span class="ico">📈</span>Yatırım
-    </div>
-    <div class="nl nl-desktop" data-page="hesaplar" onclick="goPage('hesaplar',this)">
-      <span class="ico">💳</span>Kartlar & Hesaplar
+      <span class="ico">📂</span>İçe / Dışa Aktar
     </div>
 
     <div class="nav-sect">Firma</div>
     <div class="nl nl-desktop" data-page="supplier" data-sirket onclick="goPage('supplier',this)">
-      <span class="ico">🏭</span>Tedarikçi
+      <span class="ico">🏭</span>Tedarikçiler
     </div>
     <div class="nl nl-desktop" data-page="assets" data-sirket onclick="goPage('assets',this)">
-      <span class="ico">🚗</span>Kıymetler
+      <span class="ico">🏗️</span>Sabit Kıymetler
     </div>
     <div class="nl nl-desktop" data-page="cardreport" data-sirket onclick="goPage('cardreport',this)">
       <span class="ico">📊</span>Kart Raporu
     </div>
 
     <div class="nav-sect">Sistem</div>
-    <div class="nl nl-desktop" data-page="changelog" onclick="goPage('changelog',this)">
-      <span class="ico">📝</span>Değişiklikler
-    </div>
     <div class="nl nl-desktop" data-page="help" onclick="goPage('help',this)">
       <span class="ico">❓</span>Yardım
     </div>
@@ -1432,43 +1448,57 @@ body{top:0!important}
 <div class="more-sheet" id="more-sheet">
   <div class="more-sheet-handle" id="more-sheet-handle"></div>
 
-  <div class="more-sect-label">Araçlar</div>
+  <div class="more-sect-label">Hesap & İşlem</div>
   <div class="more-grid">
-    <div class="more-tile" onclick="goPageFromSheet('recurring')">
-      <div class="mt-ico">🔁</div><div class="mt-lbl">Düzenli</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('budget')">
-      <div class="mt-ico">🎯</div><div class="mt-lbl">Tasarruf</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('invest')">
-      <div class="mt-ico">📈</div><div class="mt-lbl">Yatırım</div>
-    </div>
     <div class="more-tile" onclick="goPageFromSheet('hesaplar')">
       <div class="mt-ico">🏦</div><div class="mt-lbl">Hesaplar</div>
     </div>
-    <div class="more-tile" onclick="goPageFromSheet('templates')">
-      <div class="mt-ico">📋</div><div class="mt-lbl">Şablonlar</div>
+    <div class="more-tile" onclick="goPageFromSheet('ledger')">
+      <div class="mt-ico">📋</div><div class="mt-lbl">İşlemler</div>
     </div>
     <div class="more-tile" onclick="goPageFromSheet('scheduled')">
       <div class="mt-ico">📅</div><div class="mt-lbl">Planlanmış</div>
     </div>
+    <div class="more-tile" onclick="goPageFromSheet('templates')">
+      <div class="mt-ico">📋</div><div class="mt-lbl">Şablonlar</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('recurring')">
+      <div class="mt-ico">🔁</div><div class="mt-lbl">Düzenli</div>
+    </div>
+  </div>
+
+  <div class="more-sect-label">Planlama & Analiz</div>
+  <div class="more-grid">
+    <div class="more-tile" onclick="goPageFromSheet('budget')">
+      <div class="mt-ico">🎯</div><div class="mt-lbl">Bütçe & Hedefler</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('income-sources')">
+      <div class="mt-ico">💰</div><div class="mt-lbl">Para Kaynakları</div>
+    </div>
     <div class="more-tile" onclick="goPageFromSheet('projects')">
       <div class="mt-ico">📁</div><div class="mt-lbl">Projeler</div>
     </div>
+    <div class="more-tile" onclick="goPageFromSheet('invest')">
+      <div class="mt-ico">📈</div><div class="mt-lbl">Yatırım</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('rates')">
+      <div class="mt-ico">💱</div><div class="mt-lbl">Döviz Kurları</div>
+    </div>
+  </div>
+
+  <div class="more-sect-label">Organizasyon</div>
+  <div class="more-grid">
     <div class="more-tile" onclick="goPageFromSheet('categories')">
       <div class="mt-ico">🗂️</div><div class="mt-lbl">Kategoriler</div>
     </div>
     <div class="more-tile" onclick="goPageFromSheet('tags')">
       <div class="mt-ico">🏷️</div><div class="mt-lbl">Etiketler</div>
     </div>
-    <div class="more-tile" onclick="goPageFromSheet('income-sources')">
-      <div class="mt-ico">💰</div><div class="mt-lbl">Para Kaynakları</div>
-    </div>
     <div class="more-tile" onclick="goPageFromSheet('import')">
-      <div class="mt-ico">📂</div><div class="mt-lbl">İçe Aktar</div>
+      <div class="mt-ico">📂</div><div class="mt-lbl">İçe/Dışa Aktar</div>
     </div>
-    <div class="more-tile" onclick="goPageFromSheet('changelog')">
-      <div class="mt-ico">📝</div><div class="mt-lbl">Değişiklikler</div>
+    <div class="more-tile" onclick="goPageFromSheet('todos')">
+      <div class="mt-ico">✅</div><div class="mt-lbl">Görevler</div>
     </div>
     <div class="more-tile" onclick="goPageFromSheet('help')">
       <div class="mt-ico">❓</div><div class="mt-lbl">Yardım</div>
@@ -1481,10 +1511,10 @@ body{top:0!important}
   <div class="more-sect-label" data-sirket style="display:none">Firma</div>
   <div class="more-grid" id="more-sirket-grid" style="display:none">
     <div class="more-tile" onclick="goPageFromSheet('supplier')">
-      <div class="mt-ico">🏭</div><div class="mt-lbl">Tedarikçi</div>
+      <div class="mt-ico">🏭</div><div class="mt-lbl">Tedarikçiler</div>
     </div>
     <div class="more-tile" onclick="goPageFromSheet('assets')">
-      <div class="mt-ico">🚗</div><div class="mt-lbl">Kıymetler</div>
+      <div class="mt-ico">🏗️</div><div class="mt-lbl">Sabit Kıymetler</div>
     </div>
     <div class="more-tile" onclick="goPageFromSheet('cardreport')">
       <div class="mt-ico">📊</div><div class="mt-lbl">Kart Raporu</div>
@@ -2146,10 +2176,8 @@ body{top:0!important}
   <div id="income-source-list"></div>
 </div>
 
-<!-- ── DEĞİŞİKLİK GÜNLÜĞÜ ───────────────────────────────────── -->
-<div class="page" id="page-changelog">
-  <div class="page-title">Değişiklik Günlüğü</div>
-  <div class="page-sub">Uygulama güncelleme geçmişi</div>
+<!-- ── DEĞİŞİKLİK GÜNLÜĞÜ (kaldırıldı) -->
+<div class="page" id="page-changelog" style="display:none!important">
 
   <div class="card" style="margin-bottom:12px">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
@@ -2254,7 +2282,7 @@ body{top:0!important}
   </div>
   <div class="card" style="margin-bottom:10px">
     <div style="font-weight:700;margin-bottom:6px;color:var(--txt)">🤖 Telegram botu nasıl bağlanır?</div>
-    <div style="font-size:.84rem;color:var(--txt2);line-height:1.7">Ayarlar → Telegram Botu bölümünden bağlantı kodu alın. Telegram'da @KirpiNakitBot'u bulup <code style="background:var(--bg3);padding:2px 5px;border-radius:4px">/link KOD</code> gönderin. Artık mesajla işlem girebilirsiniz: "100 tl kahve" yazmak yeterli.</div>
+    <div style="font-size:.84rem;color:var(--txt2);line-height:1.7">Ayarlar → Telegram Botu bölümünden bağlantı kodu alın. Telegram'da @Appkirpi_BOT'u bulup <code style="background:var(--bg3);padding:2px 5px;border-radius:4px">/link KOD</code> gönderin. Artık mesajla işlem girebilirsiniz: "100 tl kahve" yazmak yeterli.</div>
   </div>
   <div class="card" style="margin-bottom:10px">
     <div style="font-weight:700;margin-bottom:6px;color:var(--txt)">🎨 Tema nasıl değiştirilir?</div>
@@ -2266,7 +2294,7 @@ body{top:0!important}
   </div>
   <div class="card">
     <div style="font-weight:700;margin-bottom:6px;color:var(--txt)">💬 Sorunum çözülmedi, nasıl ulaşırım?</div>
-    <div style="font-size:.84rem;color:var(--txt2);line-height:1.7">Destek için: <a href="mailto:destek@kirpifinans.com" style="color:var(--accent)">destek@kirpifinans.com</a> adresine e-posta gönderin veya Telegram'da @KirpiNakitBot üzerinden mesaj bırakın.</div>
+    <div style="font-size:.84rem;color:var(--txt2);line-height:1.7">Destek için: <a href="mailto:destek@kirpifinans.com" style="color:var(--accent)">destek@kirpifinans.com</a> adresine e-posta gönderin veya Telegram'da @Appkirpi_BOT üzerinden mesaj bırakın.</div>
   </div>
 </div>
 
@@ -2321,6 +2349,42 @@ body{top:0!important}
         <div style="font-weight:600;margin-bottom:4px">🏦 Yapı Kredi</div>
         <div style="color:var(--txt2)">İşlem Tarihi, Açıklama, Tutar</div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- RATES -->
+<div class="page" id="page-rates">
+  <div class="page-title">Döviz Kurları</div>
+  <div class="page-sub">Canlı kur bilgisi &mdash; 5 dakikada bir güncellenir</div>
+
+  <div id="rates-loading" style="text-align:center;padding:40px;color:var(--txt2);font-size:.9rem">Kurlar yükleniyor…</div>
+
+  <div id="rates-grid" style="display:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;max-width:800px;margin-bottom:24px"></div>
+
+  <div class="card" style="max-width:800px;margin-top:0" id="rates-calc-card" style="display:none">
+    <div class="section-title">Çevirici</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <input id="rates-amount" type="number" placeholder="Tutar" value="1000" oninput="ratesCalc()"
+        style="width:130px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;font-size:1rem;color:var(--txt)">
+      <select id="rates-from" onchange="ratesCalc()"
+        style="background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;font-size:1rem;color:var(--txt)">
+        <option value="TRY">🇹🇷 TRY</option>
+        <option value="USD">🇺🇸 USD</option>
+        <option value="EUR">🇪🇺 EUR</option>
+        <option value="GBP">🇬🇧 GBP</option>
+        <option value="GOLD">🥇 Altın (g)</option>
+      </select>
+      <span style="font-size:1.4rem;color:var(--txt2)">→</span>
+      <select id="rates-to" onchange="ratesCalc()"
+        style="background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;font-size:1rem;color:var(--txt)">
+        <option value="TRY" selected>🇹🇷 TRY</option>
+        <option value="USD">🇺🇸 USD</option>
+        <option value="EUR">🇪🇺 EUR</option>
+        <option value="GBP">🇬🇧 GBP</option>
+        <option value="GOLD">🥇 Altın (g)</option>
+      </select>
+      <div id="rates-result" style="font-size:1.3rem;font-weight:800;color:var(--accent-txt,var(--b));min-width:160px"></div>
     </div>
   </div>
 </div>
@@ -2929,7 +2993,7 @@ body{top:0!important}
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
         <div style="display:flex;gap:10px;align-items:flex-start">
           <div style="width:22px;height:22px;border-radius:50%;background:var(--brand);color:#d5fd73;font-size:.7rem;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">1</div>
-          <div style="font-size:.8rem;color:var(--txt2);line-height:1.5">Telegram'da <b id="tg-botname-lbl" style="color:var(--accent)">@KirpiNakitBot</b>'u ara ve <b>Başlat</b>'a bas</div>
+          <div style="font-size:.8rem;color:var(--txt2);line-height:1.5">Telegram'da <b id="tg-botname-lbl" style="color:var(--accent)">@Appkirpi_BOT</b>'u ara ve <b>Başlat</b>'a bas</div>
         </div>
         <div style="display:flex;gap:10px;align-items:flex-start">
           <div style="width:22px;height:22px;border-radius:50%;background:var(--brand);color:#d5fd73;font-size:.7rem;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">2</div>
@@ -2960,7 +3024,7 @@ body{top:0!important}
         <div style="font-size:.7rem;color:var(--txt2);margin-top:6px">Komut: <code id="tg-cmd" style="background:var(--bg4);padding:2px 6px;border-radius:5px">/link KOD</code> &nbsp;·&nbsp; 15 dk geçerli</div>
       </div>
       <div style="font-size:.78rem;color:var(--txt2);line-height:1.7">
-        1. Telegram'da <b id="tg-botname">@KirpiNakitBot</b>'u açın<br>
+        1. Telegram'da <b id="tg-botname">@Appkirpi_BOT</b>'u açın<br>
         2. <code>/link <span id="tg-code-inline">KOD</span></code> yazıp gönderin<br>
         3. Artık <code>market 250</code>, <code>yemek 85</code> gibi mesajlarla harcama kaydolur
       </div>
@@ -4108,6 +4172,7 @@ function goPage(id, el){
     if(id==='tags') initTagsPage();
     if(id==='scheduled') initScheduledPage();
     if(id==='income-sources') initIncomeSourcesPage();
+    if(id==='rates') initRatesPage();
   }
 
   if(prev){
@@ -8693,6 +8758,81 @@ function showAvailableLimitModal(){
   m.style.display='flex';
 }
 function closeAvailLimitModal(){ var m=document.getElementById('avail-limit-modal'); if(m) m.style.display='none'; }
+
+// ── DÖVİZ KURLARI ────────────────────────────────────────────────────────────
+var _ratesData = null;
+function initRatesPage(){
+  var loading = document.getElementById('rates-loading');
+  var grid    = document.getElementById('rates-grid');
+  var calc    = document.getElementById('rates-calc-card');
+  if(loading) loading.style.display='block';
+  if(grid)    grid.style.display='none';
+  if(calc)    calc.style.display='none';
+  xhr('/api/rates', null, function(d){
+    if(!d){ if(loading) loading.textContent='Kur bilgisi alınamadı.'; return; }
+    _ratesData = d;
+    if(loading) loading.style.display='none';
+
+    var currencies = [
+      { key:'usd_try', flag:'🇺🇸', name:'Amerikan Doları', code:'USD/TRY', color:'#22c55e' },
+      { key:'eur_try', flag:'🇪🇺', name:'Euro',            code:'EUR/TRY', color:'#3b82f6' },
+      { key:'gbp_try', flag:'🇬🇧', name:'İngiliz Sterlini', code:'GBP/TRY', color:'#a855f7' },
+      { key:'gold_try',flag:'🥇', name:'Altın (gram)',      code:'XAU/TRY', color:'#f59e0b' },
+    ];
+
+    if(grid){
+      grid.style.display='grid';
+      grid.innerHTML = currencies.map(function(c){
+        var val = d[c.key];
+        var txt = val ? '₺'+Number(val).toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+        return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:20px 18px;display:flex;flex-direction:column;gap:6px">'+
+          '<div style="font-size:2rem;line-height:1">'+c.flag+'</div>'+
+          '<div style="font-size:.72rem;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.8px">'+c.code+'</div>'+
+          '<div style="font-size:1.3rem;font-weight:800;color:'+c.color+'">'+txt+'</div>'+
+          '<div style="font-size:.75rem;color:var(--txt2)">'+c.name+'</div>'+
+        '</div>';
+      }).join('');
+    }
+
+    var upd = document.createElement('div');
+    upd.style.cssText='font-size:.75rem;color:var(--txt2);margin-bottom:16px;max-width:800px';
+    upd.textContent='Son güncelleme: '+d.updated+' (UTC)';
+    grid.insertAdjacentElement('afterend', upd);
+
+    if(calc){ calc.style.display='block'; ratesCalc(); }
+  });
+}
+
+function ratesCalc(){
+  if(!_ratesData) return;
+  var amt  = parseFloat(document.getElementById('rates-amount').value) || 0;
+  var from = document.getElementById('rates-from').value;
+  var to   = document.getElementById('rates-to').value;
+  var el   = document.getElementById('rates-result');
+  if(!el) return;
+
+  // TRY cinsinden değere dönüştür
+  function toTRY(currency, amount){
+    if(currency==='TRY')  return amount;
+    if(currency==='USD')  return amount * (_ratesData.usd_try || 1);
+    if(currency==='EUR')  return amount * (_ratesData.eur_try || 1);
+    if(currency==='GBP')  return amount * (_ratesData.gbp_try || 1);
+    if(currency==='GOLD') return amount * (_ratesData.gold_try || 1);
+    return amount;
+  }
+  function fromTRY(currency, tryAmount){
+    if(currency==='TRY')  return tryAmount;
+    if(currency==='USD')  return tryAmount / (_ratesData.usd_try || 1);
+    if(currency==='EUR')  return tryAmount / (_ratesData.eur_try || 1);
+    if(currency==='GBP')  return tryAmount / (_ratesData.gbp_try || 1);
+    if(currency==='GOLD') return tryAmount / (_ratesData.gold_try || 1);
+    return tryAmount;
+  }
+
+  var result = fromTRY(to, toTRY(from, amt));
+  var sym = to === 'TRY' ? '₺' : to === 'USD' ? '$' : to === 'EUR' ? '€' : to === 'GBP' ? '£' : '';
+  el.textContent = '= '+sym+result.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:4})+(to==='GOLD'?' g':'');
+}
 </script>
 
 <!-- KART ÖDEME MODALI -->

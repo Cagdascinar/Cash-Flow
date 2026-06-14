@@ -161,7 +161,7 @@ MAIL_PASSWORD   = os.environ.get("MAIL_PASSWORD", "")
 BACKUP_EMAIL    = os.environ.get("BACKUP_EMAIL", MAIL_FROM)
 APP_URL         = os.environ.get("APP_URL", "https://kirpifinans.com")
 TELEGRAM_TOKEN  = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME", "KirpiNakitBot")
+TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME", "Appkirpi_BOT")
 
 GELIR_CATS = ["Maaş", "Serbest Meslek", "Kira Geliri", "Yatırım Geliri / Satış",
                "Yatırım / Temettü", "Hediye / İkramiye", "Hesaplar Arası Transfer", "Diğer Gelir"]
@@ -1416,12 +1416,20 @@ def update_profile_avatar(pid):
 def switch_profile(pid):
     uid = session["user_id"]
     db  = get_db()
-    prof = db.execute("SELECT * FROM profiles WHERE id=? AND user_id=?",(pid,uid)).fetchone()
+    prof = db.execute("SELECT * FROM profiles WHERE id=%s AND user_id=%s",(pid,uid)).fetchone()
     if not prof: return jsonify({"ok":False,"error":"Profil bulunamadı"}),404
     session["profile_id"]   = prof["id"]
     session["profile_name"] = prof["name"]
     session["profile_type"] = prof["type"]
-    return jsonify({"ok":True,"name":prof["name"],"type":prof["type"]})
+    # Mobil token varsa kalıcı olarak güncelle — bir sonraki istekte doğru profil gelsin
+    token = request.headers.get("X-Mobile-Token","").strip()
+    if token:
+        with pg_connect() as con:
+            con.execute(
+                "UPDATE mobile_tokens SET profile_id=%s WHERE token=%s AND user_id=%s",
+                (prof["id"], token, uid)
+            )
+    return jsonify({"ok":True,"name":prof["name"],"type":prof["type"],"profile_id":prof["id"]})
 
 @app.route("/api/profiles/<int:pid>", methods=["DELETE"])
 @login_required
