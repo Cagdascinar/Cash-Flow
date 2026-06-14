@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C, money } from '../../constants/Colors';
-import { transactions, accounts as accountsApi, cards as cardsApi } from '../../services/api';
+import { transactions, accounts as accountsApi, cards as cardsApi, misc as miscApi } from '../../services/api';
 
 const GELIR = ['Maaş','Serbest Meslek','Kira Geliri','Yatırım Geliri / Satış','Yatırım / Temettü','Hediye / İkramiye','Hesaplar Arası Transfer','Diğer Gelir'];
 const GIDER = ['Kira / Mortgage','Market / Gıda','Faturalar','Ulaşım','Yemek / Restoran','Eğlence','Sağlık','Giyim','Eğitim','Abonelikler','Elektronik','Sigorta','Vergi / Harç','Kredi Kartı Ödemesi','Yemek Kartı Ödemesi','Döviz Alımı','Altın Alımı','Yatırım Fonu','Hisse Senedi','Hesaplar Arası Transfer','Diğer Gider'];
@@ -23,15 +23,18 @@ export default function AddScreen() {
   const [payMethod, setPayMethod] = useState<PayMethod>('nakit');
   const [accountId, setAccountId] = useState<number|null>(null);
   const [cardId,    setCardId]    = useState<number|null>(null);
+  const [projectId, setProjectId] = useState<number|null>(null);
   const [accounts,  setAccounts]  = useState<any[]>([]);
   const [cards,     setCards]     = useState<any[]>([]);
+  const [projects,  setProjects]  = useState<any[]>([]);
   const [loading,   setLoading]   = useState(false);
 
   useEffect(() => {
-    Promise.all([accountsApi.list(), cardsApi.list()])
-      .then(([acc, crd]) => {
+    Promise.all([accountsApi.list(), cardsApi.list(), miscApi.projects()])
+      .then(([acc, crd, prj]) => {
         setAccounts(Array.isArray(acc) ? acc.filter((a:any) => !['kredi_karti','kmh'].includes(a.type)) : []);
         setCards(Array.isArray(crd) ? crd : []);
+        setProjects(Array.isArray(prj) ? prj : []);
       }).catch(() => {});
   }, []);
 
@@ -43,13 +46,14 @@ export default function AddScreen() {
     const payload: Record<string, unknown> = { type, amount: amt, description: desc.trim(), category: cat, date };
     if (payMethod === 'hesap' && accountId) payload.account_id = accountId;
     if (payMethod === 'kart'  && cardId)    payload.card_id    = cardId;
+    if (type === 'gider' && projectId)      payload.project_id  = projectId;
 
     setLoading(true);
     try {
       await transactions.create(payload);
       Alert.alert('✅ Kaydedildi', '', [
         { text: 'Ana Sayfa', onPress: () => router.replace('/(tabs)') },
-        { text: 'Yeni Ekle', onPress: () => { setAmount(''); setDesc(''); } },
+        { text: 'Yeni Ekle', onPress: () => { setAmount(''); setDesc(''); setProjectId(null); } },
       ]);
     } catch (e: any) { Alert.alert('Hata', e.message); }
     finally { setLoading(false); }
@@ -66,7 +70,7 @@ export default function AddScreen() {
           <View style={s.toggle}>
             {(['gider','gelir'] as const).map(t => (
               <TouchableOpacity key={t} style={[s.tBtn, type === t && (t === 'gelir' ? s.tGreen : s.tRed)]}
-                onPress={() => { setType(t); setCat(t === 'gelir' ? GELIR[0] : GIDER[0]); }}>
+                onPress={() => { setType(t); setCat(t === 'gelir' ? GELIR[0] : GIDER[0]); setProjectId(null); }}>
                 <Text style={[s.tTxt, type === t && { color: C.white }]}>{t === 'gelir' ? '↑  Gelir' : '↓  Gider'}</Text>
               </TouchableOpacity>
             ))}
@@ -123,6 +127,39 @@ export default function AddScreen() {
             <TextInput style={s.input} placeholder="YYYY-MM-DD" placeholderTextColor={C.muted} value={date} onChangeText={setDate} />
           </View>
 
+          {/* Proje — gider türünde proje varsa göster */}
+          {type === 'gider' && projects.length > 0 && (
+            <View style={s.field}>
+              <Text style={s.lbl}>Proje <Text style={s.optional}>(isteğe bağlı)</Text></Text>
+              <View style={s.projectList}>
+                {/* Proje seçimini kaldır */}
+                <TouchableOpacity
+                  style={[s.projBtn, projectId === null && s.projBtnNone]}
+                  onPress={() => setProjectId(null)}>
+                  <Text style={[s.projTxt, projectId === null && { color: C.txt, fontWeight: '700' }]}>— Proje Yok</Text>
+                </TouchableOpacity>
+                {projects.map(p => (
+                  <TouchableOpacity key={p.id}
+                    style={[s.projBtn, projectId === p.id && s.projBtnActive]}
+                    onPress={() => setProjectId(p.id)}>
+                    <View style={[s.projDot, { backgroundColor: p.color ?? C.blue }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.projTxt, projectId === p.id && { color: C.white, fontWeight: '700' }]} numberOfLines={1}>
+                        {p.name}
+                      </Text>
+                      {p.budget > 0 && (
+                        <Text style={[s.projSub, projectId === p.id && { color: 'rgba(255,255,255,.6)' }]}>
+                          {money(p.spent)} / {money(p.budget)}
+                        </Text>
+                      )}
+                    </View>
+                    {projectId === p.id && <Text style={{ color: C.white, fontSize: 16 }}>✓</Text>}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
           <View style={s.field}>
             <Text style={s.lbl}>Kategori</Text>
             <View style={s.catGrid}>
@@ -144,34 +181,42 @@ export default function AddScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
-  header:    { paddingHorizontal: 16, paddingTop: 8 },
-  title:     { fontSize: 24, fontWeight: '800', color: C.txt },
-  toggle:    { flexDirection: 'row', margin: 16, backgroundColor: C.input, borderRadius: 14, padding: 4, gap: 4 },
-  tBtn:      { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  tGreen:    { backgroundColor: C.green },
-  tRed:      { backgroundColor: C.red },
-  tTxt:      { fontSize: 15, fontWeight: '600', color: C.txt2 },
-  amtRow:    { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, gap: 4 },
-  curr:      { fontSize: 32, fontWeight: '800', color: C.txt2 },
-  amtInput:  { flex: 1, fontSize: 48, fontWeight: '800', color: C.txt, padding: 0 },
-  field:     { marginHorizontal: 16, marginTop: 20, gap: 8 },
-  lbl:       { fontSize: 11, fontWeight: '700', color: C.txt2, textTransform: 'uppercase', letterSpacing: 0.8 },
-  methods:   { flexDirection: 'row', gap: 8 },
-  methBtn:   { flex: 1, paddingVertical: 9, borderRadius: 10, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, alignItems: 'center' },
-  methA:     { backgroundColor: C.blue, borderColor: C.blue },
-  methTxt:   { fontSize: 13, fontWeight: '600', color: C.txt2 },
-  subList:   { gap: 8, marginTop: 4 },
-  subBtn:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.card, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: C.border },
-  subA:      { backgroundColor: C.blue, borderColor: C.blue },
-  subDot:    { width: 10, height: 10, borderRadius: 5 },
-  subTxt:    { flex: 1, fontSize: 13, fontWeight: '600', color: C.txt },
-  subVal:    { fontSize: 12, color: C.txt2 },
-  input:     { backgroundColor: C.card, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: C.txt, borderWidth: 1, borderColor: C.border },
-  catGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  catBtn:    { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: C.input, borderWidth: 1, borderColor: C.border },
-  catA:      { backgroundColor: C.blue, borderColor: C.blue },
-  catTxt:    { fontSize: 13, color: C.txt2 },
-  saveBtn:   { marginHorizontal: 16, marginTop: 24, marginBottom: 40, paddingVertical: 16, borderRadius: 14, alignItems: 'center' },
-  saveTxt:   { fontSize: 16, fontWeight: '700', color: C.white },
+  container:   { flex: 1, backgroundColor: C.bg },
+  header:      { paddingHorizontal: 16, paddingTop: 8 },
+  title:       { fontSize: 24, fontWeight: '800', color: C.txt },
+  toggle:      { flexDirection: 'row', margin: 16, backgroundColor: C.input, borderRadius: 14, padding: 4, gap: 4 },
+  tBtn:        { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
+  tGreen:      { backgroundColor: C.green },
+  tRed:        { backgroundColor: C.red },
+  tTxt:        { fontSize: 15, fontWeight: '600', color: C.txt2 },
+  amtRow:      { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, gap: 4 },
+  curr:        { fontSize: 32, fontWeight: '800', color: C.txt2 },
+  amtInput:    { flex: 1, fontSize: 48, fontWeight: '800', color: C.txt, padding: 0 },
+  field:       { marginHorizontal: 16, marginTop: 20, gap: 8 },
+  lbl:         { fontSize: 11, fontWeight: '700', color: C.txt2, textTransform: 'uppercase', letterSpacing: 0.8 },
+  optional:    { fontWeight: '400', textTransform: 'none', letterSpacing: 0, fontSize: 11, color: C.muted },
+  methods:     { flexDirection: 'row', gap: 8 },
+  methBtn:     { flex: 1, paddingVertical: 9, borderRadius: 10, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, alignItems: 'center' },
+  methA:       { backgroundColor: C.blue, borderColor: C.blue },
+  methTxt:     { fontSize: 13, fontWeight: '600', color: C.txt2 },
+  subList:     { gap: 8, marginTop: 4 },
+  subBtn:      { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.card, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: C.border },
+  subA:        { backgroundColor: C.blue, borderColor: C.blue },
+  subDot:      { width: 10, height: 10, borderRadius: 5 },
+  subTxt:      { flex: 1, fontSize: 13, fontWeight: '600', color: C.txt },
+  subVal:      { fontSize: 12, color: C.txt2 },
+  input:       { backgroundColor: C.card, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: C.txt, borderWidth: 1, borderColor: C.border },
+  projectList: { gap: 8 },
+  projBtn:     { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.border },
+  projBtnNone: { borderColor: C.muted },
+  projBtnActive:{ backgroundColor: C.blue, borderColor: C.blue },
+  projDot:     { width: 12, height: 12, borderRadius: 6, flexShrink: 0 },
+  projTxt:     { fontSize: 14, color: C.txt2, flex: 1 },
+  projSub:     { fontSize: 11, color: C.txt2, marginTop: 2 },
+  catGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  catBtn:      { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: C.input, borderWidth: 1, borderColor: C.border },
+  catA:        { backgroundColor: C.blue, borderColor: C.blue },
+  catTxt:      { fontSize: 13, color: C.txt2 },
+  saveBtn:     { marginHorizontal: 16, marginTop: 24, marginBottom: 40, paddingVertical: 16, borderRadius: 14, alignItems: 'center' },
+  saveTxt:     { fontSize: 16, fontWeight: '700', color: C.white },
 });

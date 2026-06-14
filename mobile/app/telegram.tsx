@@ -50,7 +50,7 @@ export default function TelegramScreen() {
         : <View style={s.content}>
             <View style={s.botCard}>
               <Text style={s.botIco}>🤖</Text>
-              <Text style={s.botName}>@KirpiNakitBot</Text>
+              <Text style={s.botName}>@Appkirpi_BOT</Text>
               <Text style={s.botDesc}>Telegram üzerinden hızlıca işlem girin.{'\n'}"50 tl market" yazmanız yeterli!</Text>
             </View>
 
@@ -67,7 +67,7 @@ export default function TelegramScreen() {
               : <>
                   <Text style={s.step}>Nasıl bağlanılır:</Text>
                   <View style={s.steps}>
-                    {['1. Aşağıdan kod alın', '2. Telegram\'da @KirpiNakitBot\'u bulun', '3. /start komutunu gönderin', '4. Kodu bot\'a gönderin'].map((t, i) => (
+                    {['1. Aşağıdan kod alın', '2. Telegram\'da @Appkirpi_BOT\'u bulun', '3. /start komutunu gönderin', '4. Kodu bot\'a gönderin'].map((t, i) => (
                       <Text key={i} style={s.stepTxt}>{t}</Text>
                     ))}
                   </View>

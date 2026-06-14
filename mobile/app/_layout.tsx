@@ -95,7 +95,6 @@ function RootLayoutNav() {
         <Stack.Screen name="tags"          options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="scheduled"     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="income-sources" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="changelog"     options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="help"          options={{ animation: 'slide_from_right' }} />
       </Stack>
     </>

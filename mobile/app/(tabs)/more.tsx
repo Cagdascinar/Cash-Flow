@@ -201,8 +201,6 @@ export default function MoreScreen() {
 
         <Text style={s.grp}>Hakkında</Text>
         <View style={s.group}>
-          <Row ico="📝" label="Değişiklik Günlüğü" sub="Neler yeni?" onPress={() => go('/changelog')} />
-          <View style={s.sep} />
           <Row ico="❓" label="Yardım & SSS" sub="Sıkça sorulan sorular" onPress={() => go('/help')} />
         </View>
 
