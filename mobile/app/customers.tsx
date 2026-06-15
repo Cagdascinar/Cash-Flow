@@ -215,7 +215,12 @@ export default function CustomersScreen() {
               <Text style={s.mTitle}>{selCust?.name}</Text>
               <TouchableOpacity onPress={() => setInvModal(false)}><Text style={s.close}>✕</Text></TouchableOpacity>
             </View>
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+              directionalLockEnabled
+              disableScrollViewPanResponder
+            >
               {/* Yeni Fatura */}
               <View style={s.invForm}>
                 <Text style={[s.mLbl, { marginBottom: 10 }]}>Yeni Fatura Ekle</Text>
@@ -264,12 +269,17 @@ export default function CustomersScreen() {
                           <Text style={[s.amount, { color: inv.status === 'odendi' ? '#4ade80' : '#f0b90b' }]}>
                             {money(inv.amount)}
                           </Text>
-                          {inv.status !== 'odendi'
-                            ? <TouchableOpacity onPress={() => payInvoice(inv.id)} style={s.payBtn}>
-                                <Text style={s.payBtnTxt}>Tahsil Et</Text>
-                              </TouchableOpacity>
-                            : <Text style={{ color: '#4ade80', fontSize: 11 }}>✓ Ödendi</Text>
-                          }
+                          <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                            {inv.status !== 'odendi'
+                              ? <TouchableOpacity onPress={() => payInvoice(inv.id)} style={s.payBtn}>
+                                  <Text style={s.payBtnTxt}>Tahsil Et</Text>
+                                </TouchableOpacity>
+                              : <Text style={{ color: '#4ade80', fontSize: 11 }}>✓ Ödendi</Text>
+                            }
+                            <TouchableOpacity onPress={() => delInvoice(inv.id)} style={s.delBtn}>
+                              <Text style={{ fontSize: 15 }}>🗑️</Text>
+                            </TouchableOpacity>
+                          </View>
                         </View>
                       </View>
                     </SwipeableRow>
@@ -316,4 +326,5 @@ const s = StyleSheet.create({
   invNo:      { fontSize: 14, fontWeight: '700', color: C.txt },
   payBtn:    { backgroundColor: '#166534', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
   payBtnTxt: { fontSize: 11, fontWeight: '700', color: '#4ade80' },
+  delBtn:    { width: 30, height: 30, borderRadius: 8, backgroundColor: 'rgba(220,38,38,.15)', alignItems: 'center', justifyContent: 'center' },
 });
