@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 import { C, money, fmtDate } from '../constants/Colors';
 import { customers as custApi } from '../services/api';
@@ -98,7 +99,11 @@ export default function CustomersScreen() {
     Alert.alert('Fatura Sil', 'Bu faturayı silmek istiyor musunuz?', [
       { text: 'İptal', style: 'cancel' },
       { text: 'Sil', style: 'destructive', onPress: async () => {
-        try { await custApi.deleteInvoice(id); setInvoices(p => p.filter(x => x.id !== id)); }
+        try {
+          await custApi.deleteInvoice(id);
+          setInvoices(p => p.filter(x => x.id !== id));
+          load();
+        }
         catch (e: any) { Alert.alert('Hata', e.message); }
       }},
     ]);
@@ -204,72 +209,75 @@ export default function CustomersScreen() {
 
       {/* Faturalar Modal */}
       <Modal visible={invModal} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView style={s.bg} edges={['top']}>
-          <View style={s.mHeader}>
-            <Text style={s.mTitle}>{selCust?.name}</Text>
-            <TouchableOpacity onPress={() => setInvModal(false)}><Text style={s.close}>✕</Text></TouchableOpacity>
-          </View>
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-            {/* Yeni Fatura */}
-            <View style={s.invForm}>
-              <Text style={[s.mLbl, { marginBottom: 10 }]}>Yeni Fatura Ekle</Text>
-              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.mLbl}>Fatura No *</Text>
-                  <TextInput style={s.mInput} value={invNo} onChangeText={setInvNo} placeholder="F-001" placeholderTextColor={C.muted} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.mLbl}>Tutar (₺) *</Text>
-                  <TextInput style={s.mInput} value={invAmt} onChangeText={setInvAmt} placeholder="0,00" placeholderTextColor={C.muted} keyboardType="decimal-pad" />
-                </View>
-              </View>
-              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.mLbl}>Tarih</Text>
-                  <TextInput style={s.mInput} value={invDate} onChangeText={setInvDate} placeholder="YYYY-MM-DD" placeholderTextColor={C.muted} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.mLbl}>Vade</Text>
-                  <TextInput style={s.mInput} value={dueDate} onChangeText={setDueDate} placeholder="YYYY-MM-DD" placeholderTextColor={C.muted} />
-                </View>
-              </View>
-              <TextInput style={s.mInput} value={invDesc} onChangeText={setInvDesc} placeholder="Açıklama" placeholderTextColor={C.muted} />
-              <TouchableOpacity style={[s.saveBtn, { marginTop: 10 }, saving && { opacity: 0.6 }]} onPress={addInvoice} disabled={saving}>
-                <Text style={s.saveTxt}>+ Fatura Ekle</Text>
-              </TouchableOpacity>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <SafeAreaView style={s.bg} edges={['top']}>
+            <View style={s.mHeader}>
+              <Text style={s.mTitle}>{selCust?.name}</Text>
+              <TouchableOpacity onPress={() => setInvModal(false)}><Text style={s.close}>✕</Text></TouchableOpacity>
             </View>
-
-            {/* Fatura Listesi */}
-            <Text style={[s.mLbl, { marginTop: 20, marginBottom: 8 }]}>Faturalar</Text>
-            {invoices.length === 0
-              ? <Text style={{ color: C.muted, textAlign: 'center', paddingVertical: 20 }}>Fatura yok</Text>
-              : invoices.map(inv => (
-                  <View key={inv.id} style={s.invCard}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.invNo}>{inv.invoice_no}</Text>
-                      <Text style={s.sub}>{fmtDate(inv.invoice_date)}{inv.due_date ? ` · Vade: ${fmtDate(inv.due_date)}` : ''}</Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                      <Text style={[s.amount, { color: inv.status === 'odendi' ? '#4ade80' : '#f0b90b' }]}>
-                        {money(inv.amount)}
-                      </Text>
-                      <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-                        {inv.status !== 'odendi' && (
-                          <TouchableOpacity onPress={() => payInvoice(inv.id)} style={s.payBtn}>
-                            <Text style={s.payBtnTxt}>Tahsil Et</Text>
-                          </TouchableOpacity>
-                        )}
-                        {inv.status === 'odendi' && <Text style={{ color: '#4ade80', fontSize: 11 }}>✓ Ödendi</Text>}
-                        <TouchableOpacity onPress={() => delInvoice(inv.id)} style={s.delInvBtn}>
-                          <Text style={s.delInvTxt}>🗑️</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+              {/* Yeni Fatura */}
+              <View style={s.invForm}>
+                <Text style={[s.mLbl, { marginBottom: 10 }]}>Yeni Fatura Ekle</Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.mLbl}>Fatura No *</Text>
+                    <TextInput style={s.mInput} value={invNo} onChangeText={setInvNo} placeholder="F-001" placeholderTextColor={C.muted} />
                   </View>
-                ))
-            }
-          </ScrollView>
-        </SafeAreaView>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.mLbl}>Tutar (₺) *</Text>
+                    <TextInput style={s.mInput} value={invAmt} onChangeText={setInvAmt} placeholder="0,00" placeholderTextColor={C.muted} keyboardType="decimal-pad" />
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.mLbl}>Tarih</Text>
+                    <TextInput style={s.mInput} value={invDate} onChangeText={setInvDate} placeholder="YYYY-MM-DD" placeholderTextColor={C.muted} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.mLbl}>Vade</Text>
+                    <TextInput style={s.mInput} value={dueDate} onChangeText={setDueDate} placeholder="YYYY-MM-DD" placeholderTextColor={C.muted} />
+                  </View>
+                </View>
+                <TextInput style={s.mInput} value={invDesc} onChangeText={setInvDesc} placeholder="Açıklama" placeholderTextColor={C.muted} />
+                <TouchableOpacity style={[s.saveBtn, { marginTop: 10 }, saving && { opacity: 0.6 }]} onPress={addInvoice} disabled={saving}>
+                  <Text style={s.saveTxt}>+ Fatura Ekle</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Fatura Listesi */}
+              <Text style={[s.mLbl, { marginTop: 20, marginBottom: 8 }]}>Faturalar</Text>
+              {invoices.length === 0
+                ? <Text style={{ color: C.muted, textAlign: 'center', paddingVertical: 20 }}>Fatura yok</Text>
+                : invoices.map(inv => (
+                    <SwipeableRow
+                      key={inv.id}
+                      style={{ marginBottom: 8, borderRadius: 12 }}
+                      actions={[{ label: 'Sil', icon: '🗑️', color: '#dc2626', onPress: () => delInvoice(inv.id) }]}
+                    >
+                      <View style={[s.invCard, { marginBottom: 0 }]}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.invNo}>{inv.invoice_no}</Text>
+                          <Text style={s.sub}>{fmtDate(inv.invoice_date)}{inv.due_date ? ` · Vade: ${fmtDate(inv.due_date)}` : ''}</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                          <Text style={[s.amount, { color: inv.status === 'odendi' ? '#4ade80' : '#f0b90b' }]}>
+                            {money(inv.amount)}
+                          </Text>
+                          {inv.status !== 'odendi'
+                            ? <TouchableOpacity onPress={() => payInvoice(inv.id)} style={s.payBtn}>
+                                <Text style={s.payBtnTxt}>Tahsil Et</Text>
+                              </TouchableOpacity>
+                            : <Text style={{ color: '#4ade80', fontSize: 11 }}>✓ Ödendi</Text>
+                          }
+                        </View>
+                      </View>
+                    </SwipeableRow>
+                  ))
+              }
+            </ScrollView>
+          </SafeAreaView>
+        </GestureHandlerRootView>
       </Modal>
     </SafeAreaView>
   );
@@ -304,10 +312,8 @@ const s = StyleSheet.create({
   saveBtn:    { backgroundColor: C.blue, borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 8 },
   saveTxt:    { fontSize: 15, fontWeight: '700', color: C.white },
   invForm:    { backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border },
-  invCard:    { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: C.border },
+  invCard:    { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.border },
   invNo:      { fontSize: 14, fontWeight: '700', color: C.txt },
-  payBtn:      { backgroundColor: '#166534', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  payBtnTxt:   { fontSize: 11, fontWeight: '700', color: '#4ade80' },
-  delInvBtn:   { width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(220,38,38,.15)', alignItems: 'center', justifyContent: 'center' },
-  delInvTxt:   { fontSize: 14 },
+  payBtn:    { backgroundColor: '#166534', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  payBtnTxt: { fontSize: 11, fontWeight: '700', color: '#4ade80' },
 });

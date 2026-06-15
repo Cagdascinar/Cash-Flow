@@ -65,42 +65,55 @@ function RootLayoutNav() {
   return (
     <>
       <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="cards"          options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="add-card"       options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="accounts"       options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="add-account"    options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="investments"    options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="recurring"      options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="suppliers"      options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="assets"         options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="telegram"       options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="settings"       options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="edit-tx"        options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="transfer"       options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="todos"          options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="pay-card"       options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="add-goal"       options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="set-budget"     options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="invoices"       options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="rates"          options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="card-report"    options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="notifications"  options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="profiles"       options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="insights"       options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="templates"     options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="projects"      options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="categories"    options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="tags"          options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="scheduled"     options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="income-sources" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="customers"     options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="employees"     options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="kdv"           options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="ploss"         options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="help"          options={{ animation: 'slide_from_right' }} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'ios',
+          gestureEnabled: true,
+          contentStyle: { backgroundColor: '#0b0e11' },
+          animationDuration: 280,
+        }}
+      >
+        {/* Auth/tabs: fade geçiş — push animasyonu değil */}
+        <Stack.Screen name="(auth)" options={{ animation: 'fade', gestureEnabled: false }} />
+        <Stack.Screen name="(tabs)" options={{ animation: 'fade', gestureEnabled: false }} />
+
+        {/* Modal tarzı ekranlar — alttan yukarı açılır */}
+        <Stack.Screen name="settings"      options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="profiles"      options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="help"          options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="telegram"      options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="notifications" options={{ animation: 'slide_from_bottom' }} />
+
+        {/* Geri kalan tüm ekranlar screenOptions'dan 'ios' alır */}
+        <Stack.Screen name="cards" />
+        <Stack.Screen name="add-card" />
+        <Stack.Screen name="accounts" />
+        <Stack.Screen name="add-account" />
+        <Stack.Screen name="investments" />
+        <Stack.Screen name="recurring" />
+        <Stack.Screen name="suppliers" />
+        <Stack.Screen name="assets" />
+        <Stack.Screen name="edit-tx" />
+        <Stack.Screen name="transfer" />
+        <Stack.Screen name="todos" />
+        <Stack.Screen name="pay-card" />
+        <Stack.Screen name="add-goal" />
+        <Stack.Screen name="set-budget" />
+        <Stack.Screen name="invoices" />
+        <Stack.Screen name="rates" />
+        <Stack.Screen name="card-report" />
+        <Stack.Screen name="insights" />
+        <Stack.Screen name="templates" />
+        <Stack.Screen name="projects" />
+        <Stack.Screen name="categories" />
+        <Stack.Screen name="tags" />
+        <Stack.Screen name="scheduled" />
+        <Stack.Screen name="income-sources" />
+        <Stack.Screen name="customers" />
+        <Stack.Screen name="employees" />
+        <Stack.Screen name="kdv" />
+        <Stack.Screen name="ploss" />
       </Stack>
     </>
   );

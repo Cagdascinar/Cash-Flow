@@ -7211,9 +7211,11 @@ def update_customer_invoice(iid):
 @app.route("/api/customer-invoices/<int:iid>", methods=["DELETE"])
 @login_required
 def del_customer_invoice(iid):
-    uid = session["user_id"]; pid = get_pid(); db = get_db()
-    db.execute("DELETE FROM customer_invoices WHERE id=%s AND user_id=%s AND profile_id=%s",(iid,uid,pid))
+    uid = session["user_id"]; db = get_db()
+    cur = db.execute("DELETE FROM customer_invoices WHERE id=%s AND user_id=%s",(iid,uid))
     db.commit()
+    if cur._cur.rowcount == 0:
+        return jsonify({"ok": False, "error": "Fatura bulunamadı"}), 404
     return jsonify({"ok":True})
 
 @app.route("/api/customer-invoices/<int:iid>/pay", methods=["POST"])
