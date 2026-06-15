@@ -243,6 +243,24 @@ nav{width:220px;background:var(--brand);border-right:none;
 }
 
 /* ── NAV ── */
+/* ── NAV USER CARD (sol üst profil) ── */
+.nav-user-card{display:flex;align-items:center;gap:11px;padding:14px 14px 12px;
+  border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:6px;
+  transition:background .12s;border-radius:0}
+.nav-user-card:hover{background:rgba(255,255,255,.08)}
+.nav-top-avatar{width:42px;height:42px;border-radius:10px;background:rgba(255,255,255,.12);
+  flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;
+  border:1.5px solid rgba(255,255,255,.18);box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.nav-user-info{min-width:0;flex:1}
+.nav-top-name{font-size:.82rem;font-weight:800;color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em}
+.nav-top-type{font-size:.67rem;color:rgba(255,255,255,.45);margin-top:1px;white-space:nowrap}
+/* Collapsed: sadece avatar, isim gizle */
+nav.nav-collapsed .nav-user-card{padding:10px 9px;justify-content:center;gap:0}
+nav.nav-collapsed .nav-user-info{display:none}
+nav.nav-collapsed .nav-top-avatar{width:38px;height:38px}
+
+/* eski nav-logo stili (fallback) */
 .nav-logo{padding:24px 20px 16px;border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:8px}
 .nav-logo .brand{font-size:1.1rem;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:8px;color:#fff}
 .nav-logo .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--accent)}
@@ -260,7 +278,7 @@ nav{width:220px;background:var(--brand);border-right:none;
 
 /* ── MOBILE ALT NAV — Apple iOS Tab Bar Standard ── */
 @media(max-width:768px){
-  .nav-sect,.nl-desktop,.nl-desktop-only,.nl-menu,.nl-more,.nl-spacer,.nav-logo{display:none!important}
+  .nav-sect,.nl-desktop,.nl-desktop-only,.nl-menu,.nl-more,.nl-spacer,.nav-logo,.nav-user-card,.nav-ham{display:none!important}
 
   /* Tab bar container */
   .nav-links {
@@ -1435,11 +1453,16 @@ body{top:0!important}
   <div class="nav-ham">
     <button onclick="toggleNav()" title="Menüyü Daralt / Genişlet" id="nav-ham-btn">☰</button>
   </div>
-  <div class="nav-logo" onclick="goPage('dashboard',document.querySelector('[data-page=dashboard]'))" style="cursor:pointer">
-    <div class="brand">
-      <div class="kirpi-walk-wrap"><img src="/icon.svg" class="kirpi-walk-img" style="width:32px;height:32px;border-radius:8px"> </div><span class="brand-txt" style="margin-left:4px">Kirpi</span>
+  <!-- Kullanıcı profil kartı (sol üst) -->
+  <div class="nav-user-card" onclick="goPage('settings',document.querySelector('[data-page=settings]'))" style="cursor:pointer" title="Ayarlar">
+    <div id="nav-top-avatar" class="nav-top-avatar">
+      <img src="/icon.svg" id="nav-top-avatar-img" style="width:100%;height:100%;object-fit:cover;border-radius:9px;display:none">
+      <span id="nav-top-avatar-initials" style="font-size:1.1rem;line-height:1">🦔</span>
     </div>
-    <div class="sub">Gelir · Gider · Yatırım</div>
+    <div class="nav-user-info">
+      <div id="nav-top-name" class="nav-top-name">Kirpi Finans</div>
+      <div id="nav-top-type" class="nav-top-type">Gelir · Gider · Yatırım</div>
+    </div>
   </div>
   <div class="nav-links">
     <!-- Mobil alt nav (4 sabit buton) -->
@@ -4669,7 +4692,11 @@ function _appInit(){
       var curPid=parseInt(sessionStorage.getItem('cur_pid')||'0');
       var preferred=parseInt(localStorage.getItem('preferred_pid')||'0');
       var activeP=d.profiles.find(function(p){return p.id===(preferred||curPid);})||d.profiles[0];
-      if(activeP){ var snEl=document.getElementById('sidebar-profile-name'); if(snEl) snEl.textContent=activeP.name; updateSidebarProfileAvatar(activeP.avatar||''); }
+      if(activeP){
+        var snEl=document.getElementById('sidebar-profile-name'); if(snEl) snEl.textContent=activeP.name;
+        updateSidebarProfileAvatar(activeP.avatar||'');
+        updateNavTopProfile(activeP.name, activeP.type||'sahis');
+      }
       if(preferred&&preferred!==curPid){
         var match=d.profiles.find(function(p){return p.id===preferred;});
         if(match){
@@ -5197,6 +5224,7 @@ function loadProfiles(){
       var snEl=document.getElementById('sidebar-profile-name');
       if(snEl) snEl.textContent=activeP.name;
       updateSidebarProfileAvatar(activeP.avatar||'');
+      updateNavTopProfile(activeP.name, activeP.type||'sahis');
     }
     if(preferred && preferred!==curPid){
       var match=list.find(function(p){return p.id===preferred;});
@@ -5306,9 +5334,23 @@ function handleProfileAvatarUpload(input, pid){
 }
 
 function updateSidebarProfileAvatar(avatar){
+  // Alt sidebar avatar (yuvarlak)
   var el=document.getElementById('sidebar-profile-avatar');
-  if(!el) return;
-  el.innerHTML=avatar?'<img src="'+avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':'';
+  if(el) el.innerHTML=avatar?'<img src="'+avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':'';
+  // Sol üst kare avatar
+  var img=document.getElementById('nav-top-avatar-img');
+  var ini=document.getElementById('nav-top-avatar-initials');
+  if(img && ini){
+    if(avatar){ img.src=avatar; img.style.display='block'; ini.style.display='none'; }
+    else { img.style.display='none'; ini.style.display=''; }
+  }
+}
+
+function updateNavTopProfile(name, profileType){
+  var nameEl=document.getElementById('nav-top-name');
+  var typeEl=document.getElementById('nav-top-type');
+  if(nameEl && name) nameEl.textContent=name;
+  if(typeEl) typeEl.textContent=profileType==='sirket'?'🏢 Ticari Hesap':'👤 Bireysel Hesap';
 }
 
 function switchProfileThen(pid, cb){
