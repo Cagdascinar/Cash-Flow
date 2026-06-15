@@ -10178,6 +10178,7 @@ function loadCustInvoices(){
               '<div style="font-size:.95rem;font-weight:800;color:var(--txt)">'+fmt(inv.total_amount)+'</div>'+
               '<div style="font-size:.7rem;color:'+sColor+';font-weight:600;margin-top:2px">'+(statusMap[inv.status]||inv.status)+'</div>'+
             '</div>'+
+            '<button onclick="openEditCustInvoice('+inv.id+')" title="Düzenle" style="background:none;border:none;color:var(--txt2);cursor:pointer;font-size:1rem;padding:2px 4px;flex-shrink:0;-webkit-tap-highlight-color:transparent">✏️</button>'+
             '<button onclick="delCustInvoice('+inv.id+')" title="Sil" style="background:none;border:none;color:var(--txt2);cursor:pointer;font-size:1rem;padding:2px 4px;flex-shrink:0;-webkit-tap-highlight-color:transparent">🗑</button>'+
           '</div>'+
         '</div>'+
@@ -10224,6 +10225,58 @@ function delCustInvoice(id){
     if(d&&d.ok===false){ alert(d.error||'Hata'); return; }
     loadCustInvoices(); loadCustSummary();
   }, false, true);
+}
+
+var _editingCustInvId = null;
+function openEditCustInvoice(id){
+  xhr('/api/customer-invoices', null, function(items){
+    var inv = (items||[]).find(function(x){ return x.id===id; });
+    if(!inv) return;
+    _editingCustInvId = id;
+    var existing = document.getElementById('mod-edit-cust-inv');
+    if(existing) existing.remove();
+    var html =
+      '<div id="mod-edit-cust-inv" class="mod-backdrop" onclick="if(event.target===this)this.remove()" style="display:flex">'+
+      '<div class="mod-sheet" style="max-width:480px;width:100%">'+
+        '<div class="mod-handle"></div>'+
+        '<div class="mod-title">Fatura Düzenle</div>'+
+        '<div class="mod-field"><div class="mod-label">Fatura No</div>'+
+          '<input type="text" class="mod-input" id="ecust-inv-no" value="'+escHtml(inv.invoice_no||'')+'"></div>'+
+        '<div style="display:flex;gap:10px">'+
+          '<div class="mod-field" style="flex:1"><div class="mod-label">Tutar (₺)</div>'+
+            '<input type="number" class="mod-input" id="ecust-inv-amt" value="'+(inv.amount||0)+'" step="0.01"></div>'+
+          '<div class="mod-field" style="flex:1"><div class="mod-label">KDV %</div>'+
+            '<input type="number" class="mod-input" id="ecust-inv-kdv" value="'+(inv.kdv_rate||20)+'" step="1"></div>'+
+        '</div>'+
+        '<div style="display:flex;gap:10px">'+
+          '<div class="mod-field" style="flex:1"><div class="mod-label">Tarih</div>'+
+            '<input type="date" class="mod-input" id="ecust-inv-date" value="'+(inv.invoice_date||'')+'"></div>'+
+          '<div class="mod-field" style="flex:1"><div class="mod-label">Vade</div>'+
+            '<input type="date" class="mod-input" id="ecust-inv-due" value="'+(inv.due_date||'')+'"></div>'+
+        '</div>'+
+        '<div class="mod-field"><div class="mod-label">Açıklama</div>'+
+          '<input type="text" class="mod-input" id="ecust-inv-desc" value="'+escHtml(inv.description||'')+'"></div>'+
+        '<button class="mod-save" onclick="saveEditCustInvoice()">💾 Kaydet</button>'+
+      '</div></div>';
+    document.body.insertAdjacentHTML('beforeend', html);
+  });
+}
+
+function saveEditCustInvoice(){
+  var body = {
+    invoice_no:   document.getElementById('ecust-inv-no').value.trim(),
+    amount:       parseFloat(document.getElementById('ecust-inv-amt').value)||0,
+    kdv_rate:     parseFloat(document.getElementById('ecust-inv-kdv').value)||20,
+    invoice_date: document.getElementById('ecust-inv-date').value,
+    due_date:     document.getElementById('ecust-inv-due').value,
+    description:  document.getElementById('ecust-inv-desc').value.trim()
+  };
+  if(!body.invoice_no || !body.amount){ showToast('Fatura no ve tutar zorunlu','#ef4444'); return; }
+  xhr('/api/customer-invoices/'+_editingCustInvId, body, function(d){
+    if(d&&d.ok===false){ alert(d.error||'Hata'); return; }
+    document.getElementById('mod-edit-cust-inv').remove();
+    loadCustInvoices(); loadCustSummary();
+  }, true);
 }
 
 function delCustomer(id, name){
