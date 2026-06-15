@@ -211,8 +211,20 @@ html{height:auto;overflow-y:auto}
 body{background:var(--bg);color:var(--txt);font-family:var(--font);min-height:100vh;
   overflow-x:hidden;overflow-y:auto;height:auto;
   overscroll-behavior-x:none;-webkit-overflow-scrolling:touch;touch-action:pan-y;
-  -webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+  -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
+  /* 300ms gecikmeyi kaldır — dokunmatik tıklamalar anında */
+  touch-action:manipulation}
 input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:text}
+/* Tüm interaktif elemanlar: tap delay yok, glow yok, aktif state hızlı */
+button,a,[onclick],.nl,.tappable{
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+button:active,.btn:active,.mod-btn:active,.nl:active{
+  opacity:.78;
+  transform:scale(.97);
+  transition:opacity .06s,transform .06s !important;
+}
 
 /* ── LAYOUT ── */
 .shell{display:flex;min-height:100vh}
@@ -447,15 +459,14 @@ nav.nav-collapsed .nav-top-avatar{width:38px;height:38px}
 .main{display:flex;flex-direction:column}
 .page{
   display:none;padding:20px 28px;max-width:1280px;
-  opacity:0;transform:translateY(14px) scale(.99);
   touch-action:pan-y;
+  /* başlangıç opacity'si artık JS tarafından yönetilir — CSS default temiz kalır */
 }
-.page.active{
-  display:block;
-  opacity:1;
-  transform:none;
+.page.active{ display:block; }
+/* Mobil: alt nav (70px) + safe area kadar ekstra boşluk — butonlar kesilmez */
+@media(max-width:768px){
+  .page{ padding:16px 16px calc(96px + env(safe-area-inset-bottom,0px)) }
 }
-.page.slide-back{transform:translateX(-12px);opacity:0}
 /* Dil butonu */
 .lang-btn{padding:8px 6px;border-radius:10px;border:1.5px solid var(--border2);background:var(--bg3);
   color:var(--txt);font-size:.75rem;font-weight:600;cursor:pointer;transition:.14s;text-align:center;
@@ -1321,8 +1332,12 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
 /* ── MODAL BASE ──────────────────────────────────────────────── */
 .mod-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);z-index:1000;display:flex;align-items:flex-end;justify-content:center}
 @media(min-width:600px){.mod-backdrop{align-items:center}}
-.mod-sheet{background:var(--bg);border-radius:20px 20px 0 0;width:100%;max-width:540px;padding:20px 20px 32px;max-height:88vh;overflow-y:auto}
-@media(min-width:600px){.mod-sheet{border-radius:20px;padding:24px}}
+.mod-sheet{background:var(--bg);border-radius:20px 20px 0 0;width:100%;max-width:540px;
+  padding:20px 20px 0;max-height:88vh;overflow-y:auto;
+  /* flex layout: içerik scroll eder, aksiyon butonları alta yapışır */
+  display:flex;flex-direction:column}
+.mod-sheet > *:not(.mod-actions){flex-shrink:0}
+@media(min-width:600px){.mod-sheet{border-radius:20px}}
 .mod-handle{width:36px;height:4px;background:var(--bg4);border-radius:2px;margin:0 auto 18px}
 .mod-title{font-size:1.05rem;font-weight:800;color:var(--txt);margin-bottom:16px}
 .mod-field{margin-bottom:12px}
@@ -1331,7 +1346,15 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
 .mod-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(213,253,115,.1)}
 .mod-row{display:flex;gap:8px}
 .mod-row .mod-field{flex:1}
-.mod-actions{display:flex;gap:8px;margin-top:16px}
+.mod-actions{
+  display:flex;gap:8px;
+  /* Sayfanın altına yapış — scroll edilse bile görünür kalır */
+  position:sticky;bottom:0;
+  background:var(--bg);
+  padding:12px 0 calc(20px + env(safe-area-inset-bottom,0px));
+  margin-top:auto;
+  border-top:1px solid var(--border)
+}
 .mod-btn{flex:1;padding:13px;border:none;border-radius:12px;font-size:.9rem;font-weight:700;cursor:pointer;transition:.1s}
 .mod-btn:active{opacity:.8;transform:scale(.98)}
 .mod-btn.primary{background:linear-gradient(135deg,#d5fd73,#b8e832);color:#07091f}
@@ -1396,6 +1419,28 @@ nav.nav-collapsed #sidebar-profile-name,nav.nav-collapsed #nav-bottom-sub{displa
   transition:opacity .1s;padding:2px 5px;border-radius:4px;color:rgba(255,255,255,.45);line-height:1}
 .nl:hover .fav-star{opacity:1}
 .fav-star.on{opacity:1!important;color:var(--accent)}
+
+/* ── DESKTOP MODAL (modal-box) ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);
+  z-index:9100;display:flex;align-items:center;justify-content:center;padding:20px}
+@media(max-width:600px){.modal-bg{align-items:flex-end;padding:0}}
+.modal-box{background:var(--bg);border-radius:18px;width:100%;
+  max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.5)}
+@media(max-width:600px){.modal-box{border-radius:20px 20px 0 0;max-height:92vh;
+  padding-bottom:env(safe-area-inset-bottom,0px)}}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:18px 20px 14px;border-bottom:1px solid var(--border);
+  position:sticky;top:0;background:var(--bg);z-index:1;border-radius:18px 18px 0 0}
+.modal-title{font-size:1rem;font-weight:800;color:var(--txt)}
+.modal-close{background:var(--bg3);border:none;border-radius:8px;width:30px;height:30px;
+  cursor:pointer;color:var(--txt2);font-size:.9rem;display:flex;align-items:center;
+  justify-content:center;transition:.1s;-webkit-tap-highlight-color:transparent}
+.modal-close:hover{background:var(--bg4);color:var(--txt)}
+/* Form alanları */
+.f-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px}
+label{display:block;font-size:.7rem;font-weight:700;color:var(--txt2);
+  text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;margin-top:8px}
+label:first-child{margin-top:0}
 
 /* ── BILANÇO / KREDİ / ÇEK page styles ── */
 .bilanco-section{margin-bottom:8px}
@@ -4737,78 +4782,98 @@ function updateMonthLabel(){
 }
 
 // ── NAVIGATION ───────────────────────────────────────────────────────────────
-function goPage(id, el){
-  var prev = document.querySelector('.page.active');
-  var next = document.getElementById('page-'+id);
-  if(prev && prev === next) return;
+var _navBusy = false;
+var _navQueue = null;
 
-  document.querySelectorAll('.nl').forEach(function(n){n.classList.remove('active')});
+function goPage(id, el){
+  _navQueue = {id:id, el:el};
+  if(!_navBusy) _processNav();
+}
+
+function _pageInit(id){
+  if(id==='ledger') loadAllTx();
+  if(id==='dashboard') loadDashboard();
+  if(id==='recurring') initRecurringPage();
+  if(id==='invest') initInvestPage();
+  if(id==='hesaplar'){ loadAccounts(); loadCards(); }
+  if(id==='add'){ setTab('gider'); loadAccountsDropdown(); loadCardsDropdown(); loadProjectsDropdown(); _updateAddProfileBanner(); }
+  if(id==='settings') initSettingsPage();
+  if(id==='budget') loadGoalsPage();
+  if(id==='todos') initTodosPage();
+  if(id==='supplier') initSupplierPage();
+  if(id==='assets') initAssetsPage();
+  if(id==='templates') initTemplatesPage();
+  if(id==='projects') initProjectsPage();
+  if(id==='cardreport') loadCardReport();
+  if(id==='categories') initCategoriesPage();
+  if(id==='tags') initTagsPage();
+  if(id==='scheduled') initScheduledPage();
+  if(id==='income-sources') initIncomeSourcesPage();
+  if(id==='rates') initRatesPage();
+  if(id==='customers') initCustomersPage();
+  if(id==='employees') initEmployeesPage();
+  if(id==='kdv') initKDVPage();
+  if(id==='ploss') initPLossPage();
+  if(id==='loans') initLoansPage();
+  if(id==='checks') initChecksPage();
+  if(id==='bilanco') initBilancoPage();
+  if(id==='ratios') initRatiosPage();
+  if(id==='muhtasar') initMuhtasarPage();
+}
+
+function _processNav(){
+  var req = _navQueue; _navQueue = null;
+  if(!req){ _navBusy = false; return; }
+
+  var id = req.id, el = req.el;
+  var next = document.getElementById('page-'+id);
+  if(!next){ _navBusy = false; _processNav(); return; }
+
+  _navBusy = true;
+
+  var prev = document.querySelector('.page.active');
+
+  // Nav highlight — immediate
+  document.querySelectorAll('.nl').forEach(function(n){ n.classList.remove('active'); });
   if(el) el.classList.add('active');
 
-  function show(){
-    // Önce yeni sayfayı hazırla (gizli)
-    next.style.display='block';
-    next.style.opacity='0';
-    next.style.transform='translateX(12px)';
-    next.style.transition='none';
+  // Same page: scroll to top only
+  if(prev === next){
+    window.scrollTo({top:0,behavior:'smooth'});
+    _navBusy = false;
+    _processNav();
+    return;
+  }
 
+  // Fire page init early so data starts loading
+  playClick();
+  _pageInit(id);
+
+  // Instantly hide all other pages (no fade-out stutter)
+  document.querySelectorAll('.page').forEach(function(p){
+    if(p !== next){
+      p.classList.remove('active');
+      p.style.cssText = 'display:none';
+    }
+  });
+
+  // Reveal next with a clean upward fade
+  next.style.cssText = 'display:block;opacity:0;transform:translateY(10px);transition:none;will-change:opacity,transform';
+  requestAnimationFrame(function(){
     requestAnimationFrame(function(){
-      // Eski sayfayı fade out
-      if(prev && prev !== next){
-        prev.style.transition='opacity .15s ease';
-        prev.style.opacity='0';
-      }
-      requestAnimationFrame(function(){
-        // Eski gizle, yeni göster
-        document.querySelectorAll('.page').forEach(function(p){
-          if(p !== next){ p.classList.remove('active'); p.style.display='none'; p.style.opacity=''; p.style.transition=''; p.style.transform=''; }
-        });
-        next.style.transition='opacity .2s ease,transform .2s cubic-bezier(.25,.46,.45,.94)';
-        next.style.opacity='1';
-        next.style.transform='translateX(0)';
-        next.classList.add('active');
-      });
-    });
-    playClick();
-    if(id==='ledger') loadAllTx();
-    if(id==='dashboard') loadDashboard();
-    if(id==='recurring') initRecurringPage();
-    if(id==='invest') initInvestPage();
-    if(id==='hesaplar'){ loadAccounts(); loadCards(); }
-    if(id==='add'){ setTab('gider'); loadAccountsDropdown(); loadCardsDropdown(); loadProjectsDropdown(); _updateAddProfileBanner(); }
-    if(id==='settings') initSettingsPage();
-    if(id==='budget') loadGoalsPage();
-    if(id==='todos') initTodosPage();
-    if(id==='supplier') initSupplierPage();
-    if(id==='assets') initAssetsPage();
-    if(id==='templates') initTemplatesPage();
-    if(id==='projects') initProjectsPage();
-    if(id==='cardreport') loadCardReport();
-    if(id==='categories') initCategoriesPage();
-    if(id==='tags') initTagsPage();
-    if(id==='scheduled') initScheduledPage();
-    if(id==='income-sources') initIncomeSourcesPage();
-    if(id==='rates') initRatesPage();
-    if(id==='customers') initCustomersPage();
-    if(id==='employees') initEmployeesPage();
-    if(id==='kdv')  initKDVPage();
-    if(id==='ploss') initPLossPage();
-    if(id==='download') {} // static page, no init needed
-    if(id==='loans') initLoansPage();
-    if(id==='checks') initChecksPage();
-    if(id==='bilanco') initBilancoPage();
-    if(id==='ratios') initRatiosPage();
-    if(id==='muhtasar') initMuhtasarPage();
-  }
+      next.style.transition = 'opacity .2s ease, transform .2s cubic-bezier(.22,1,.36,1)';
+      next.style.opacity = '1';
+      next.style.transform = 'translateY(0)';
+      next.classList.add('active');
+      window.scrollTo(0, 0);
 
-  if(prev){
-    prev.style.transition='opacity .16s ease,transform .16s ease';
-    prev.style.opacity='0';
-    prev.style.transform='translateY(8px)';
-    setTimeout(show, 160);
-  } else {
-    show();
-  }
+      setTimeout(function(){
+        next.style.cssText = '';   // clean up inline styles
+        _navBusy = false;
+        _processNav();             // run any queued navigation
+      }, 220);
+    });
+  });
 }
 
 // ── COLLAPSIBLE NAV ─────────────────────────────────────────────────────────
