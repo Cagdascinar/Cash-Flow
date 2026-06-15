@@ -1344,6 +1344,62 @@ a,div[onclick],span[onclick]{-webkit-tap-highlight-color:transparent}
 .acc-actions{display:flex;gap:6px;margin-top:10px;border-top:1px solid var(--border);padding-top:10px}
 .acc-act-btn{flex:1;padding:7px;border:none;border-radius:9px;font-size:.75rem;font-weight:700;cursor:pointer;transition:.1s;-webkit-tap-highlight-color:transparent}
 .acc-act-btn:active{opacity:.75}
+
+/* ── COLLAPSIBLE SIDEBAR ── */
+nav{transition:width .22s cubic-bezier(.4,0,.2,1);overflow:hidden}
+nav.nav-collapsed{width:60px}
+nav.nav-collapsed .nav-logo .sub,
+nav.nav-collapsed .nl span:not(.ico),
+nav.nav-collapsed .nav-sect,
+nav.nav-collapsed .fav-lbl{display:none!important}
+nav.nav-collapsed .nav-logo{padding:16px 10px;justify-content:center}
+nav.nav-collapsed .nav-logo .brand{justify-content:center}
+nav.nav-collapsed .kirpi-walk-wrap{margin:0}
+nav.nav-collapsed .nl{justify-content:center;padding:9px 0}
+nav.nav-collapsed .nl .ico{margin:0;width:100%}
+nav.nav-collapsed .nav-bottom{padding:10px 6px}
+nav.nav-collapsed #sidebar-profile-avatar{margin:0 auto}
+nav.nav-collapsed #sidebar-profile-name,nav.nav-collapsed #nav-bottom-sub{display:none}
+.nav-ham{width:100%;padding:10px 12px 4px;display:flex;justify-content:flex-end}
+.nav-ham button{background:none;border:none;cursor:pointer;color:rgba(255,255,255,.5);
+  font-size:1.15rem;padding:4px 6px;border-radius:8px;transition:.12s;line-height:1}
+.nav-ham button:hover{background:rgba(255,255,255,.12);color:#fff}
+.main{transition:margin-left .22s cubic-bezier(.4,0,.2,1)}
+.main.nav-collapsed{margin-left:60px}
+/* keep bottom toggle button visible in mobile */
+@media(max-width:768px){.nav-ham,.main.nav-collapsed{display:none!important;margin-left:0!important}}
+
+/* ── HIDE MOBILE-ONLY NAV ITEMS ON DESKTOP ── */
+@media(min-width:769px){.nl-mobile-only{display:none!important}}
+
+/* ── FAVORITES ── */
+.fav-star{position:absolute;right:6px;top:50%;transform:translateY(-50%);
+  background:none;border:none;font-size:.78rem;opacity:0;cursor:pointer;
+  transition:opacity .1s;padding:2px 5px;border-radius:4px;color:rgba(255,255,255,.45);line-height:1}
+.nl:hover .fav-star{opacity:1}
+.fav-star.on{opacity:1!important;color:var(--accent)}
+
+/* ── BILANÇO / KREDİ / ÇEK page styles ── */
+.bilanco-section{margin-bottom:8px}
+.bilanco-hdr{font-size:.66rem;font-weight:800;color:var(--txt2);text-transform:uppercase;
+  letter-spacing:.1em;padding:5px 0;border-bottom:1px solid var(--border)}
+.bilanco-row{display:flex;justify-content:space-between;align-items:center;
+  padding:5px 0;font-size:.81rem;border-bottom:1px solid rgba(255,255,255,.04)}
+.bilanco-total{display:flex;justify-content:space-between;padding:6px 0;
+  font-size:.86rem;font-weight:700;border-top:1px solid var(--border);margin-top:2px}
+.bilanco-grand{display:flex;justify-content:space-between;padding:10px 0;
+  font-size:.95rem;font-weight:900;border-top:2px solid var(--border);margin-top:8px}
+.kpi-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.kpi-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;
+  padding:12px 14px;flex:1;min-width:130px}
+.kpi-v{font-size:1.15rem;font-weight:900;color:var(--txt)}
+.kpi-v-g{color:var(--g)}.kpi-v-r{color:var(--r)}.kpi-v-y{color:var(--y)}
+.kpi-lbl{font-size:.68rem;color:var(--txt2);margin-top:3px}
+.btn-xs{padding:3px 8px;border-radius:6px;border:1px solid var(--border);
+  background:var(--bg3);color:var(--txt);cursor:pointer;font-size:.7rem;font-weight:600;
+  transition:.1s}
+.btn-xs:hover{background:var(--bg2)}
+.btn-xs.danger{color:var(--r);border-color:rgba(246,70,93,.3)}
 </style>
 <script>
 (function(){var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();
@@ -1374,109 +1430,154 @@ body{top:0!important}
 <div class="shell">
 
 <!-- ── SIDEBAR NAV ── -->
-<nav>
+<nav id="main-nav">
+  <!-- Hamburger toggle (masaüstü) -->
+  <div class="nav-ham">
+    <button onclick="toggleNav()" title="Menüyü Daralt / Genişlet" id="nav-ham-btn">☰</button>
+  </div>
   <div class="nav-logo" onclick="goPage('dashboard',document.querySelector('[data-page=dashboard]'))" style="cursor:pointer">
     <div class="brand">
-      <div class="kirpi-walk-wrap"><img src="/icon.svg" class="kirpi-walk-img" style="width:32px;height:32px;border-radius:8px"> </div>Kirpi
+      <div class="kirpi-walk-wrap"><img src="/icon.svg" class="kirpi-walk-img" style="width:32px;height:32px;border-radius:8px"> </div><span class="brand-txt" style="margin-left:4px">Kirpi</span>
     </div>
     <div class="sub">Gelir · Gider · Yatırım</div>
   </div>
   <div class="nav-links">
-    <!-- Mobil alt nav (5 sabit buton) -->
-    <div class="nl active" data-page="dashboard" onclick="goPage('dashboard',this)">
+    <!-- Mobil alt nav (4 sabit buton) -->
+    <div class="nl nl-mobile-only active" data-page="dashboard" onclick="goPage('dashboard',this)">
       <span class="ico">🏠</span>Ana Sayfa
     </div>
-    <div class="nl" data-page="ledger" onclick="goPage('ledger',this)">
+    <div class="nl nl-mobile-only" data-page="ledger" onclick="goPage('ledger',this)">
       <span class="ico">📋</span>İşlemler
     </div>
-    <div class="nl nl-add" data-page="add" onclick="goPage('add',this)">
+    <div class="nl nl-mobile-only nl-add" data-page="add" onclick="goPage('add',this)">
       <span class="ico">➕</span>Ekle
     </div>
-    <div class="nl" data-page="budget" onclick="goPage('budget',this)">
+    <div class="nl nl-mobile-only" data-page="budget" onclick="goPage('budget',this)">
       <span class="ico">🎯</span>Bütçe
     </div>
     <div class="nl nl-menu" onclick="openMoreSheet()">
       <span class="ico">☰</span>Menü
     </div>
-    <div class="nl nl-more nl-desktop-only" onclick="openMoreSheet()">
-      <span class="ico">⋯</span>Daha
-    </div>
+
+    <!-- Favoriler (sadece masaüstü, dinamik) -->
+    <div class="nav-sect fav-lbl" id="fav-sect" style="display:none">Favoriler</div>
+    <div id="fav-links"></div>
 
     <!-- Masaüstü yan menü -->
     <div class="nav-sect">Ana</div>
     <div class="nl nl-desktop" data-page="dashboard" onclick="goPage('dashboard',this)">
       <span class="ico">🏠</span>Ana Sayfa
+      <button class="fav-star" onclick="toggleFav(event,'dashboard','🏠','Ana Sayfa')" title="Favorilere ekle">★</button>
     </div>
     <div class="nl nl-desktop" data-page="ledger" onclick="goPage('ledger',this)">
       <span class="ico">📋</span>İşlemler
+      <button class="fav-star" onclick="toggleFav(event,'ledger','📋','İşlemler')" title="Favorilere ekle">★</button>
     </div>
     <div class="nl nl-desktop" data-page="hesaplar" onclick="goPage('hesaplar',this)">
       <span class="ico">🏦</span>Hesaplar & Kartlar
+      <button class="fav-star" onclick="toggleFav(event,'hesaplar','🏦','Hesaplar')" title="Favorilere ekle">★</button>
     </div>
     <div class="nl nl-desktop" data-page="invest" onclick="goPage('invest',this)">
       <span class="ico">📈</span>Yatırımlar
+      <button class="fav-star" onclick="toggleFav(event,'invest','📈','Yatırımlar')" title="Favorilere ekle">★</button>
     </div>
 
     <div class="nav-sect">Planlama</div>
-    <div class="nl nl-desktop" data-page="scheduled" onclick="goPage('scheduled',this)">
-      <span class="ico">📅</span>Planlanmış İşlemler
-    </div>
-    <div class="nl nl-desktop" data-page="templates" onclick="goPage('templates',this)">
-      <span class="ico">📋</span>İşlem Şablonları
+    <div class="nl nl-desktop" data-page="budget" onclick="goPage('budget',this)">
+      <span class="ico">🎯</span>Bütçe & Hedefler
+      <button class="fav-star" onclick="toggleFav(event,'budget','🎯','Bütçe')" title="Favorilere ekle">★</button>
     </div>
     <div class="nl nl-desktop" data-page="recurring" onclick="goPage('recurring',this)">
       <span class="ico">🔁</span>Düzenli İşlemler
-    </div>
-    <div class="nl nl-desktop" data-page="budget" onclick="goPage('budget',this)">
-      <span class="ico">🎯</span>Bütçe & Hedefler
+      <button class="fav-star" onclick="toggleFav(event,'recurring','🔁','Düzenli')" title="Favorilere ekle">★</button>
     </div>
     <div class="nl nl-desktop" data-page="income-sources" onclick="goPage('income-sources',this)">
       <span class="ico">💰</span>Para Kaynakları
+      <button class="fav-star" onclick="toggleFav(event,'income-sources','💰','Para Kaynakları')" title="Favorilere ekle">★</button>
+    </div>
+    <div class="nl nl-desktop" data-page="scheduled" onclick="goPage('scheduled',this)">
+      <span class="ico">📅</span>Planlanmış İşlemler
+      <button class="fav-star" onclick="toggleFav(event,'scheduled','📅','Planlanmış')" title="Favorilere ekle">★</button>
+    </div>
+    <div class="nl nl-desktop" data-page="templates" onclick="goPage('templates',this)">
+      <span class="ico">📋</span>İşlem Şablonları
+      <button class="fav-star" onclick="toggleFav(event,'templates','📋','Şablonlar')" title="Favorilere ekle">★</button>
     </div>
     <div class="nl nl-desktop" data-page="projects" onclick="goPage('projects',this)">
       <span class="ico">📁</span>Projeler
+      <button class="fav-star" onclick="toggleFav(event,'projects','📁','Projeler')" title="Favorilere ekle">★</button>
     </div>
 
-    <div class="nav-sect">Analiz</div>
+    <div class="nav-sect">Araçlar</div>
     <div class="nl nl-desktop" data-page="rates" onclick="goPage('rates',this)">
       <span class="ico">💱</span>Döviz Kurları
+      <button class="fav-star" onclick="toggleFav(event,'rates','💱','Döviz')" title="Favorilere ekle">★</button>
     </div>
     <div class="nl nl-desktop" data-page="todos" onclick="goPage('todos',this)">
       <span class="ico">✅</span>Görevler
+      <button class="fav-star" onclick="toggleFav(event,'todos','✅','Görevler')" title="Favorilere ekle">★</button>
     </div>
-
-    <div class="nav-sect">Organizasyon</div>
     <div class="nl nl-desktop" data-page="categories" onclick="goPage('categories',this)">
       <span class="ico">🗂️</span>Kategoriler
+      <button class="fav-star" onclick="toggleFav(event,'categories','🗂️','Kategoriler')" title="Favorilere ekle">★</button>
     </div>
     <div class="nl nl-desktop" data-page="tags" onclick="goPage('tags',this)">
-      <span class="ico">🏷️</span>Etiketler & Filtre
+      <span class="ico">🏷️</span>Etiketler
+      <button class="fav-star" onclick="toggleFav(event,'tags','🏷️','Etiketler')" title="Favorilere ekle">★</button>
     </div>
     <div class="nl nl-desktop" data-page="import" onclick="goPage('import',this)">
       <span class="ico">📂</span>İçe / Dışa Aktar
+      <button class="fav-star" onclick="toggleFav(event,'import','📂','Aktar')" title="Favorilere ekle">★</button>
     </div>
 
     <div class="nav-sect">Firma</div>
     <div class="nl nl-desktop" data-page="customers" data-sirket onclick="goPage('customers',this)">
       <span class="ico">🤝</span>Müşteri & Alacak
+      <button class="fav-star" onclick="toggleFav(event,'customers','🤝','Müşteriler')" title="Favorilere ekle">★</button>
     </div>
     <div class="nl nl-desktop" data-page="supplier" data-sirket onclick="goPage('supplier',this)">
       <span class="ico">🏭</span>Tedarikçiler
+      <button class="fav-star" onclick="toggleFav(event,'supplier','🏭','Tedarikçiler')" title="Favorilere ekle">★</button>
     </div>
     <div class="nl nl-desktop" data-page="employees" data-sirket onclick="goPage('employees',this)">
       <span class="ico">👷</span>Çalışanlar & Bordro
+      <button class="fav-star" onclick="toggleFav(event,'employees','👷','Çalışanlar')" title="Favorilere ekle">★</button>
     </div>
     <div class="nl nl-desktop" data-page="kdv" data-sirket onclick="goPage('kdv',this)">
       <span class="ico">🧾</span>KDV Takibi
+      <button class="fav-star" onclick="toggleFav(event,'kdv','🧾','KDV')" title="Favorilere ekle">★</button>
     </div>
     <div class="nl nl-desktop" data-page="ploss" data-sirket onclick="goPage('ploss',this)">
       <span class="ico">📉</span>Kar-Zarar Raporu
+      <button class="fav-star" onclick="toggleFav(event,'ploss','📉','Kar-Zarar')" title="Favorilere ekle">★</button>
+    </div>
+    <div class="nl nl-desktop" data-page="loans" data-sirket onclick="goPage('loans',this)">
+      <span class="ico">🏦</span>Kredi Takibi
+      <button class="fav-star" onclick="toggleFav(event,'loans','🏦','Krediler')" title="Favorilere ekle">★</button>
+    </div>
+    <div class="nl nl-desktop" data-page="checks" data-sirket onclick="goPage('checks',this)">
+      <span class="ico">📋</span>Çek Takibi
+      <button class="fav-star" onclick="toggleFav(event,'checks','📋','Çekler')" title="Favorilere ekle">★</button>
+    </div>
+    <div class="nl nl-desktop" data-page="bilanco" data-sirket onclick="goPage('bilanco',this)">
+      <span class="ico">⚖️</span>Bilanço
+      <button class="fav-star" onclick="toggleFav(event,'bilanco','⚖️','Bilanço')" title="Favorilere ekle">★</button>
+    </div>
+    <div class="nl nl-desktop" data-page="ratios" data-sirket onclick="goPage('ratios',this)">
+      <span class="ico">📈</span>Finansal Oranlar
+      <button class="fav-star" onclick="toggleFav(event,'ratios','📈','Oranlar')" title="Favorilere ekle">★</button>
+    </div>
+    <div class="nl nl-desktop" data-page="muhtasar" data-sirket onclick="goPage('muhtasar',this)">
+      <span class="ico">📑</span>Muhtasar
+      <button class="fav-star" onclick="toggleFav(event,'muhtasar','📑','Muhtasar')" title="Favorilere ekle">★</button>
     </div>
     <div class="nl nl-desktop" data-page="assets" data-sirket onclick="goPage('assets',this)">
       <span class="ico">🏗️</span>Sabit Kıymetler
+      <button class="fav-star" onclick="toggleFav(event,'assets','🏗️','Sabit Kıymet')" title="Favorilere ekle">★</button>
     </div>
     <div class="nl nl-desktop" data-page="cardreport" data-sirket onclick="goPage('cardreport',this)">
       <span class="ico">📊</span>Kart Raporu
+      <button class="fav-star" onclick="toggleFav(event,'cardreport','📊','Kart Raporu')" title="Favorilere ekle">★</button>
     </div>
 
     <div class="nav-sect">Sistem</div>
@@ -3591,6 +3692,118 @@ body{top:0!important}
   </div>
 </div>
 
+<!-- ── KREDİ TAKİBİ ──────────────────────────────────────────────── -->
+<div class="page" id="page-loans">
+  <div class="page-hdr"><h1 class="page-title">🏦 Kredi Takibi</h1>
+    <button class="btn-sm" onclick="openLoanModal()">+ Kredi Ekle</button>
+  </div>
+  <div class="kpi-row" id="loan-kpis"></div>
+  <div id="loan-list"></div>
+  <!-- Modal -->
+  <div class="modal-bg" id="loan-modal-bg" onclick="if(event.target===this)closeLoanModal()" style="display:none">
+    <div class="modal-box" style="max-width:480px">
+      <div class="modal-hdr"><span class="modal-title">Kredi Ekle</span>
+        <button class="modal-close" onclick="closeLoanModal()">✕</button></div>
+      <div style="padding:0 20px 20px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="grid-column:1/-1"><label>Banka Adı *</label><input class="f-input" id="loan-bank" placeholder="İş Bankası"></div>
+        <div><label>Kredi Türü</label><select class="f-input" id="loan-type">
+          <option value="nakdi">Nakdi</option><option value="tasit">Taşıt</option>
+          <option value="konut">Konut</option><option value="ticari">Ticari</option></select></div>
+        <div><label>Para Birimi</label><select class="f-input" id="loan-currency">
+          <option>TRY</option><option>USD</option><option>EUR</option></select></div>
+        <div><label>Kredi Tutarı</label><input class="f-input" id="loan-principal" type="number" placeholder="100000"></div>
+        <div><label>Kalan Borç</label><input class="f-input" id="loan-remaining" type="number" placeholder="80000"></div>
+        <div><label>Faiz Oranı (%)</label><input class="f-input" id="loan-rate" type="number" step="0.01" placeholder="2.89"></div>
+        <div><label>Aylık Taksit</label><input class="f-input" id="loan-installment" type="number" placeholder="5000"></div>
+        <div><label>Taksit Günü</label><input class="f-input" id="loan-day" type="number" min="1" max="31" value="15"></div>
+        <div><label>Başlangıç</label><input class="f-input" id="loan-start" type="date"></div>
+        <div><label>Bitiş</label><input class="f-input" id="loan-end" type="date"></div>
+        <div style="grid-column:1/-1"><label>Notlar</label><input class="f-input" id="loan-notes" placeholder="Opsiyonel"></div>
+        <div style="grid-column:1/-1"><button class="btn" onclick="saveLoan()" style="width:100%">💾 Kaydet</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── ÇEK TAKİBİ ──────────────────────────────────────────────── -->
+<div class="page" id="page-checks">
+  <div class="page-hdr"><h1 class="page-title">📋 Çek Takibi</h1>
+    <button class="btn-sm" onclick="openCheckModal()">+ Çek Ekle</button>
+  </div>
+  <div class="kpi-row" id="check-kpis"></div>
+  <div style="display:flex;gap:8px;margin-bottom:12px">
+    <button class="btn-sm active" id="ctab-bekliyor" onclick="setCheckTab('bekliyor')">⏳ Bekliyor</button>
+    <button class="btn-sm" id="ctab-tahsil" onclick="setCheckTab('tahsil_edildi')">✓ Tahsil</button>
+    <button class="btn-sm" id="ctab-all" onclick="setCheckTab('')">Tümü</button>
+  </div>
+  <div id="check-list"></div>
+  <!-- Modal -->
+  <div class="modal-bg" id="check-modal-bg" onclick="if(event.target===this)closeCheckModal()" style="display:none">
+    <div class="modal-box" style="max-width:440px">
+      <div class="modal-hdr"><span class="modal-title">Çek Ekle</span>
+        <button class="modal-close" onclick="closeCheckModal()">✕</button></div>
+      <div style="padding:0 20px 20px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="grid-column:1/-1">
+          <label>Çek Türü</label>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <button class="btn-sm active" id="ck-alacak-btn" onclick="setCkType('alacak')">📥 Alacak</button>
+            <button class="btn-sm" id="ck-borclu-btn" onclick="setCkType('borclu')">📤 Borçlu</button>
+          </div>
+          <input type="hidden" id="ck-type-val" value="alacak">
+        </div>
+        <div><label>Çek No</label><input class="f-input" id="ck-no" placeholder="C-001"></div>
+        <div><label>Keşideci</label><input class="f-input" id="ck-drawer" placeholder="ABC A.Ş."></div>
+        <div><label>Banka</label><input class="f-input" id="ck-bank" placeholder="Akbank"></div>
+        <div><label>Tutar *</label><input class="f-input" id="ck-amount" type="number" placeholder="10000"></div>
+        <div><label>Düzenlenme</label><input class="f-input" id="ck-issue" type="date"></div>
+        <div><label>Vade *</label><input class="f-input" id="ck-due" type="date"></div>
+        <div style="grid-column:1/-1"><label>Notlar</label><input class="f-input" id="ck-notes" placeholder="Opsiyonel"></div>
+        <div style="grid-column:1/-1"><button class="btn" onclick="saveCheck()" style="width:100%">💾 Kaydet</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── BİLANÇO ──────────────────────────────────────────────────── -->
+<div class="page" id="page-bilanco">
+  <div class="page-hdr"><h1 class="page-title">⚖️ Bilanço</h1>
+    <button class="btn-sm" onclick="loadBilanco()">🔄 Yenile</button>
+  </div>
+  <div id="bilanco-date" style="color:var(--txt2);font-size:.8rem;margin-bottom:14px"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px" id="bilanco-grid">
+    <div class="f-card"><div style="font-size:.7rem;font-weight:800;color:var(--g);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">AKTİF</div><div id="bilanco-aktif"></div></div>
+    <div class="f-card"><div style="font-size:.7rem;font-weight:800;color:var(--r);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">PASİF</div><div id="bilanco-pasif"></div></div>
+  </div>
+  <div id="bilanco-check" style="text-align:center;margin-top:14px;padding:12px;border-radius:10px;font-weight:700"></div>
+</div>
+
+<!-- ── FİNANSAL ORANLAR ──────────────────────────────────────────── -->
+<div class="page" id="page-ratios">
+  <div class="page-hdr"><h1 class="page-title">📈 Finansal Oranlar</h1>
+    <button class="btn-sm" onclick="loadRatios()">🔄 Yenile</button>
+  </div>
+  <div id="ratios-grid" class="kpi-row" style="flex-wrap:wrap"></div>
+  <div id="ratios-detail"></div>
+</div>
+
+<!-- ── MUHTASAR ──────────────────────────────────────────────────── -->
+<div class="page" id="page-muhtasar">
+  <div class="page-hdr"><h1 class="page-title">📑 Muhtasar & Beyanname</h1></div>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+    <button class="btn-sm" onclick="prevMuhtasarMonth()">‹</button>
+    <span id="muhtasar-period" style="font-size:1rem;font-weight:700;min-width:120px;text-align:center"></span>
+    <button class="btn-sm" onclick="nextMuhtasarMonth()">›</button>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div class="f-card"><div style="font-size:.7rem;font-weight:800;color:var(--txt2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">📋 Muhtasar Beyanname</div><div id="muhtasar-bordro"></div></div>
+    <div class="f-card"><div style="font-size:.7rem;font-weight:800;color:var(--txt2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">🧾 KDV Beyannamesi</div><div id="muhtasar-kdv"></div></div>
+  </div>
+  <div class="f-card" style="margin-top:14px">
+    <div style="font-size:.7rem;font-weight:800;color:var(--txt2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">💰 Ödeme Özeti</div>
+    <div id="muhtasar-ozet"></div>
+  </div>
+</div>
+
 <!-- ── MODALS ──────────────────────────────────────────────────── -->
 
 <!-- Kategori Ekle Modalı -->
@@ -4481,6 +4694,11 @@ function goPage(id, el){
     if(id==='employees') initEmployeesPage();
     if(id==='kdv')  initKDVPage();
     if(id==='ploss') initPLossPage();
+    if(id==='loans') initLoansPage();
+    if(id==='checks') initChecksPage();
+    if(id==='bilanco') initBilancoPage();
+    if(id==='ratios') initRatiosPage();
+    if(id==='muhtasar') initMuhtasarPage();
   }
 
   if(prev){
@@ -4491,6 +4709,318 @@ function goPage(id, el){
   } else {
     show();
   }
+}
+
+// ── COLLAPSIBLE NAV ─────────────────────────────────────────────────────────
+function toggleNav(){
+  var nav=document.getElementById('main-nav');
+  var main=document.querySelector('.main');
+  var btn=document.getElementById('nav-ham-btn');
+  var collapsed=nav.classList.toggle('nav-collapsed');
+  if(main) main.classList.toggle('nav-collapsed',collapsed);
+  if(btn) btn.textContent=collapsed?'»':'☰';
+  localStorage.setItem('navCollapsed',collapsed?'1':'0');
+}
+(function(){
+  if(localStorage.getItem('navCollapsed')==='1'){
+    var nav=document.getElementById('main-nav');
+    var main=document.querySelector('.main');
+    var btn=document.getElementById('nav-ham-btn');
+    if(nav){nav.classList.add('nav-collapsed');}
+    if(main){main.classList.add('nav-collapsed');}
+    if(btn){btn.textContent='»';}
+  }
+})();
+
+// ── FAVORITES ────────────────────────────────────────────────────────────────
+function _getFavs(){ try{return JSON.parse(localStorage.getItem('kirpi_favs')||'[]');}catch(e){return[];} }
+function _saveFavs(arr){ localStorage.setItem('kirpi_favs',JSON.stringify(arr)); }
+
+function renderFavs(){
+  var favs=_getFavs();
+  var sect=document.getElementById('fav-sect');
+  var container=document.getElementById('fav-links');
+  if(!sect||!container) return;
+  if(favs.length===0){ sect.style.display='none'; container.innerHTML=''; return; }
+  sect.style.display='';
+  container.innerHTML=favs.map(function(f){
+    return '<div class="nl nl-desktop" data-page="'+f.id+'" onclick="goPage(\''+f.id+'\',this)" style="color:var(--accent)">'
+      +'<span class="ico">'+f.ico+'</span>'+f.lbl
+      +'<button class="fav-star on" onclick="toggleFav(event,\''+f.id+'\',\''+f.ico+'\',\''+f.lbl+'\')" title="Favoriden çıkar" style="opacity:1">★</button>'
+      +'</div>';
+  }).join('');
+  // sync star states
+  document.querySelectorAll('.nl .fav-star').forEach(function(btn){
+    var page=btn.closest('.nl')&&btn.closest('.nl').dataset.page;
+    if(!page) return;
+    btn.classList.toggle('on', favs.some(function(f){return f.id===page;}));
+  });
+}
+
+function toggleFav(e,id,ico,lbl){
+  e.stopPropagation();
+  var favs=_getFavs();
+  var idx=favs.findIndex(function(f){return f.id===id;});
+  if(idx>=0){ favs.splice(idx,1); } else { favs.push({id:id,ico:ico,lbl:lbl}); }
+  _saveFavs(favs);
+  renderFavs();
+}
+
+// init favs on load
+document.addEventListener('DOMContentLoaded',renderFavs);
+setTimeout(renderFavs,400);
+
+// ── KREDİ TAKİBİ ─────────────────────────────────────────────────────────────
+function initLoansPage(){ loadLoanList(); }
+
+function loadLoanList(){
+  xhr('/api/loans/summary',null,function(data){
+    var kpis=document.getElementById('loan-kpis');
+    if(kpis) kpis.innerHTML=
+      '<div class="kpi-card"><div class="kpi-v kpi-v-r">'+money(data.total_remaining)+'</div><div class="kpi-lbl">Toplam Kalan Borç</div></div>'
+      +'<div class="kpi-card"><div class="kpi-v kpi-v-y">'+money(data.total_monthly_installment)+'</div><div class="kpi-lbl">Aylık Toplam Taksit</div></div>'
+      +'<div class="kpi-card"><div class="kpi-v">'+data.active_count+'</div><div class="kpi-lbl">Aktif Kredi</div></div>';
+    var list=document.getElementById('loan-list');
+    if(!list) return;
+    if(!data.loans||data.loans.length===0){list.innerHTML='<div class="empty-state">🏦 Henüz kredi kaydı yok</div>';return;}
+    list.innerHTML=data.loans.map(function(l){
+      var pct=l.principal>0?Math.round((1-l.remaining/l.principal)*100):0;
+      return '<div class="f-card" style="margin-bottom:10px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+        +'<div><div style="font-weight:700;font-size:.95rem">'+l.bank_name+'</div>'
+        +'<div style="color:var(--txt2);font-size:.78rem">'+l.loan_type+' · '+l.currency+' · Taksit günü: '+l.installment_day+'</div></div>'
+        +'<button onclick="deleteLoan('+l.id+')" style="background:none;border:none;color:var(--txt2);cursor:pointer;font-size:1rem">✕</button></div>'
+        +'<div style="display:flex;gap:20px;margin-top:10px">'
+        +'<div><div style="color:var(--r);font-weight:800;font-size:1.05rem">'+money(l.remaining)+'</div><div style="color:var(--txt2);font-size:.7rem">Kalan</div></div>'
+        +'<div><div style="font-weight:700">'+money(l.installment_amount)+'</div><div style="color:var(--txt2);font-size:.7rem">Aylık Taksit</div></div>'
+        +'<div><div style="color:var(--y);font-weight:700">%'+l.interest_rate+'</div><div style="color:var(--txt2);font-size:.7rem">Faiz</div></div></div>'
+        +'<div style="background:var(--bg3);border-radius:6px;height:5px;overflow:hidden;margin-top:10px">'
+        +'<div style="background:var(--g);height:100%;width:'+pct+'%;border-radius:6px;transition:width .5s"></div></div>'
+        +'<div style="font-size:.7rem;color:var(--txt2);margin-top:3px">%'+pct+' ödendi</div>'
+        +'</div>';
+    }).join('');
+  });
+}
+
+function openLoanModal(){
+  document.getElementById('loan-start').value=_todayDate;
+  document.getElementById('loan-modal-bg').style.display='flex';
+}
+function closeLoanModal(){ document.getElementById('loan-modal-bg').style.display='none'; }
+function saveLoan(){
+  var body={
+    bank_name:document.getElementById('loan-bank').value,
+    loan_type:document.getElementById('loan-type').value,
+    currency:document.getElementById('loan-currency').value,
+    principal:document.getElementById('loan-principal').value,
+    remaining:document.getElementById('loan-remaining').value||document.getElementById('loan-principal').value,
+    interest_rate:document.getElementById('loan-rate').value||0,
+    installment_amount:document.getElementById('loan-installment').value||0,
+    installment_day:document.getElementById('loan-day').value||1,
+    start_date:document.getElementById('loan-start').value||_todayDate,
+    end_date:document.getElementById('loan-end').value||'',
+    notes:document.getElementById('loan-notes').value
+  };
+  if(!body.bank_name){alert('Banka adı zorunlu');return;}
+  xhr('/api/loans',body,function(r){
+    if(r.ok){closeLoanModal();loadLoanList();}else alert(r.error||'Hata');
+  },'POST');
+}
+function deleteLoan(id){
+  if(!confirm('Bu kredi silinsin mi?')) return;
+  xhr('/api/loans/'+id,null,function(){loadLoanList();},'DELETE');
+}
+
+// ── ÇEK TAKİBİ ───────────────────────────────────────────────────────────────
+var _checkTab='bekliyor';
+function initChecksPage(){ loadCheckSummary(); setCheckTab(_checkTab); }
+
+function loadCheckSummary(){
+  xhr('/api/checks/summary',null,function(data){
+    var kpis=document.getElementById('check-kpis');
+    if(!kpis) return;
+    kpis.innerHTML=
+      '<div class="kpi-card"><div class="kpi-v kpi-v-g">'+money(data.alacak_toplam)+'</div><div class="kpi-lbl">Alacak Çekler</div></div>'
+      +'<div class="kpi-card"><div class="kpi-v kpi-v-r">'+money(data.borclu_toplam)+'</div><div class="kpi-lbl">Borçlu Çekler</div></div>'
+      +'<div class="kpi-card"><div class="kpi-v" style="color:'+(data.net>=0?'var(--g)':'var(--r)')+'">'+money(data.net)+'</div><div class="kpi-lbl">Net</div></div>'
+      +(data.due_soon_count>0?'<div class="kpi-card"><div class="kpi-v kpi-v-y">'+data.due_soon_count+'</div><div class="kpi-lbl">7 Gün İçinde Vade</div></div>':'');
+  });
+}
+
+function setCheckTab(tab){
+  _checkTab=tab;
+  ['bekliyor','tahsil','all'].forEach(function(k){
+    var el=document.getElementById('ctab-'+k);
+    if(el) el.classList.toggle('active',
+      (k==='bekliyor'&&tab==='bekliyor')||(k==='tahsil'&&tab==='tahsil_edildi')||(k==='all'&&tab===''));
+  });
+  var url='/api/checks'+(tab?'?status='+tab:'');
+  xhr(url,null,function(rows){
+    var list=document.getElementById('check-list');
+    if(!list) return;
+    if(!rows||rows.length===0){list.innerHTML='<div class="empty-state">📋 Çek kaydı yok</div>';return;}
+    var today=_todayDate;
+    list.innerHTML=rows.map(function(c){
+      var late=c.status==='bekliyor'&&c.due_date<today;
+      return '<div class="f-card" style="margin-bottom:8px;border-left:3px solid '+(c.check_type==='alacak'?'var(--g)':'var(--r)')+'">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center">'
+        +'<div><div style="font-weight:700">'+(c.check_no||'Çek')+' — '+(c.drawer||'—')+'</div>'
+        +'<div style="color:var(--txt2);font-size:.78rem">'+(c.bank_name||'')
+        +' · Vade: <span style="color:'+(late?'var(--r)':'inherit')+'">'+c.due_date+(late?' ⚠':'')+'</span></div></div>'
+        +'<div style="text-align:right">'
+        +'<div style="font-weight:800;color:'+(c.check_type==='alacak'?'var(--g)':'var(--r)')+'">'+money(c.amount)+'</div>'
+        +'<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:5px">'
+        +(c.status==='bekliyor'?'<button class="btn-xs" onclick="collectCheck('+c.id+')">✓ Tahsil</button>':'')
+        +'<button class="btn-xs danger" onclick="deleteCheck('+c.id+')">✕</button>'
+        +'</div></div></div></div>';
+    }).join('');
+  });
+}
+
+function openCheckModal(){
+  document.getElementById('ck-issue').value=_todayDate;
+  document.getElementById('check-modal-bg').style.display='flex';
+}
+function closeCheckModal(){document.getElementById('check-modal-bg').style.display='none';}
+function setCkType(t){
+  document.getElementById('ck-type-val').value=t;
+  document.getElementById('ck-alacak-btn').classList.toggle('active',t==='alacak');
+  document.getElementById('ck-borclu-btn').classList.toggle('active',t==='borclu');
+}
+function saveCheck(){
+  var body={
+    check_type:document.getElementById('ck-type-val').value,
+    check_no:document.getElementById('ck-no').value,
+    drawer:document.getElementById('ck-drawer').value,
+    bank_name:document.getElementById('ck-bank').value,
+    amount:document.getElementById('ck-amount').value,
+    issue_date:document.getElementById('ck-issue').value||_todayDate,
+    due_date:document.getElementById('ck-due').value,
+    notes:document.getElementById('ck-notes').value
+  };
+  if(!body.amount||!body.due_date){alert('Tutar ve vade tarihi zorunlu');return;}
+  xhr('/api/checks',body,function(r){
+    if(r.ok){closeCheckModal();initChecksPage();}else alert(r.error||'Hata');
+  },'POST');
+}
+function collectCheck(id){
+  xhr('/api/checks/'+id,{status:'tahsil_edildi'},function(r){if(r.ok)initChecksPage();},'PUT');
+}
+function deleteCheck(id){
+  if(!confirm('Çek silinsin mi?')) return;
+  xhr('/api/checks/'+id,null,function(){initChecksPage();},'DELETE');
+}
+
+// ── BİLANÇO ──────────────────────────────────────────────────────────────────
+function initBilancoPage(){ loadBilanco(); }
+function loadBilanco(){
+  xhr('/api/balance-sheet',null,function(data){
+    var dateEl=document.getElementById('bilanco-date');
+    if(dateEl) dateEl.textContent='Bilanço Tarihi: '+(data.meta&&data.meta.date?data.meta.date:_todayDate);
+    var a=data.aktif, p=data.pasif;
+    var aktifEl=document.getElementById('bilanco-aktif');
+    var pasifEl=document.getElementById('bilanco-pasif');
+    if(aktifEl) aktifEl.innerHTML=
+      '<div class="bilanco-section"><div class="bilanco-hdr">I. DÖNEN VARLIKLAR</div>'
+      +'<div class="bilanco-row"><span>Kasa / Bankalar</span><span style="color:var(--g)">'+money(a.donen_varliklar.kasa_banka)+'</span></div>'
+      +'<div class="bilanco-row"><span>Ticari Alacaklar</span><span>'+money(a.donen_varliklar.ticari_alacak)+'</span></div>'
+      +'<div class="bilanco-row"><span>Alacak Çekler</span><span>'+money(a.donen_varliklar.alacak_cekler)+'</span></div>'
+      +'<div class="bilanco-total"><span>Dönen Varlıklar</span><span>'+money(a.donen_varliklar.toplam)+'</span></div></div>'
+      +'<div class="bilanco-section" style="margin-top:10px"><div class="bilanco-hdr">II. DURAN VARLIKLAR</div>'
+      +'<div class="bilanco-row"><span>Net Sabit Kıymetler</span><span>'+money(a.duran_varliklar.net_sabit_kiymet)+'</span></div>'
+      +'<div class="bilanco-row"><span>Finansal Yatırımlar</span><span>'+money(a.duran_varliklar.yatirimlar)+'</span></div>'
+      +'<div class="bilanco-total"><span>Duran Varlıklar</span><span>'+money(a.duran_varliklar.toplam)+'</span></div></div>'
+      +'<div class="bilanco-grand"><span>AKTİF TOPLAM</span><span style="color:var(--g)">'+money(a.toplam)+'</span></div>';
+    if(pasifEl) pasifEl.innerHTML=
+      '<div class="bilanco-section"><div class="bilanco-hdr">III. KISA VADELİ YÜKÜMLÜLÜKLER</div>'
+      +'<div class="bilanco-row"><span>Ticari Borçlar</span><span style="color:var(--r)">'+money(p.kv_yukumluluk.ticari_borc)+'</span></div>'
+      +'<div class="bilanco-row"><span>Borçlu Çekler</span><span style="color:var(--r)">'+money(p.kv_yukumluluk.borclu_cekler)+'</span></div>'
+      +'<div class="bilanco-row"><span>KDV Borcu</span><span style="color:var(--r)">'+money(p.kv_yukumluluk.kdv_borcu)+'</span></div>'
+      +'<div class="bilanco-row"><span>Banka Kredileri (KV)</span><span style="color:var(--r)">'+money(p.kv_yukumluluk.banka_kredisi)+'</span></div>'
+      +'<div class="bilanco-row"><span>Personel Borçları</span><span style="color:var(--r)">'+money(p.kv_yukumluluk.personel_borc)+'</span></div>'
+      +'<div class="bilanco-total"><span>KV Yükümlülükler</span><span>'+money(p.kv_yukumluluk.toplam)+'</span></div></div>'
+      +'<div class="bilanco-section" style="margin-top:10px"><div class="bilanco-hdr">IV. UZUN VADELİ YÜKÜMLÜLÜKLER</div>'
+      +'<div class="bilanco-row"><span>Uzun Vadeli Krediler</span><span style="color:var(--r)">'+money(p.uv_yukumluluk.banka_kredisi)+'</span></div>'
+      +'<div class="bilanco-total"><span>UV Yükümlülükler</span><span>'+money(p.uv_yukumluluk.toplam)+'</span></div></div>'
+      +'<div class="bilanco-section" style="margin-top:10px"><div class="bilanco-hdr">V. ÖZKAYNAKLAR</div>'
+      +'<div class="bilanco-total" style="color:var(--g)"><span>Özkaynaklar</span><span>'+money(p.ozkaynaklar)+'</span></div></div>'
+      +'<div class="bilanco-grand"><span>PASİF TOPLAM</span><span style="color:var(--r)">'+money(p.toplam)+'</span></div>';
+    var chk=document.getElementById('bilanco-check');
+    if(chk){
+      var ok=data.meta&&data.meta.balanced;
+      chk.style.background=ok?'rgba(213,253,115,.1)':'rgba(246,70,93,.1)';
+      chk.style.color=ok?'var(--g)':'var(--r)';
+      chk.textContent=ok?'✓ Bilanço Denkliği Sağlandı':'⚠ Bilanço Dengesi Kontrol Edilmeli';
+    }
+  });
+}
+
+// ── FİNANSAL ORANLAR ─────────────────────────────────────────────────────────
+function initRatiosPage(){ loadRatios(); }
+function loadRatios(){
+  xhr('/api/financial-ratios',null,function(d){
+    var grid=document.getElementById('ratios-grid');
+    if(grid) grid.innerHTML=[
+      {lbl:'Cari Oran',val:d.cari_oran,suf:'x',good:d.cari_oran>=1.5,tip:'≥1.5 sağlıklı'},
+      {lbl:'Asit-Test',val:d.asit_test,suf:'x',good:d.asit_test>=1.0,tip:'≥1.0 iyi'},
+      {lbl:'Brüt Kar Marjı',val:d.brut_kar_marji,suf:'%',good:d.brut_kar_marji>0,tip:''},
+      {lbl:'Tahsilat Süresi',val:d.dso_gun,suf:' gün',good:d.dso_gun!==null&&d.dso_gun<30,tip:'<30 gün hedef'},
+      {lbl:'Ödeme Süresi',val:d.dpo_gun,suf:' gün',good:d.dpo_gun!==null&&d.dpo_gun>30,tip:'>30 gün avantajlı'},
+    ].map(function(r){
+      var v=r.val!==null&&r.val!==undefined?r.val+r.suf:'—';
+      var cl=r.val!==null&&r.val!==undefined?(r.good?'kpi-v-g':'kpi-v-y'):'';
+      return '<div class="kpi-card"><div class="kpi-v '+cl+'">'+v+'</div>'
+        +'<div class="kpi-lbl">'+r.lbl+(r.tip?' <span style="opacity:.6;font-size:.65rem">'+r.tip+'</span>':'')+'</div></div>';
+    }).join('')
+    +'<div class="kpi-card"><div class="kpi-v kpi-v-g">'+money(d.gelir)+'</div><div class="kpi-lbl">Aylık Gelir</div></div>'
+    +'<div class="kpi-card"><div class="kpi-v kpi-v-r">'+money(d.gider)+'</div><div class="kpi-lbl">Aylık Gider</div></div>'
+    +'<div class="kpi-card"><div class="kpi-v" style="color:'+(d.net>=0?'var(--g)':'var(--r)')+'">'+money(d.net)+'</div><div class="kpi-lbl">Aylık Net</div></div>';
+
+    var det=document.getElementById('ratios-detail');
+    if(det) det.innerHTML='<div class="f-card">'
+      +'<div style="font-size:.7rem;font-weight:800;color:var(--txt2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">Detay</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
+      +'<div class="bilanco-row"><span>Toplam Alacak</span><span style="color:var(--y)">'+money(d.toplam_alacak)+'</span></div>'
+      +'<div class="bilanco-row"><span>Toplam Borç</span><span style="color:var(--r)">'+money(d.toplam_borc)+'</span></div>'
+      +'<div class="bilanco-row"><span>Toplam Kredi</span><span style="color:var(--r)">'+money(d.toplam_kredi)+'</span></div>'
+      +'<div class="bilanco-row"><span>Kasa / Banka</span><span style="color:var(--g)">'+money(d.kasa_banka)+'</span></div>'
+      +'</div></div>';
+  });
+}
+
+// ── MUHTASAR ─────────────────────────────────────────────────────────────────
+var _muhYear=new Date().getFullYear(), _muhMonth=new Date().getMonth()+1;
+var _MONTHS_TR=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+function initMuhtasarPage(){ renderMuhtasarPeriod(); loadMuhtasar(); }
+function renderMuhtasarPeriod(){ var el=document.getElementById('muhtasar-period'); if(el) el.textContent=_MONTHS_TR[_muhMonth-1]+' '+_muhYear; }
+function prevMuhtasarMonth(){ if(_muhMonth===1){_muhMonth=12;_muhYear--;}else _muhMonth--; renderMuhtasarPeriod();loadMuhtasar(); }
+function nextMuhtasarMonth(){ if(_muhMonth===12){_muhMonth=1;_muhYear++;}else _muhMonth++; renderMuhtasarPeriod();loadMuhtasar(); }
+function loadMuhtasar(){
+  xhr('/api/muhtasar?year='+_muhYear+'&month='+_muhMonth,null,function(d){
+    var b=d.bordro,k=d.kdv,oz=d.ozet;
+    var bEl=document.getElementById('muhtasar-bordro');
+    if(bEl) bEl.innerHTML=
+      '<div class="bilanco-row"><span>Çalışan Sayısı</span><span>'+b.calisam_sayisi+'</span></div>'
+      +'<div class="bilanco-row"><span>Toplam Brüt Maaş</span><span>'+money(b.toplam_brut)+'</span></div>'
+      +'<div class="bilanco-row"><span>Toplam Net Maaş</span><span style="color:var(--g)">'+money(b.toplam_net)+'</span></div>'
+      +'<div class="bilanco-row"><span>SGK İşçi Payı</span><span style="color:var(--r)">'+money(b.sgk_isci)+'</span></div>'
+      +'<div class="bilanco-row"><span>SGK İşveren Payı</span><span style="color:var(--r)">'+money(b.sgk_isveren)+'</span></div>'
+      +'<div class="bilanco-total"><span>Toplam SGK</span><span style="color:var(--r)">'+money(b.toplam_sgk)+'</span></div>'
+      +'<div class="bilanco-row"><span>Gelir Vergisi Stopajı</span><span style="color:var(--y)">'+money(b.gelir_vergisi_stopaj)+'</span></div>'
+      +'<div class="bilanco-row"><span>Damga Vergisi</span><span style="color:var(--y)">'+money(b.damga_vergisi)+'</span></div>';
+    var kEl=document.getElementById('muhtasar-kdv');
+    if(kEl) kEl.innerHTML=
+      '<div class="bilanco-row"><span>Tahsil Edilen KDV</span><span style="color:var(--r)">'+money(k.tahsil_edilen)+'</span></div>'
+      +'<div class="bilanco-row"><span>İndirilecek KDV</span><span style="color:var(--g)">'+money(k.indirilecek)+'</span></div>'
+      +'<div class="bilanco-total"><span>'+(k.odenecek>0?'Ödenecek KDV':'KDV İadesi')+'</span>'
+      +'<span style="color:'+(k.odenecek>0?'var(--r)':'var(--g)')+'">'+money(k.odenecek||k.iade)+'</span></div>';
+    var ozEl=document.getElementById('muhtasar-ozet');
+    if(ozEl) ozEl.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">'
+      +'<div class="kpi-card"><div class="kpi-v kpi-v-y">'+money(oz.stopaj_muhtasar)+'</div><div class="kpi-lbl">Muhtasar (GV+DV)</div></div>'
+      +'<div class="kpi-card"><div class="kpi-v kpi-v-r">'+money(oz.sgk_bildirim)+'</div><div class="kpi-lbl">SGK Bildirim</div></div>'
+      +'<div class="kpi-card"><div class="kpi-v kpi-v-r">'+money(oz.kdv_beyanname)+'</div><div class="kpi-lbl">KDV Beyanname</div></div>'
+      +'</div>';
+  });
 }
 
 // ── MORE SHEET ───────────────────────────────────────────────────────────────

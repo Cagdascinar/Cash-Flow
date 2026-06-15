@@ -595,6 +595,43 @@ def init_db():
             description     TEXT NOT NULL DEFAULT '',
             created_at      TEXT NOT NULL
         )""",
+        # ── Krediler (Banka Kredileri) ─────────────────────────────────────────
+        """CREATE TABLE IF NOT EXISTS loans (
+            id                 SERIAL PRIMARY KEY,
+            user_id            INTEGER NOT NULL,
+            profile_id         INTEGER NOT NULL DEFAULT 1,
+            bank_name          TEXT NOT NULL,
+            loan_type          TEXT NOT NULL DEFAULT 'nakdi',
+            principal          DOUBLE PRECISION NOT NULL DEFAULT 0,
+            remaining          DOUBLE PRECISION NOT NULL DEFAULT 0,
+            interest_rate      DOUBLE PRECISION NOT NULL DEFAULT 0,
+            start_date         TEXT NOT NULL,
+            end_date           TEXT NOT NULL DEFAULT '',
+            installment_amount DOUBLE PRECISION NOT NULL DEFAULT 0,
+            installment_day    INTEGER NOT NULL DEFAULT 1,
+            currency           TEXT NOT NULL DEFAULT 'TRY',
+            status             TEXT NOT NULL DEFAULT 'aktif',
+            notes              TEXT NOT NULL DEFAULT '',
+            created_at         TEXT NOT NULL
+        )""",
+        # ── Çekler (Vadeli Çekler) ────────────────────────────────────────────
+        """CREATE TABLE IF NOT EXISTS checks (
+            id           SERIAL PRIMARY KEY,
+            user_id      INTEGER NOT NULL,
+            profile_id   INTEGER NOT NULL DEFAULT 1,
+            check_type   TEXT NOT NULL DEFAULT 'alacak',
+            check_no     TEXT NOT NULL DEFAULT '',
+            drawer       TEXT NOT NULL DEFAULT '',
+            bank_name    TEXT NOT NULL DEFAULT '',
+            amount       DOUBLE PRECISION NOT NULL DEFAULT 0,
+            currency     TEXT NOT NULL DEFAULT 'TRY',
+            issue_date   TEXT NOT NULL,
+            due_date     TEXT NOT NULL,
+            status       TEXT NOT NULL DEFAULT 'bekliyor',
+            portfolio_id INTEGER,
+            notes        TEXT NOT NULL DEFAULT '',
+            created_at   TEXT NOT NULL
+        )""",
     ]
     migrations = [
         ("users",        "email",          "TEXT NOT NULL DEFAULT ''"),
@@ -7566,6 +7603,571 @@ def profit_loss():
         "total_gelir": round(total_g, 2),
         "total_gider": round(total_e, 2),
         "net_kar":     round(total_g - total_e, 2),
+    })
+
+# ── KREDİLER ──────────────────────────────────────────────────────────────────
+
+@app.route("/api/loans", methods=["GET"])
+@login_required
+def list_loans():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    rows = db.execute(
+        "SELECT * FROM loans WHERE user_id=%s AND profile_id=%s ORDER BY status, end_date",
+        (uid, pid)
+    ).fetchall()
+    return jsonify([row_to_dict(r) for r in rows])
+
+@app.route("/api/loans", methods=["POST"])
+@login_required
+def add_loan():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    d = request.get_json(force=True) or {}
+    if not d.get("bank_name", "").strip():
+        return jsonify({"ok": False, "error": "Banka adı zorunlu"}), 400
+    db.execute(
+        """INSERT INTO loans (user_id,profile_id,bank_name,loan_type,principal,remaining,
+           interest_rate,start_date,end_date,installment_amount,installment_day,currency,status,notes,created_at)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+        (uid, pid, d["bank_name"].strip(), d.get("loan_type", "nakdi"),
+         float(d.get("principal", 0)), float(d.get("remaining", d.get("principal", 0))),
+         float(d.get("interest_rate", 0)), d.get("start_date", today_str()),
+         d.get("end_date", ""), float(d.get("installment_amount", 0)),
+         int(d.get("installment_day", 1)), d.get("currency", "TRY"),
+         d.get("status", "aktif"), d.get("notes", ""), today_str())
+    )
+    db.commit()
+    return jsonify({"ok": True})
+
+@app.route("/api/loans/<int:lid>", methods=["PUT"])
+@login_required
+def update_loan(lid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    d = request.get_json(force=True) or {}
+    fields, vals = [], []
+    for col in ["bank_name", "loan_type", "interest_rate", "end_date", "installment_amount",
+                "installment_day", "currency", "status", "notes"]:
+        if col in d:
+            fields.append(f"{col}=%s")
+            if col in ("interest_rate", "installment_amount"):
+                vals.append(float(d[col]))
+            elif col == "installment_day":
+                vals.append(int(d[col]))
+            else:
+                vals.append(d[col])
+    if "remaining" in d:
+        fields.append("remaining=%s"); vals.append(float(d["remaining"]))
+    if not fields:
+        return jsonify({"ok": True})
+    vals += [lid, uid, pid]
+    db.execute(f"UPDATE loans SET {','.join(fields)} WHERE id=%s AND user_id=%s AND profile_id=%s", vals)
+    db.commit()
+    return jsonify({"ok": True})
+
+@app.route("/api/loans/<int:lid>", methods=["DELETE"])
+@login_required
+def del_loan(lid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    db.execute("DELETE FROM loans WHERE id=%s AND user_id=%s AND profile_id=%s", (lid, uid, pid))
+    db.commit()
+    return jsonify({"ok": True})
+
+@app.route("/api/loans/summary", methods=["GET"])
+@login_required
+def loan_summary():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    rows = db.execute(
+        "SELECT * FROM loans WHERE user_id=%s AND profile_id=%s AND status='aktif'",
+        (uid, pid)
+    ).fetchall()
+    total_remaining = sum(float(r["remaining"]) for r in rows)
+    total_installment = sum(float(r["installment_amount"]) for r in rows)
+    return jsonify({
+        "total_remaining": round(total_remaining, 2),
+        "total_monthly_installment": round(total_installment, 2),
+        "active_count": len(rows),
+        "loans": [row_to_dict(r) for r in rows]
+    })
+
+# ── ÇEKLER ────────────────────────────────────────────────────────────────────
+
+@app.route("/api/checks", methods=["GET"])
+@login_required
+def list_checks():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    status_filter = request.args.get("status", "")
+    sql = "SELECT * FROM checks WHERE user_id=%s AND profile_id=%s"
+    params = [uid, pid]
+    if status_filter:
+        sql += " AND status=%s"
+        params.append(status_filter)
+    sql += " ORDER BY due_date"
+    rows = db.execute(sql, params).fetchall()
+    return jsonify([row_to_dict(r) for r in rows])
+
+@app.route("/api/checks", methods=["POST"])
+@login_required
+def add_check():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    d = request.get_json(force=True) or {}
+    if not d.get("amount") or not d.get("due_date"):
+        return jsonify({"ok": False, "error": "Tutar ve vade tarihi zorunlu"}), 400
+    db.execute(
+        """INSERT INTO checks (user_id,profile_id,check_type,check_no,drawer,bank_name,
+           amount,currency,issue_date,due_date,status,notes,created_at)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+        (uid, pid, d.get("check_type", "alacak"), d.get("check_no", ""),
+         d.get("drawer", ""), d.get("bank_name", ""),
+         float(d["amount"]), d.get("currency", "TRY"),
+         d.get("issue_date", today_str()), d["due_date"],
+         "bekliyor", d.get("notes", ""), today_str())
+    )
+    db.commit()
+    return jsonify({"ok": True})
+
+@app.route("/api/checks/<int:cid>", methods=["PUT"])
+@login_required
+def update_check(cid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    d = request.get_json(force=True) or {}
+    fields, vals = [], []
+    for col in ["check_type", "check_no", "drawer", "bank_name", "amount",
+                "currency", "issue_date", "due_date", "status", "notes"]:
+        if col in d:
+            fields.append(f"{col}=%s")
+            vals.append(float(d[col]) if col == "amount" else d[col])
+    if not fields:
+        return jsonify({"ok": True})
+    vals += [cid, uid, pid]
+    db.execute(f"UPDATE checks SET {','.join(fields)} WHERE id=%s AND user_id=%s AND profile_id=%s", vals)
+    db.commit()
+    return jsonify({"ok": True})
+
+@app.route("/api/checks/<int:cid>", methods=["DELETE"])
+@login_required
+def del_check(cid):
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    db.execute("DELETE FROM checks WHERE id=%s AND user_id=%s AND profile_id=%s", (cid, uid, pid))
+    db.commit()
+    return jsonify({"ok": True})
+
+@app.route("/api/checks/summary", methods=["GET"])
+@login_required
+def check_summary():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    today = today_str()
+    import datetime as dt
+    week_later = (dt.date.today() + dt.timedelta(days=7)).isoformat()
+    rows = db.execute(
+        "SELECT * FROM checks WHERE user_id=%s AND profile_id=%s AND status='bekliyor'",
+        (uid, pid)
+    ).fetchall()
+    alacak = sum(float(r["amount"]) for r in rows if r["check_type"] == "alacak")
+    borclu = sum(float(r["amount"]) for r in rows if r["check_type"] == "borclu")
+    overdue = [row_to_dict(r) for r in rows if r["due_date"] < today]
+    due_soon = [row_to_dict(r) for r in rows if today <= r["due_date"] <= week_later]
+    return jsonify({
+        "alacak_toplam": round(alacak, 2),
+        "borclu_toplam": round(borclu, 2),
+        "net": round(alacak - borclu, 2),
+        "overdue_count": len(overdue),
+        "due_soon_count": len(due_soon),
+        "due_soon": due_soon,
+        "overdue": overdue
+    })
+
+# ── BİLANÇO ───────────────────────────────────────────────────────────────────
+
+@app.route("/api/balance-sheet", methods=["GET"])
+@login_required
+def balance_sheet():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    today_iso = today_str()
+
+    # AKTİF (Assets)
+    # 1. Dönen Varlıklar (Current Assets)
+    # Kasa/Bankalar — hesap bakiyeleri (initial_balance + işlemler)
+    acc_bal = db.execute(
+        """SELECT
+             COALESCE(SUM(a.initial_balance), 0) +
+             COALESCE((
+               SELECT SUM(CASE WHEN t.type='gelir' THEN t.amount ELSE -t.amount END)
+               FROM transactions t
+               WHERE t.profile_id=%s AND t.date <= %s
+                 AND NOT (t.card_id IS NOT NULL AND t.account_id IS NULL)
+             ), 0) AS b
+           FROM accounts a
+           WHERE a.profile_id=%s AND a.active=1
+             AND a.type NOT IN ('kredi_karti','kmh')""",
+        (pid, today_iso, pid)
+    ).fetchone()
+    kasa_banka = float(acc_bal["b"] or 0) if acc_bal else 0
+
+    # Ticari Alacaklar — ödenmemiş müşteri faturaları
+    receivable = db.execute(
+        "SELECT COALESCE(SUM(amount),0) as total FROM customer_invoices WHERE profile_id=%s AND status!='odendi'",
+        (pid,)
+    ).fetchone()
+    ticari_alacak = float(receivable["total"] or 0)
+
+    # Alacak Çekler
+    alacak_cek = db.execute(
+        "SELECT COALESCE(SUM(amount),0) as t FROM checks WHERE user_id=%s AND profile_id=%s AND check_type='alacak' AND status='bekliyor'",
+        (uid, pid)
+    ).fetchone()
+    alacak_cekler = float(alacak_cek["t"] or 0)
+
+    # İndirilecek KDV (alış KDV'si)
+    kdv_alacak = db.execute(
+        "SELECT COALESCE(SUM(kdv_amount),0) as t FROM kdv_records WHERE user_id=%s AND profile_id=%s AND kdv_type='indirilecek'",
+        (uid, pid)
+    ).fetchone()
+    devreden_kdv = float(kdv_alacak["t"] or 0)
+
+    donen_varliklar = round(kasa_banka + ticari_alacak + alacak_cekler, 2)
+
+    # 2. Duran Varlıklar (Fixed Assets)
+    asset_rows = db.execute(
+        "SELECT * FROM assets WHERE user_id=%s AND profile_id=%s AND active=1",
+        (uid, pid)
+    ).fetchall()
+    toplam_varlik_maliyet = sum(float(r["purchase_price"]) for r in asset_rows)
+    toplam_amortisman = 0
+    for r in asset_rows:
+        dep = calc_depreciation(float(r["purchase_price"]), r["purchase_date"],
+                                float(r["depreciation_rate"]), r["depreciation_method"])
+        toplam_amortisman += dep["accumulated"]
+    net_duran_varlik = round(toplam_varlik_maliyet - toplam_amortisman, 2)
+
+    # Yatırımlar
+    inv_rows = db.execute(
+        "SELECT COALESCE(SUM(current_value),0) as t FROM investments WHERE user_id=%s AND profile_id=%s",
+        (uid, pid)
+    ).fetchone()
+    yatirimlar = float(inv_rows["t"] or 0) if inv_rows["t"] else 0
+
+    duran_varliklar = round(net_duran_varlik + yatirimlar, 2)
+    toplam_aktif = round(donen_varliklar + duran_varliklar, 2)
+
+    # PASİF (Liabilities + Equity)
+    # 1. Kısa Vadeli Yükümlülükler
+    payable = db.execute(
+        "SELECT COALESCE(SUM(amount),0) as total FROM supplier_invoices WHERE profile_id=%s AND status='bekliyor'",
+        (pid,)
+    ).fetchone()
+    ticari_borc = float(payable["total"] or 0)
+
+    borclu_cek = db.execute(
+        "SELECT COALESCE(SUM(amount),0) as t FROM checks WHERE user_id=%s AND profile_id=%s AND check_type='borclu' AND status='bekliyor'",
+        (uid, pid)
+    ).fetchone()
+    borclu_cekler = float(borclu_cek["t"] or 0)
+
+    # KDV Borcu (tahsil edilen - indirilecek, negatifse sıfır)
+    kdv_tahsil_row = db.execute(
+        "SELECT COALESCE(SUM(kdv_amount),0) as t FROM kdv_records WHERE user_id=%s AND profile_id=%s AND kdv_type='tahsil'",
+        (uid, pid)
+    ).fetchone()
+    kdv_borcu = max(float(kdv_tahsil_row["t"] or 0) - devreden_kdv, 0)
+
+    # Kısa vadeli kredi borçları (konut kredisi hariç)
+    kv_loans = db.execute(
+        "SELECT COALESCE(SUM(remaining),0) as t FROM loans WHERE user_id=%s AND profile_id=%s AND status='aktif' AND loan_type!='konut'",
+        (uid, pid)
+    ).fetchone()
+    kv_kredi = float(kv_loans["t"] or 0)
+
+    # Personel borçları (ödenmemiş bordro)
+    personel_borc_row = db.execute(
+        "SELECT COALESCE(SUM(net_salary),0) as t FROM payroll WHERE user_id=%s AND profile_id=%s AND paid=0",
+        (uid, pid)
+    ).fetchone()
+    personel_borc = float(personel_borc_row["t"] or 0)
+
+    kv_yukumluluk = round(ticari_borc + borclu_cekler + kdv_borcu + kv_kredi + personel_borc, 2)
+
+    # 2. Uzun Vadeli Yükümlülükler (konut kredisi)
+    uv_loans = db.execute(
+        "SELECT COALESCE(SUM(remaining),0) as t FROM loans WHERE user_id=%s AND profile_id=%s AND status='aktif' AND loan_type='konut'",
+        (uid, pid)
+    ).fetchone()
+    uv_kredi = float(uv_loans["t"] or 0)
+    uv_yukumluluk = round(uv_kredi, 2)
+
+    toplam_pasif_borc = round(kv_yukumluluk + uv_yukumluluk, 2)
+
+    # 3. Özkaynaklar (Equity) — aktif - yükümlülükler
+    ozkaynaklar = round(toplam_aktif - toplam_pasif_borc, 2)
+    toplam_pasif = round(toplam_pasif_borc + ozkaynaklar, 2)
+
+    return jsonify({
+        "aktif": {
+            "donen_varliklar": {
+                "kasa_banka":    round(kasa_banka, 2),
+                "ticari_alacak": round(ticari_alacak, 2),
+                "alacak_cekler": round(alacak_cekler, 2),
+                "toplam":        donen_varliklar
+            },
+            "duran_varliklar": {
+                "net_sabit_kiymet": round(net_duran_varlik, 2),
+                "yatirimlar":       round(yatirimlar, 2),
+                "toplam":           duran_varliklar
+            },
+            "toplam": toplam_aktif
+        },
+        "pasif": {
+            "kv_yukumluluk": {
+                "ticari_borc":   round(ticari_borc, 2),
+                "borclu_cekler": round(borclu_cekler, 2),
+                "kdv_borcu":     round(kdv_borcu, 2),
+                "banka_kredisi": round(kv_kredi, 2),
+                "personel_borc": round(personel_borc, 2),
+                "toplam":        kv_yukumluluk
+            },
+            "uv_yukumluluk": {
+                "banka_kredisi": round(uv_kredi, 2),
+                "toplam":        uv_yukumluluk
+            },
+            "ozkaynaklar": ozkaynaklar,
+            "toplam": toplam_pasif
+        },
+        "meta": {
+            "date": today_str(),
+            "balanced": abs(toplam_aktif - toplam_pasif) < 1
+        }
+    })
+
+# ── FİNANSAL ORANLAR ──────────────────────────────────────────────────────────
+
+@app.route("/api/financial-ratios", methods=["GET"])
+@login_required
+def financial_ratios():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    import calendar
+    now_date = datetime.now()
+    year = now_date.year
+    month = now_date.month
+
+    m_start = f"{year:04d}-{month:02d}-01"
+    last_day = calendar.monthrange(year, month)[1]
+    m_end = f"{year:04d}-{month:02d}-{last_day:02d}"
+
+    tx_rows = db.execute(
+        "SELECT type, SUM(amount) as total FROM transactions WHERE user_id=%s AND profile_id=%s AND date BETWEEN %s AND %s GROUP BY type",
+        (uid, pid, m_start, m_end)
+    ).fetchall()
+    gelir = gider = 0
+    for r in tx_rows:
+        if r["type"] == "gelir":
+            gelir = float(r["total"] or 0)
+        else:
+            gider = float(r["total"] or 0)
+
+    # Hesap bakiyesi
+    acc_bal = db.execute(
+        """SELECT
+             COALESCE(SUM(a.initial_balance), 0) +
+             COALESCE((
+               SELECT SUM(CASE WHEN t.type='gelir' THEN t.amount ELSE -t.amount END)
+               FROM transactions t
+               WHERE t.profile_id=%s AND t.date <= %s
+                 AND NOT (t.card_id IS NOT NULL AND t.account_id IS NULL)
+             ), 0) AS b
+           FROM accounts a
+           WHERE a.profile_id=%s AND a.active=1
+             AND a.type NOT IN ('kredi_karti','kmh')""",
+        (pid, m_end, pid)
+    ).fetchone()
+    kasa = float(acc_bal["b"] or 0) if acc_bal else 0
+
+    alacak = db.execute(
+        "SELECT COALESCE(SUM(amount),0) as t FROM customer_invoices WHERE profile_id=%s AND status!='odendi'",
+        (pid,)
+    ).fetchone()
+    ticari_alacak = float(alacak["t"] or 0)
+
+    borc = db.execute(
+        "SELECT COALESCE(SUM(amount),0) as t FROM supplier_invoices WHERE profile_id=%s AND status='bekliyor'",
+        (pid,)
+    ).fetchone()
+    ticari_borc = float(borc["t"] or 0)
+
+    krediler = db.execute(
+        "SELECT COALESCE(SUM(remaining),0) as t FROM loans WHERE user_id=%s AND profile_id=%s AND status='aktif'",
+        (uid, pid)
+    ).fetchone()
+    toplam_kredi = float(krediler["t"] or 0)
+
+    donen_varlik = kasa + ticari_alacak
+    kv_yukumluluk = max(ticari_borc + toplam_kredi * 0.3, 1)
+
+    cari_oran = round(donen_varlik / kv_yukumluluk, 2) if kv_yukumluluk > 0 else None
+    asit_test = round(kasa / kv_yukumluluk, 2) if kv_yukumluluk > 0 else None
+    brut_kar_marji = round((gelir - gider) / gelir * 100, 1) if gelir > 0 else None
+
+    # DSO — Alacak tahsilat süresi (gün)
+    avg_daily_sales = gelir / last_day if gelir > 0 else 0
+    dso = round(ticari_alacak / avg_daily_sales, 0) if avg_daily_sales > 0 else None
+
+    # DPO — Borç ödeme süresi (gün)
+    avg_daily_purchase = gider / last_day if gider > 0 else 0
+    dpo = round(ticari_borc / avg_daily_purchase, 0) if avg_daily_purchase > 0 else None
+
+    return jsonify({
+        "period": f"{year:04d}-{month:02d}",
+        "gelir": round(gelir, 2),
+        "gider": round(gider, 2),
+        "net": round(gelir - gider, 2),
+        "cari_oran": cari_oran,
+        "asit_test": asit_test,
+        "brut_kar_marji": brut_kar_marji,
+        "dso_gun": dso,
+        "dpo_gun": dpo,
+        "toplam_alacak": round(ticari_alacak, 2),
+        "toplam_borc": round(ticari_borc, 2),
+        "toplam_kredi": round(toplam_kredi, 2),
+        "kasa_banka": round(kasa, 2),
+    })
+
+# ── MUHTASAR ──────────────────────────────────────────────────────────────────
+
+@app.route("/api/muhtasar", methods=["GET"])
+@login_required
+def muhtasar():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    year  = int(request.args.get("year",  datetime.now().year))
+    month = int(request.args.get("month", datetime.now().month))
+    period = f"{year:04d}-{month:02d}"
+
+    # Bordrodan stopaj (gelir vergisi + damga vergisi = income_tax sütununda birleşik)
+    rows = db.execute(
+        "SELECT * FROM payroll WHERE user_id=%s AND profile_id=%s AND period=%s",
+        (uid, pid, period)
+    ).fetchall()
+
+    # payroll tablosunda income_tax = gelir_vergisi + damga_vergisi (birleşik)
+    bordro_toplam_vergi = sum(float(r["income_tax"]) for r in rows)
+    sgk_isci     = sum(float(r["sgk_employee"]) for r in rows)
+    sgk_isveren  = sum(float(r["sgk_employer"]) for r in rows)
+    toplam_brut  = sum(float(r["gross_salary"]) for r in rows)
+    toplam_net   = sum(float(r["net_salary"]) for r in rows)
+    calisma_sayisi = len(rows)
+
+    # KDV özeti — kdv_type: 'tahsil' (satış KDV) vs 'indirilecek' (alış KDV)
+    kdv_tahsil_row = db.execute(
+        "SELECT COALESCE(SUM(kdv_amount),0) as t FROM kdv_records WHERE user_id=%s AND profile_id=%s AND kdv_type='tahsil' AND period=%s",
+        (uid, pid, period)
+    ).fetchone()
+    kdv_indirilecek_row = db.execute(
+        "SELECT COALESCE(SUM(kdv_amount),0) as t FROM kdv_records WHERE user_id=%s AND profile_id=%s AND kdv_type='indirilecek' AND period=%s",
+        (uid, pid, period)
+    ).fetchone()
+
+    tahsil_kdv = float(kdv_tahsil_row["t"] or 0)
+    indirilecek_kdv = float(kdv_indirilecek_row["t"] or 0)
+    odenecek_kdv = max(tahsil_kdv - indirilecek_kdv, 0)
+    iade_kdv = max(indirilecek_kdv - tahsil_kdv, 0)
+
+    return jsonify({
+        "period": period,
+        "year": year, "month": month,
+        "bordro": {
+            "calisma_sayisi":       calisma_sayisi,
+            "toplam_brut":          round(toplam_brut, 2),
+            "toplam_net":           round(toplam_net, 2),
+            "sgk_isci":             round(sgk_isci, 2),
+            "sgk_isveren":          round(sgk_isveren, 2),
+            "gelir_vergisi_stopaj": round(bordro_toplam_vergi * 0.99241, 2),  # damga hariç yaklaşık
+            "damga_vergisi":        round(bordro_toplam_vergi * 0.00759, 2),
+            "toplam_sgk":           round(sgk_isci + sgk_isveren, 2),
+        },
+        "kdv": {
+            "tahsil_edilen": round(tahsil_kdv, 2),
+            "indirilecek":   round(indirilecek_kdv, 2),
+            "odenecek":      round(odenecek_kdv, 2),
+            "iade":          round(iade_kdv, 2),
+        },
+        "ozet": {
+            "stopaj_muhtasar": round(bordro_toplam_vergi, 2),
+            "sgk_bildirim":    round(sgk_isci + sgk_isveren, 2),
+            "kdv_beyanname":   round(odenecek_kdv, 2),
+        }
+    })
+
+# ── NAKİT AKIŞI (Aylık) ───────────────────────────────────────────────────────
+
+@app.route("/api/cashflow", methods=["GET"])
+@login_required
+def cashflow():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    year = int(request.args.get("year", datetime.now().year))
+
+    # İşlemlerden aylık gelir/gider
+    tx_rows = db.execute(
+        """SELECT substr(date,1,7) AS period,
+                  type,
+                  SUM(amount) AS total
+           FROM transactions
+           WHERE user_id=%s AND profile_id=%s AND substr(date,1,4)=%s
+           GROUP BY substr(date,1,7), type
+           ORDER BY period""",
+        (uid, pid, str(year))
+    ).fetchall()
+
+    months = {}
+    for r in tx_rows:
+        m = r["period"]
+        if m not in months:
+            months[m] = {"gelir": 0.0, "gider": 0.0}
+        months[m][r["type"]] = months[m].get(r["type"], 0.0) + float(r["total"] or 0)
+
+    # Bordro maliyetini gidere ekle
+    payroll_rows = db.execute(
+        """SELECT period, SUM(total_cost) AS tc
+           FROM payroll
+           WHERE user_id=%s AND profile_id=%s AND substr(period,1,4)=%s
+           GROUP BY period""",
+        (uid, pid, str(year))
+    ).fetchall()
+    for pr in payroll_rows:
+        m = pr["period"]
+        if m not in months:
+            months[m] = {"gelir": 0.0, "gider": 0.0}
+        months[m]["gider"] = months[m].get("gider", 0.0) + float(pr["tc"] or 0)
+
+    # Kredi taksitlerini gidere ekle
+    loan_rows = db.execute(
+        "SELECT installment_amount, installment_day FROM loans WHERE user_id=%s AND profile_id=%s AND status='aktif'",
+        (uid, pid)
+    ).fetchall()
+    monthly_loan = sum(float(r["installment_amount"]) for r in loan_rows)
+
+    # Tüm ayları oluştur (boş olanlar dahil)
+    import calendar
+    result = []
+    cumulative = 0.0
+    for m in range(1, 13):
+        period = f"{year:04d}-{m:02d}"
+        g = months.get(period, {}).get("gelir", 0.0)
+        e = months.get(period, {}).get("gider", 0.0) + (monthly_loan if period in months else 0.0)
+        net = round(g - e, 2)
+        cumulative = round(cumulative + net, 2)
+        result.append({
+            "period":     period,
+            "gelir":      round(g, 2),
+            "gider":      round(e, 2),
+            "net":        net,
+            "kumulatif":  cumulative,
+        })
+
+    total_gelir = sum(r["gelir"] for r in result)
+    total_gider = sum(r["gider"] for r in result)
+
+    return jsonify({
+        "year": year,
+        "monthly": result,
+        "total_gelir": round(total_gelir, 2),
+        "total_gider": round(total_gider, 2),
+        "net_cashflow": round(total_gelir - total_gider, 2),
     })
 
 if __name__ == "__main__":
