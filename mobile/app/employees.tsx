@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C, money } from '../constants/Colors';
 import { employees as empApi } from '../services/api';
+import { SwipeableRow } from '../components/SwipeableRow';
 
 const EMP_TYPES: Record<string, string> = {
   tam: 'Tam Zamanlı', yarim: 'Yarı Zamanlı', donemsel: 'Dönemsel',
@@ -177,22 +178,25 @@ export default function EmployeesScreen() {
               list.length === 0
                 ? <View style={s.empty}><Text style={s.emptyIco}>👷</Text><Text style={s.emptyTxt}>Çalışan eklenmedi</Text></View>
                 : list.map(emp => (
-                    <View key={emp.id} style={s.card}>
-                      <View style={s.empAvatar}>
-                        <Text style={s.empAvatarTxt}>{emp.name[0]?.toUpperCase()}</Text>
+                    <SwipeableRow
+                      key={emp.id}
+                      style={{ marginHorizontal: 16, marginBottom: 10, borderRadius: 14 }}
+                      actions={[{ label: 'Sil', icon: '🗑️', color: '#dc2626', onPress: () => delEmp(emp.id, emp.name) }]}
+                    >
+                      <View style={s.card}>
+                        <View style={s.empAvatar}>
+                          <Text style={s.empAvatarTxt}>{emp.name[0]?.toUpperCase()}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.name}>{emp.name}</Text>
+                          <Text style={s.sub}>{emp.title ?? ''} · {EMP_TYPES[emp.employment_type] ?? ''}</Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={s.salary}>{money(emp.gross_salary)}</Text>
+                          <Text style={s.salLbl}>Brüt</Text>
+                        </View>
                       </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.name}>{emp.name}</Text>
-                        <Text style={s.sub}>{emp.title ?? ''} · {EMP_TYPES[emp.employment_type] ?? ''}</Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={s.salary}>{money(emp.gross_salary)}</Text>
-                        <Text style={s.salLbl}>Brüt</Text>
-                      </View>
-                      <TouchableOpacity onPress={() => delEmp(emp.id, emp.name)} style={{ paddingLeft: 8 }}>
-                        <Text style={{ color: C.muted, fontSize: 16 }}>✕</Text>
-                      </TouchableOpacity>
-                    </View>
+                    </SwipeableRow>
                   ))
             ) : (
               <>
@@ -398,7 +402,7 @@ const s = StyleSheet.create({
   sumCard:    { flex: 1, backgroundColor: C.card, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center' },
   sumVal:     { fontSize: 14, fontWeight: '800', color: C.txt },
   sumLbl:     { fontSize: 10, color: C.txt2, marginTop: 4, textAlign: 'center' },
-  card:       { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 8, backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border, gap: 10 },
+  card:       { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border, gap: 10 },
   empAvatar:  { width: 42, height: 42, borderRadius: 21, backgroundColor: '#1e2533', alignItems: 'center', justifyContent: 'center' },
   empAvatarTxt: { fontSize: 18, fontWeight: '800', color: C.txt },
   name:       { fontSize: 15, fontWeight: '700', color: C.txt },

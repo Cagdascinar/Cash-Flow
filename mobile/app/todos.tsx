@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C } from '../constants/Colors';
 import { misc } from '../services/api';
+import { SwipeableRow } from '../components/SwipeableRow';
 
 function fmtDate(d: Date) {
   return d.toISOString().split('T')[0];
@@ -121,15 +122,17 @@ export default function TodosScreen() {
               <View style={s.empty}><Text style={s.emptyIco}>✅</Text><Text style={s.emptyTxt}>Bu gün için yapılacak yok</Text></View>
             ) : null}
             renderItem={({ item }) => (
-              <TouchableOpacity style={s.item} onPress={() => toggle(item.id, !!item.done)} activeOpacity={0.7}>
-                <View style={[s.checkbox, item.done && s.checkboxDone]}>
-                  {item.done && <Text style={s.checkmark}>✓</Text>}
-                </View>
-                <Text style={[s.itemText, item.done && s.itemDone]}>{item.text}</Text>
-                <TouchableOpacity onPress={() => del(item.id)} style={{ padding: 4 }}>
-                  <Text style={{ color: C.muted, fontSize: 16 }}>✕</Text>
+              <SwipeableRow
+                style={{ marginHorizontal: 16, marginTop: 10, borderRadius: 12 }}
+                actions={[{ label: 'Sil', icon: '🗑️', color: '#dc2626', onPress: () => del(item.id) }]}
+              >
+                <TouchableOpacity style={s.item} onPress={() => toggle(item.id, !!item.done)} activeOpacity={0.7}>
+                  <View style={[s.checkbox, item.done && s.checkboxDone]}>
+                    {item.done && <Text style={s.checkmark}>✓</Text>}
+                  </View>
+                  <Text style={[s.itemText, item.done && s.itemDone]}>{item.text}</Text>
                 </TouchableOpacity>
-              </TouchableOpacity>
+              </SwipeableRow>
             )}
           />
       }
@@ -151,7 +154,7 @@ const s = StyleSheet.create({
   addInput:  { flex: 1, backgroundColor: C.card, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: C.txt, borderWidth: 1, borderColor: C.border },
   addBtn:    { width: 48, height: 48, backgroundColor: C.blue, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   addBtnTxt: { fontSize: 24, color: C.white, fontWeight: '300' },
-  item:      { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 10, backgroundColor: C.card, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: C.border, gap: 12 },
+  item:      { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: C.border, gap: 12 },
   checkbox:  { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
   checkboxDone: { backgroundColor: C.green, borderColor: C.green },
   checkmark: { fontSize: 12, color: C.white, fontWeight: '800' },

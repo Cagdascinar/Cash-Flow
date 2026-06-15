@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C } from '../constants/Colors';
 import { suppliers as suppApi } from '../services/api';
+import { SwipeableRow } from '../components/SwipeableRow';
 
 const VERGI_DAIRELERI = [
   'Büyük Mükellefler VD','Ankara VD','İstanbul VD','İzmir VD',
@@ -100,20 +101,25 @@ export default function SuppliersScreen() {
             {list.length === 0
               ? <View style={s.empty}><Text style={s.emptyIco}>🏢</Text><Text style={s.emptyTxt}>Tedarikçi eklenmedi</Text></View>
               : list.map(sup => (
-                  <View key={sup.id} style={s.card}>
-                    <View style={s.cardTop}>
-                      <View style={s.ico}><Text style={{ fontSize: 20 }}>🏢</Text></View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.name}>{sup.name}</Text>
-                        {sup.unvan && <Text style={s.sub}>{sup.unvan}</Text>}
-                        {sup.vkn && <Text style={s.sub}>VKN: {sup.vkn}{sup.vergi_dairesi ? ` · ${sup.vergi_dairesi}` : ''}</Text>}
-                        {sup.contact_name && <Text style={s.sub}>👤 {sup.contact_name}</Text>}
-                        {sup.email && <Text style={s.sub}>📧 {sup.email}</Text>}
-                        {sup.phone && <Text style={s.sub}>📞 {sup.phone}</Text>}
+                  <SwipeableRow
+                    key={sup.id}
+                    style={{ marginHorizontal: 16, marginBottom: 10, borderRadius: 14 }}
+                    actions={[{ label: 'Sil', icon: '🗑️', color: '#dc2626', onPress: () => del(sup.id) }]}
+                  >
+                    <View style={s.card}>
+                      <View style={s.cardTop}>
+                        <View style={s.ico}><Text style={{ fontSize: 20 }}>🏢</Text></View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.name}>{sup.name}</Text>
+                          {sup.unvan && <Text style={s.sub}>{sup.unvan}</Text>}
+                          {sup.vkn && <Text style={s.sub}>VKN: {sup.vkn}{sup.vergi_dairesi ? ` · ${sup.vergi_dairesi}` : ''}</Text>}
+                          {sup.contact_name && <Text style={s.sub}>👤 {sup.contact_name}</Text>}
+                          {sup.email && <Text style={s.sub}>📧 {sup.email}</Text>}
+                          {sup.phone && <Text style={s.sub}>📞 {sup.phone}</Text>}
+                        </View>
                       </View>
-                      <TouchableOpacity onPress={() => del(sup.id)}><Text style={{ color: C.muted, fontSize: 16 }}>✕</Text></TouchableOpacity>
                     </View>
-                  </View>
+                  </SwipeableRow>
                 ))
             }
             <View style={{ height: 40 }} />
@@ -211,7 +217,7 @@ const s = StyleSheet.create({
   title:       { fontSize: 20, fontWeight: '800', color: C.txt, flex: 1 },
   addBtn:      { backgroundColor: C.blue, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
   addTxt:      { fontSize: 14, fontWeight: '700', color: C.white },
-  card:        { marginHorizontal: 16, marginBottom: 10, marginTop: 8, backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border },
+  card:        { backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border },
   cardTop:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   ico:         { width: 40, height: 40, borderRadius: 12, backgroundColor: C.input, alignItems: 'center', justifyContent: 'center' },
   name:        { fontSize: 15, fontWeight: '700', color: C.txt },

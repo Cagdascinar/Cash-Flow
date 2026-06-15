@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C } from '../constants/Colors';
 import { userCategories as catApi, misc as miscApi } from '../services/api';
+import { SwipeableRow } from '../components/SwipeableRow';
 
 const CAT_ICONS = ['🍔','🚗','🏠','💊','📚','🎮','✈️','👗','💻','🎵',
                    '⚽','🐶','🌱','🎁','💪','🎬','☕','🍺','🛍️','💰',
@@ -103,15 +104,18 @@ export default function CategoriesScreen() {
               <>
                 <Text style={s.sect}>Özel</Text>
                 {filtered.map(c => (
-                  <View key={c.id} style={s.catRow}>
-                    <View style={[s.catDot, { backgroundColor: c.color || '#10069F' }]}>
-                      <Text style={{ fontSize: 16 }}>{c.icon || '📌'}</Text>
+                  <SwipeableRow
+                    key={c.id}
+                    style={{ marginHorizontal: 16, marginBottom: 8, borderRadius: 12 }}
+                    actions={[{ label: 'Sil', icon: '🗑️', color: '#dc2626', onPress: () => del(c.id, c.name) }]}
+                  >
+                    <View style={s.catRow}>
+                      <View style={[s.catDot, { backgroundColor: c.color || '#10069F' }]}>
+                        <Text style={{ fontSize: 16 }}>{c.icon || '📌'}</Text>
+                      </View>
+                      <Text style={s.catName}>{c.name}</Text>
                     </View>
-                    <Text style={s.catName}>{c.name}</Text>
-                    <TouchableOpacity onPress={() => del(c.id, c.name)}>
-                      <Text style={{ color: C.muted, fontSize: 18 }}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
+                  </SwipeableRow>
                 ))}
               </>
             )}
@@ -181,7 +185,7 @@ const s = StyleSheet.create({
   chipWrap:   { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 8 },
   chip:       { paddingHorizontal: 12, paddingVertical: 7, backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.border },
   chipTxt:    { fontSize: 13, color: C.txt2 },
-  catRow:     { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 8, backgroundColor: C.card, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.border, gap: 12 },
+  catRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.border, gap: 12 },
   catDot:     { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   catName:    { fontSize: 15, fontWeight: '600', color: C.txt, flex: 1 },
   mHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },

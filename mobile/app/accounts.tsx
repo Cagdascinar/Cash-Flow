@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C, money } from '../constants/Colors';
 import { accounts as accountsApi } from '../services/api';
+import { SwipeableRow } from '../components/SwipeableRow';
 
 const TYPE_LBL: Record<string, string> = { vadesiz: 'Vadesiz', vadeli: 'Vadeli', kredi_karti: 'Kredi Kartı', kmh: 'KMH', diger: 'Diğer' };
 
@@ -64,21 +65,24 @@ export default function AccountsScreen() {
               const isD   = ['kredi_karti', 'kmh'].includes(a.type);
               const color = isD ? C.red : bal >= 0 ? C.green : C.red;
               return (
-                <View key={a.id} style={s.card}>
-                  <View style={[s.dot, { backgroundColor: a.color ?? C.blue }]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.name}>{a.name}</Text>
-                    <Text style={s.bank}>{a.bank} · {TYPE_LBL[a.type] ?? a.type}</Text>
+                <SwipeableRow
+                  key={a.id}
+                  style={{ marginHorizontal: 16, marginBottom: 10, borderRadius: 14 }}
+                  actions={[{ label: 'Sil', icon: '🗑️', color: '#dc2626', onPress: () => del(a.id) }]}
+                >
+                  <View style={s.card}>
+                    <View style={[s.dot, { backgroundColor: a.color ?? C.blue }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.name}>{a.name}</Text>
+                      <Text style={s.bank}>{a.bank} · {TYPE_LBL[a.type] ?? a.type}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                      <Text style={[s.bal, { color }]}>{money(Math.abs(bal))}</Text>
+                      {isD && <Text style={{ fontSize: 11, color: C.red }}>Borç</Text>}
+                      {a.available != null && <Text style={{ fontSize: 11, color: C.green }}>Kalan: {money(a.available)}</Text>}
+                    </View>
                   </View>
-                  <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                    <Text style={[s.bal, { color }]}>{money(Math.abs(bal))}</Text>
-                    {isD && <Text style={{ fontSize: 11, color: C.red }}>Borç</Text>}
-                    {a.available != null && <Text style={{ fontSize: 11, color: C.green }}>Kalan: {money(a.available)}</Text>}
-                    <TouchableOpacity onPress={() => del(a.id)}>
-                      <Text style={{ fontSize: 12, color: C.muted }}>🗑️ Sil</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                </SwipeableRow>
               );
             })
         }
@@ -99,7 +103,7 @@ const s = StyleSheet.create({
   totalCard:{ margin: 16, backgroundColor: '#0d1f3c', borderRadius: 16, padding: 20, borderWidth: 1, borderColor: 'rgba(99,160,255,.15)', alignItems: 'center' },
   totalLbl: { fontSize: 13, color: 'rgba(255,255,255,.45)' },
   totalVal: { fontSize: 30, fontWeight: '900', marginTop: 4, letterSpacing: -1 },
-  card:     { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 10, backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border, gap: 12 },
+  card:     { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border, gap: 12 },
   dot:      { width: 12, height: 12, borderRadius: 6 },
   name:     { fontSize: 15, fontWeight: '600', color: C.txt },
   bank:     { fontSize: 12, color: C.txt2, marginTop: 2 },

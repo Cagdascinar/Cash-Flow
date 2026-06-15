@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C, money } from '../constants/Colors';
 import { recurring as recurringApi } from '../services/api';
+import { SwipeableRow } from '../components/SwipeableRow';
 
 const GELIR = ['Maaş','Serbest Meslek','Kira Geliri','Yatırım Geliri / Satış','Diğer Gelir'];
 const GIDER = ['Kira / Mortgage','Faturalar','Abonelikler','Sigorta','Kredi Kartı Ödemesi','Diğer Gider'];
@@ -98,26 +99,29 @@ export default function RecurringScreen() {
             {list.length === 0
               ? <View style={s.empty}><Text style={s.emptyIco}>🔄</Text><Text style={s.emptyTxt}>Tekrarlayan işlem yok</Text></View>
               : list.map(r => (
-                  <View key={r.id} style={s.card}>
-                    <View style={s.cardLeft}>
-                      <View style={[s.dot, { backgroundColor: r.type === 'gelir' ? C.green : C.red }]} />
-                      <View>
-                        <Text style={s.cardTitle}>{r.category}</Text>
-                        <Text style={s.cardSub}>{r.description || ''} · {FREQ.find(f => f.key === r.frequency)?.label ?? r.frequency}</Text>
+                  <SwipeableRow
+                    key={r.id}
+                    style={{ marginHorizontal: 16, marginBottom: 10, borderRadius: 14 }}
+                    actions={[
+                      { label: 'Düzenle', icon: '✏️', color: '#2563eb', onPress: () => openEdit(r) },
+                      { label: 'Sil',     icon: '🗑️', color: '#dc2626', onPress: () => del(r.id) },
+                    ]}
+                  >
+                    <View style={s.card}>
+                      <View style={s.cardLeft}>
+                        <View style={[s.dot, { backgroundColor: r.type === 'gelir' ? C.green : C.red }]} />
+                        <View>
+                          <Text style={s.cardTitle}>{r.category}</Text>
+                          <Text style={s.cardSub}>{r.description || ''} · {FREQ.find(f => f.key === r.frequency)?.label ?? r.frequency}</Text>
+                        </View>
+                      </View>
+                      <View style={s.cardRight}>
+                        <Text style={[s.amount, { color: r.type === 'gelir' ? C.green : C.red }]}>
+                          {r.type === 'gelir' ? '+' : '-'}{money(r.amount)}
+                        </Text>
                       </View>
                     </View>
-                    <View style={s.cardRight}>
-                      <Text style={[s.amount, { color: r.type === 'gelir' ? C.green : C.red }]}>
-                        {r.type === 'gelir' ? '+' : '-'}{money(r.amount)}
-                      </Text>
-                      <TouchableOpacity onPress={() => openEdit(r)} style={{ padding: 4 }}>
-                        <Text style={{ color: C.blue, fontSize: 16 }}>✎</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => del(r.id)} style={{ padding: 4 }}>
-                        <Text style={{ color: C.muted, fontSize: 16 }}>✕</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+                  </SwipeableRow>
                 ))
             }
             <View style={{ height: 40 }} />
@@ -188,7 +192,7 @@ const s = StyleSheet.create({
   title:       { fontSize: 20, fontWeight: '800', color: C.txt, flex: 1 },
   addBtn:      { backgroundColor: C.blue, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
   addTxt:      { fontSize: 14, fontWeight: '700', color: C.white },
-  card:        { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 10, backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border },
+  card:        { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border },
   cardLeft:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   dot:         { width: 10, height: 10, borderRadius: 5 },
   cardTitle:   { fontSize: 14, fontWeight: '600', color: C.txt },

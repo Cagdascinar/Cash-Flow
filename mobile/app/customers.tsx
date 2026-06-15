@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C, money, fmtDate } from '../constants/Colors';
 import { customers as custApi } from '../services/api';
+import { SwipeableRow } from '../components/SwipeableRow';
 
 export default function CustomersScreen() {
   const router = useRouter();
@@ -135,24 +136,27 @@ export default function CustomersScreen() {
             {list.length === 0
               ? <View style={s.empty}><Text style={s.emptyIco}>👥</Text><Text style={s.emptyTxt}>Müşteri eklenmedi</Text></View>
               : list.map(item => (
-                  <TouchableOpacity key={item.id} style={s.card} onPress={() => openInvoices(item)}>
-                    <View style={s.cardLeft}>
-                      <Text style={s.avatar}>{item.name[0]?.toUpperCase()}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.name}>{item.name}</Text>
-                      {item.contact_name && <Text style={s.sub}>{item.contact_name}</Text>}
-                      {item.phone && <Text style={s.sub}>{item.phone}</Text>}
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      {(item.total_unpaid ?? 0) > 0
-                        ? <Text style={[s.amount, { color: '#f0b90b' }]}>{money(item.total_unpaid)}</Text>
-                        : <Text style={[s.amount, { color: '#4ade80' }]}>Temiz</Text>}
-                      <TouchableOpacity onPress={() => del(item.id, item.name)} style={{ marginTop: 6 }}>
-                        <Text style={{ color: C.muted, fontSize: 13 }}>✕</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </TouchableOpacity>
+                  <SwipeableRow
+                    key={item.id}
+                    style={{ marginHorizontal: 16, marginTop: 8, borderRadius: 14 }}
+                    actions={[{ label: 'Sil', icon: '🗑️', color: '#dc2626', onPress: () => del(item.id, item.name) }]}
+                  >
+                    <TouchableOpacity style={s.card} onPress={() => openInvoices(item)}>
+                      <View style={s.cardLeft}>
+                        <Text style={s.avatar}>{item.name[0]?.toUpperCase()}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.name}>{item.name}</Text>
+                        {item.contact_name && <Text style={s.sub}>{item.contact_name}</Text>}
+                        {item.phone && <Text style={s.sub}>{item.phone}</Text>}
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        {(item.total_unpaid ?? 0) > 0
+                          ? <Text style={[s.amount, { color: '#f0b90b' }]}>{money(item.total_unpaid)}</Text>
+                          : <Text style={[s.amount, { color: '#4ade80' }]}>Temiz</Text>}
+                      </View>
+                    </TouchableOpacity>
+                  </SwipeableRow>
                 ))
             }
           </ScrollView>
@@ -268,7 +272,7 @@ const s = StyleSheet.create({
   sumCard:    { flex: 1, backgroundColor: C.card, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center' },
   sumVal:     { fontSize: 15, fontWeight: '800', color: C.txt },
   sumLbl:     { fontSize: 10, color: C.txt2, marginTop: 4 },
-  card:       { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 8, backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border, gap: 12 },
+  card:       { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border, gap: 12 },
   cardLeft:   { width: 42, height: 42, borderRadius: 21, backgroundColor: C.blue, alignItems: 'center', justifyContent: 'center' },
   avatar:     { fontSize: 18, fontWeight: '800', color: C.white },
   name:       { fontSize: 15, fontWeight: '700', color: C.txt },

@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C, money } from '../constants/Colors';
 import { cards as cardsApi } from '../services/api';
+import { SwipeableRow } from '../components/SwipeableRow';
 
 const TYPE_ICO: Record<string, string> = { kredi: '💳', banka: '🏦', yemek: '🍽️', hediye: '🎁' };
 
@@ -85,33 +86,34 @@ export default function CardsScreen() {
         {list.length === 0
           ? <View style={s.empty}><Text style={{ fontSize: 48 }}>💳</Text><Text style={s.emptyTxt}>Kart eklenmedi</Text><Text style={s.emptySub}>Web'den ekleyebilirsiniz</Text></View>
           : list.map(c => (
-              <View key={c.id} style={s.card}>
-                <View style={s.cardTop}>
-                  <View style={s.ico}><Text style={{ fontSize: 20 }}>{TYPE_ICO[c.card_type] ?? '💳'}</Text></View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.bank}>{c.bank_name}</Text>
-                    <Text style={s.cname}>{c.card_name || c.card_type}</Text>
-                  </View>
-                  <Text style={s.lim}>Limit: {money(c.limit_)}</Text>
-                </View>
-                <Bar used={c.used_ ?? 0} limit={c.limit_ ?? 0} />
-                <View style={s.footer}>
-                  {[['Ekstre', String(c.statement_day)], ['Son Ödeme', String(c.due_day)], ['Asgari', money(Math.round((c.used_ ?? 0) * ((c.min_pct ?? 25) / 100)))]].map(([lbl, val]) => (
-                    <View key={lbl as string} style={{ flex: 1, alignItems: 'center' }}>
-                      <Text style={s.fLbl}>{lbl}</Text>
-                      <Text style={s.fVal}>{val}</Text>
+              <SwipeableRow
+                key={c.id}
+                style={{ marginHorizontal: 16, marginBottom: 12, borderRadius: 16 }}
+                actions={[{ label: 'Sil', icon: '🗑️', color: '#dc2626', onPress: () => delCard(c.id) }]}
+              >
+                <View style={s.card}>
+                  <View style={s.cardTop}>
+                    <View style={s.ico}><Text style={{ fontSize: 20 }}>{TYPE_ICO[c.card_type] ?? '💳'}</Text></View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.bank}>{c.bank_name}</Text>
+                      <Text style={s.cname}>{c.card_name || c.card_type}</Text>
                     </View>
-                  ))}
-                </View>
-                <View style={s.actions}>
+                    <Text style={s.lim}>Limit: {money(c.limit_)}</Text>
+                  </View>
+                  <Bar used={c.used_ ?? 0} limit={c.limit_ ?? 0} />
+                  <View style={s.footer}>
+                    {[['Ekstre', String(c.statement_day)], ['Son Ödeme', String(c.due_day)], ['Asgari', money(Math.round((c.used_ ?? 0) * ((c.min_pct ?? 25) / 100)))]].map(([lbl, val]) => (
+                      <View key={lbl as string} style={{ flex: 1, alignItems: 'center' }}>
+                        <Text style={s.fLbl}>{lbl}</Text>
+                        <Text style={s.fVal}>{val}</Text>
+                      </View>
+                    ))}
+                  </View>
                   <TouchableOpacity style={s.payBtn} onPress={() => router.push({ pathname: '/pay-card' as any, params: { id: c.id, bank: c.bank_name, name: c.card_name || '', used: String(c.used_ ?? 0), min: String(Math.round((c.used_ ?? 0) * ((c.min_pct ?? 25) / 100))) } })}>
                     <Text style={s.payTxt}>💳 Ödeme Yap</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.delBtn} onPress={() => delCard(c.id)}>
-                    <Text style={s.delTxt}>🗑️ Sil</Text>
-                  </TouchableOpacity>
                 </View>
-              </View>
+              </SwipeableRow>
             ))
         }
         <View style={{ height: 40 }} />
@@ -132,7 +134,7 @@ const s = StyleSheet.create({
   box:     { flex: 1, backgroundColor: C.card, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center' },
   boxVal:  { fontSize: 13, fontWeight: '800' },
   boxLbl:  { fontSize: 10, color: C.txt2, marginTop: 2 },
-  card:    { marginHorizontal: 16, marginBottom: 12, backgroundColor: C.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: C.border },
+  card:    { backgroundColor: C.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: C.border },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   ico:     { width: 40, height: 40, borderRadius: 12, backgroundColor: C.input, alignItems: 'center', justifyContent: 'center' },
   bank:    { fontSize: 15, fontWeight: '700', color: C.txt },
@@ -141,11 +143,8 @@ const s = StyleSheet.create({
   footer:  { flexDirection: 'row', marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: C.border },
   fLbl:    { fontSize: 11, color: C.muted },
   fVal:    { fontSize: 14, fontWeight: '700', color: C.txt, marginTop: 2 },
-  actions: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  payBtn:  { flex: 1, backgroundColor: C.green, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
+  payBtn:  { marginTop: 12, backgroundColor: C.green, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
   payTxt:  { fontSize: 13, fontWeight: '700', color: C.white },
-  delBtn:  { flex: 1, backgroundColor: C.input, borderRadius: 10, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: C.border },
-  delTxt:  { fontSize: 13, fontWeight: '700', color: C.red },
   empty:   { alignItems: 'center', paddingVertical: 48 },
   emptyTxt:{ fontSize: 16, fontWeight: '600', color: C.txt, marginTop: 12 },
   emptySub:{ fontSize: 13, color: C.txt2, marginTop: 4 },
