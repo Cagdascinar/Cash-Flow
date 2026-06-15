@@ -1662,9 +1662,25 @@ body{top:0!important}
       <span class="ico">🏗️</span>Sabit Kıymetler
       <button class="fav-star" onclick="toggleFav(event,'assets','🏗️','Sabit Kıymet')" title="Favorilere ekle">★</button>
     </div>
+    <div class="nl nl-desktop" data-page="amortisman" data-sirket onclick="goPage('amortisman',this)">
+      <span class="ico">📉</span>Amortisman Raporu
+      <button class="fav-star" onclick="toggleFav(event,'amortisman','📉','Amortisman')" title="Favorilere ekle">★</button>
+    </div>
     <div class="nl nl-desktop" data-page="cardreport" data-sirket onclick="goPage('cardreport',this)">
       <span class="ico">📊</span>Kart Raporu
       <button class="fav-star" onclick="toggleFav(event,'cardreport','📊','Kart Raporu')" title="Favorilere ekle">★</button>
+    </div>
+    <div class="nl nl-desktop" data-page="mizan" data-sirket onclick="goPage('mizan',this)">
+      <span class="ico">⚖️</span>Mizan
+      <button class="fav-star" onclick="toggleFav(event,'mizan','⚖️','Mizan')" title="Favorilere ekle">★</button>
+    </div>
+    <div class="nl nl-desktop" data-page="variance" data-sirket onclick="goPage('variance',this)">
+      <span class="ico">🎯</span>Bütçe vs Gerçekleşen
+      <button class="fav-star" onclick="toggleFav(event,'variance','🎯','Bütçe Varyans')" title="Favorilere ekle">★</button>
+    </div>
+    <div class="nl nl-desktop" data-page="bankrecon" data-sirket onclick="goPage('bankrecon',this)">
+      <span class="ico">🏦</span>Banka Mutabakatı
+      <button class="fav-star" onclick="toggleFav(event,'bankrecon','🏦','Mutabakat')" title="Favorilere ekle">★</button>
     </div>
 
     <div class="nav-sect">Sistem</div>
@@ -1746,8 +1762,12 @@ body{top:0!important}
   <div class="drw-item" id="drw-f-bilanco"    onclick="goPageFromSheet('bilanco')"    style="display:none"><span class="di">⚖️</span>Bilanço</div>
   <div class="drw-item" id="drw-f-ratios"     onclick="goPageFromSheet('ratios')"     style="display:none"><span class="di">📊</span>Finansal Oranlar</div>
   <div class="drw-item" id="drw-f-muhtasar"   onclick="goPageFromSheet('muhtasar')"   style="display:none"><span class="di">📑</span>Muhtasar</div>
-  <div class="drw-item" id="drw-f-assets"     onclick="goPageFromSheet('assets')"     style="display:none"><span class="di">🏗️</span>Sabit Kıymetler</div>
-  <div class="drw-item" id="drw-f-cardreport" onclick="goPageFromSheet('cardreport')" style="display:none"><span class="di">📈</span>Kart Raporu</div>
+  <div class="drw-item" id="drw-f-assets"      onclick="goPageFromSheet('assets')"      style="display:none"><span class="di">🏗️</span>Sabit Kıymetler</div>
+  <div class="drw-item" id="drw-f-amortisman" onclick="goPageFromSheet('amortisman')"  style="display:none"><span class="di">📉</span>Amortisman Raporu</div>
+  <div class="drw-item" id="drw-f-cardreport" onclick="goPageFromSheet('cardreport')"  style="display:none"><span class="di">📊</span>Kart Raporu</div>
+  <div class="drw-item" id="drw-f-mizan"      onclick="goPageFromSheet('mizan')"       style="display:none"><span class="di">⚖️</span>Mizan</div>
+  <div class="drw-item" id="drw-f-variance"   onclick="goPageFromSheet('variance')"    style="display:none"><span class="di">🎯</span>Bütçe vs Gerçekleşen</div>
+  <div class="drw-item" id="drw-f-bankrecon"  onclick="goPageFromSheet('bankrecon')"   style="display:none"><span class="di">🏦</span>Banka Mutabakatı</div>
 
   <div class="drw-divider"></div>
   <!-- ── SİSTEM ── -->
@@ -3932,6 +3952,89 @@ body{top:0!important}
   </div>
 </div>
 
+<!-- ── MİZAN ──────────────────────────────────────────────── -->
+<div class="page" id="page-mizan">
+  <div class="page-hdr">
+    <h1 class="page-title">⚖️ Mizan</h1>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select id="mizan-year-sel" class="f-input" style="width:90px;padding:7px 10px;font-size:.82rem" onchange="loadMizan()"></select>
+      <select id="mizan-month-sel" class="f-input" style="width:110px;padding:7px 10px;font-size:.82rem" onchange="loadMizan()">
+        <option value="">Tüm Yıl</option>
+        <option value="1">Ocak</option><option value="2">Şubat</option><option value="3">Mart</option>
+        <option value="4">Nisan</option><option value="5">Mayıs</option><option value="6">Haziran</option>
+        <option value="7">Temmuz</option><option value="8">Ağustos</option><option value="9">Eylül</option>
+        <option value="10">Ekim</option><option value="11">Kasım</option><option value="12">Aralık</option>
+      </select>
+      <button class="btn btn-ghost tappable" onclick="loadMizan()" style="padding:7px 12px">↻</button>
+    </div>
+  </div>
+  <div id="mizan-totals" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px"></div>
+  <div class="f-card" style="padding:0;overflow:hidden">
+    <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+      <thead>
+        <tr style="background:var(--bg3)">
+          <th style="padding:10px 14px;text-align:left;color:var(--txt2);font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--border)">Kategori</th>
+          <th style="padding:10px 14px;text-align:right;color:#f87171;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--border)">Borç (Gider)</th>
+          <th style="padding:10px 14px;text-align:right;color:#4ade80;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--border)">Alacak (Gelir)</th>
+          <th style="padding:10px 14px;text-align:right;color:var(--txt2);font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--border)">Bakiye</th>
+        </tr>
+      </thead>
+      <tbody id="mizan-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── BÜTÇE vs GERÇEKLEŞEN ──────────────────────────────── -->
+<div class="page" id="page-variance">
+  <div class="page-hdr">
+    <h1 class="page-title">🎯 Bütçe vs Gerçekleşen</h1>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="month" id="variance-period" class="f-input" style="padding:7px 10px;font-size:.82rem" onchange="loadVariance()">
+      <button class="btn btn-ghost tappable" onclick="loadVariance()" style="padding:7px 12px">↻</button>
+    </div>
+  </div>
+  <div id="variance-summary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px"></div>
+  <div id="variance-list"></div>
+</div>
+
+<!-- ── BANKA MUTABAKATI ──────────────────────────────────── -->
+<div class="page" id="page-bankrecon">
+  <div class="page-hdr">
+    <h1 class="page-title">🏦 Banka Mutabakatı</h1>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="month" id="recon-period" class="f-input" style="padding:7px 10px;font-size:.82rem" onchange="loadBankRecon()">
+      <button class="btn btn-ghost tappable" onclick="loadBankRecon()" style="padding:7px 12px">↻</button>
+    </div>
+  </div>
+  <div id="recon-list"></div>
+</div>
+
+<!-- ── AMORTİSMAN RAPORU ─────────────────────────────────── -->
+<div class="page" id="page-amortisman">
+  <div class="page-hdr">
+    <h1 class="page-title">📉 Amortisman Raporu</h1>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select id="amorti-year-sel" class="f-input" style="width:100px;padding:7px 10px;font-size:.82rem" onchange="loadAmortisman()"></select>
+      <button class="btn btn-ghost tappable" onclick="loadAmortisman()" style="padding:7px 12px">↻</button>
+    </div>
+  </div>
+  <div id="amorti-totals" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px"></div>
+  <div class="f-card" style="padding:0;overflow:hidden">
+    <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+      <thead>
+        <tr style="background:var(--bg3)">
+          <th style="padding:10px 12px;text-align:left;color:var(--txt2);font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border)">Varlık</th>
+          <th style="padding:10px 12px;text-align:right;color:var(--txt2);font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border)">Maliyet</th>
+          <th style="padding:10px 12px;text-align:right;color:#f59e0b;font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border)">Yıllık Amorti.</th>
+          <th style="padding:10px 12px;text-align:right;color:#f87171;font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border)">Birikmiş</th>
+          <th style="padding:10px 12px;text-align:right;color:#4ade80;font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;border-bottom:1px solid var(--border)">Defter Değeri</th>
+        </tr>
+      </thead>
+      <tbody id="amorti-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
 <!-- ── MODALS ──────────────────────────────────────────────────── -->
 
 <!-- Kategori Ekle Modalı -->
@@ -4804,9 +4907,13 @@ function _pageInit(id){
   if(id==='ploss') initPLossPage();
   if(id==='loans') initLoansPage();
   if(id==='checks') initChecksPage();
-  if(id==='bilanco') initBilancoPage();
-  if(id==='ratios') initRatiosPage();
-  if(id==='muhtasar') initMuhtasarPage();
+  if(id==='bilanco')    initBilancoPage();
+  if(id==='ratios')     initRatiosPage();
+  if(id==='muhtasar')   initMuhtasarPage();
+  if(id==='mizan')      initMizanPage();
+  if(id==='variance')   initVariancePage();
+  if(id==='bankrecon')  initBankReconPage();
+  if(id==='amortisman') initAmortismanPage();
 }
 
 function _processNav(){
@@ -5176,6 +5283,200 @@ function loadMuhtasar(){
   });
 }
 
+// ── MİZAN ────────────────────────────────────────────────────────────────────
+function initMizanPage(){
+  var ys=document.getElementById('mizan-year-sel');
+  if(ys&&!ys.options.length){
+    var now=new Date().getFullYear();
+    for(var y=now;y>=now-4;y--) ys.add(new Option(y,y,y===now,y===now));
+  }
+  loadMizan();
+}
+function loadMizan(){
+  var yr=document.getElementById('mizan-year-sel').value;
+  var mo=document.getElementById('mizan-month-sel').value;
+  xhr('/api/mizan?year='+yr+(mo?'&month='+mo:''),null,function(d){
+    function fmt(v,col){
+      return '<span style="color:'+col+'">'+money(v)+'</span>';
+    }
+    // Toplamlar
+    var tot=document.getElementById('mizan-totals');
+    if(tot) tot.innerHTML=[
+      {lbl:'Toplam Borç (Gider)',val:money(d.total_borc),col:'#f87171'},
+      {lbl:'Toplam Alacak (Gelir)',val:money(d.total_alacak),col:'#4ade80'},
+      {lbl:'Net Bakiye',val:money(d.net_bakiye),col:d.net_bakiye>=0?'#4ade80':'#f87171'},
+    ].map(function(k){
+      return '<div class="f-card" style="text-align:center;padding:12px">'
+        +'<div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt2);margin-bottom:5px">'+k.lbl+'</div>'
+        +'<div style="font-size:1.1rem;font-weight:800;color:'+k.col+'">'+k.val+'</div></div>';
+    }).join('');
+    // Satırlar
+    var tb=document.getElementById('mizan-tbody');
+    if(!tb) return;
+    if(!d.lines||!d.lines.length){tb.innerHTML='<tr><td colspan="4" style="padding:24px;text-align:center;color:var(--txt2)">Veri yok</td></tr>';return;}
+    tb.innerHTML=d.lines.map(function(l){
+      var bak=l.bakiye;
+      return '<tr style="border-bottom:1px solid var(--border)">'
+        +'<td style="padding:9px 14px;color:var(--txt);font-weight:500">'+escHtml(l.category)+'</td>'
+        +'<td style="padding:9px 14px;text-align:right;color:#f87171;font-weight:600">'+money(l.borc)+'</td>'
+        +'<td style="padding:9px 14px;text-align:right;color:#4ade80;font-weight:600">'+money(l.alacak)+'</td>'
+        +'<td style="padding:9px 14px;text-align:right;font-weight:700;color:'+(bak>=0?'#4ade80':'#f87171')+'">'+money(bak)+'</td>'
+        +'</tr>';
+    }).join('')
+    +'<tr style="background:var(--bg3);font-weight:800">'
+    +'<td style="padding:10px 14px;color:var(--txt)">TOPLAM</td>'
+    +'<td style="padding:10px 14px;text-align:right;color:#f87171">'+money(d.total_borc)+'</td>'
+    +'<td style="padding:10px 14px;text-align:right;color:#4ade80">'+money(d.total_alacak)+'</td>'
+    +'<td style="padding:10px 14px;text-align:right;color:'+(d.net_bakiye>=0?'#4ade80':'#f87171')+'">'+money(d.net_bakiye)+'</td>'
+    +'</tr>';
+  });
+}
+
+// ── BÜTÇE vs GERÇEKLEŞEN ─────────────────────────────────────────────────────
+function initVariancePage(){
+  var p=document.getElementById('variance-period');
+  if(p&&!p.value) p.value=new Date().toISOString().slice(0,7);
+  loadVariance();
+}
+function loadVariance(){
+  var period=document.getElementById('variance-period').value;
+  xhr('/api/budget/variance?period='+period,null,function(d){
+    var s=document.getElementById('variance-summary');
+    if(s) s.innerHTML=[
+      {lbl:'Toplam Bütçe',val:money(d.total_budget),col:'var(--b)'},
+      {lbl:'Gerçekleşen',val:money(d.total_actual),col:d.total_actual>d.total_budget?'#f87171':'var(--txt)'},
+      {lbl:'Kalan / Aşım',val:money(Math.abs(d.total_var)),col:d.total_var>=0?'#4ade80':'#f87171',pre:d.total_var>=0?'✓ ':'⚠ '},
+    ].map(function(k){
+      return '<div class="f-card" style="text-align:center;padding:12px">'
+        +'<div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt2);margin-bottom:5px">'+k.lbl+'</div>'
+        +'<div style="font-size:1rem;font-weight:800;color:'+k.col+'">'+(k.pre||'')+k.val+'</div></div>';
+    }).join('');
+
+    var el=document.getElementById('variance-list');
+    if(!el) return;
+    if(!d.lines||!d.lines.length){
+      el.innerHTML='<div class="f-card" style="text-align:center;padding:32px;color:var(--txt2)">Bütçe tanımlanmamış — Bütçe & Hedefler sayfasından kategori bütçesi ekleyin</div>';
+      return;
+    }
+    el.innerHTML=d.lines.map(function(l){
+      var pct=Math.min(l.pct_used,100);
+      var barCol=l.status==='askin'?'#f87171':l.status==='uyari'?'#f59e0b':'#4ade80';
+      var varCol=l.variance>=0?'#4ade80':'#f87171';
+      return '<div class="f-card" style="margin-bottom:10px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+          +'<div style="font-weight:700;color:var(--txt)">'+escHtml(l.category)+'</div>'
+          +'<div style="font-size:.72rem;font-weight:800;color:'+varCol+'">'
+            +(l.variance>=0?'✓ '+money(l.variance)+' kaldı':'⚠ '+money(-l.variance)+' aşıldı')+'</div></div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:.75rem;color:var(--txt2);margin-bottom:6px">'
+          +'<span>Bütçe: <b style="color:var(--txt)">'+money(l.budget)+'</b></span>'
+          +'<span>Harcanan: <b style="color:'+(l.pct_used>100?'#f87171':'var(--txt)')+'">'+money(l.actual)+'</b></span>'
+          +'<span style="color:'+barCol+'"><b>%'+Math.round(l.pct_used>999?999:l.pct_used)+'</b></span></div>'
+        +'<div style="background:var(--bg3);border-radius:6px;height:6px;overflow:hidden">'
+          +'<div style="background:'+barCol+';height:100%;width:'+pct+'%;border-radius:6px;transition:width .5s"></div></div>'
+        +'</div>';
+    }).join('');
+  });
+}
+
+// ── BANKA MUTABAKATI ─────────────────────────────────────────────────────────
+function initBankReconPage(){
+  var p=document.getElementById('recon-period');
+  if(p&&!p.value) p.value=new Date().toISOString().slice(0,7);
+  loadBankRecon();
+}
+function loadBankRecon(){
+  var period=document.getElementById('recon-period').value;
+  xhr('/api/bank-recon?period='+period,null,function(d){
+    var el=document.getElementById('recon-list');
+    if(!el) return;
+    if(!d.accounts||!d.accounts.length){
+      el.innerHTML='<div class="f-card" style="text-align:center;padding:32px;color:var(--txt2)">Aktif hesap bulunamadı</div>';
+      return;
+    }
+    el.innerHTML=d.accounts.map(function(a){
+      var bal=a.closing;
+      var balCol=bal>=0?'#4ade80':'#f87171';
+      return '<div class="f-card" style="margin-bottom:10px">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+          +'<div>'
+            +'<div style="font-weight:800;color:var(--txt);font-size:.95rem">'+escHtml(a.account_name)+'</div>'
+            +'<div style="font-size:.72rem;color:var(--txt2)">'+escHtml(a.bank||'')+(a.bank&&a.type?' · ':'')+(a.type||'')+'</div>'
+          +'</div>'
+          +'<div style="text-align:right">'
+            +'<div style="font-size:1.2rem;font-weight:900;color:'+balCol+'">'+money(bal)+'</div>'
+            +'<div style="font-size:.68rem;color:var(--txt2)">Kapanış Bakiyesi</div>'
+          +'</div>'
+        +'</div>'
+        +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:.75rem">'
+          +'<div style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">'
+            +'<div style="color:var(--txt2);margin-bottom:2px">Açılış</div>'
+            +'<div style="font-weight:700;color:var(--txt)">'+money(a.opening)+'</div></div>'
+          +'<div style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">'
+            +'<div style="color:#4ade80;margin-bottom:2px">Giren</div>'
+            +'<div style="font-weight:700;color:#4ade80">+'+money(a.income)+'</div></div>'
+          +'<div style="background:var(--bg3);border-radius:8px;padding:8px;text-align:center">'
+            +'<div style="color:#f87171;margin-bottom:2px">Çıkan</div>'
+            +'<div style="font-weight:700;color:#f87171">-'+money(a.expense)+'</div></div>'
+        +'</div>'
+        +'</div>';
+    }).join('');
+  });
+}
+
+// ── AMORTİSMAN ───────────────────────────────────────────────────────────────
+function initAmortismanPage(){
+  var ys=document.getElementById('amorti-year-sel');
+  if(ys&&!ys.options.length){
+    var now=new Date().getFullYear();
+    for(var y=now;y>=now-4;y--) ys.add(new Option(y,y,y===now,y===now));
+  }
+  loadAmortisman();
+}
+function loadAmortisman(){
+  var yr=document.getElementById('amorti-year-sel').value;
+  xhr('/api/assets/depreciation?year='+yr,null,function(d){
+    var tot=document.getElementById('amorti-totals');
+    if(tot) tot.innerHTML=[
+      {lbl:'Toplam Maliyet',val:money(d.totals.cost),col:'var(--txt)'},
+      {lbl:yr+' Yılı Amortismanı',val:money(d.totals.year_depreciation),col:'#f59e0b'},
+      {lbl:'Birikmiş Amortisman',val:money(d.totals.accumulated),col:'#f87171'},
+      {lbl:'Toplam Defter Değeri',val:money(d.totals.book_value),col:'#4ade80'},
+    ].map(function(k){
+      return '<div class="f-card" style="text-align:center;padding:11px">'
+        +'<div style="font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt2);margin-bottom:4px">'+k.lbl+'</div>'
+        +'<div style="font-size:.95rem;font-weight:800;color:'+k.col+'">'+k.val+'</div></div>';
+    }).join('');
+
+    var tb=document.getElementById('amorti-tbody');
+    if(!tb) return;
+    if(!d.lines||!d.lines.length){
+      tb.innerHTML='<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--txt2)">Sabit kıymet bulunamadı</td></tr>';
+      return;
+    }
+    tb.innerHTML=d.lines.map(function(a){
+      var faded=a.fully_written?'opacity:.5':'';
+      var meth=a.method==='hizlandirilmis'?'Hızlandırılmış':'Normal';
+      return '<tr style="border-bottom:1px solid var(--border);'+faded+'">'
+        +'<td style="padding:9px 12px">'
+          +'<div style="font-weight:600;color:var(--txt)">'+escHtml(a.name)+'</div>'
+          +'<div style="font-size:.68rem;color:var(--txt2)">'+meth+' · %'+a.rate_pct+' · '+a.age_years+' yıl / '+a.life_years+' yıl'+(a.fully_written?' · <span style="color:#f59e0b">İtfa Tamamlandı</span>':'')+'</div>'
+        +'</td>'
+        +'<td style="padding:9px 12px;text-align:right;color:var(--txt);font-weight:600">'+money(a.cost)+'</td>'
+        +'<td style="padding:9px 12px;text-align:right;color:#f59e0b;font-weight:600">'+money(a.year_depreciation)+'</td>'
+        +'<td style="padding:9px 12px;text-align:right;color:#f87171;font-weight:600">'+money(a.accumulated)+'</td>'
+        +'<td style="padding:9px 12px;text-align:right;color:#4ade80;font-weight:700">'+money(a.book_value)+'</td>'
+        +'</tr>';
+    }).join('')
+    +'<tr style="background:var(--bg3);font-weight:800">'
+    +'<td style="padding:10px 12px;color:var(--txt)">TOPLAM</td>'
+    +'<td style="padding:10px 12px;text-align:right;color:var(--txt)">'+money(d.totals.cost)+'</td>'
+    +'<td style="padding:10px 12px;text-align:right;color:#f59e0b">'+money(d.totals.year_depreciation)+'</td>'
+    +'<td style="padding:10px 12px;text-align:right;color:#f87171">'+money(d.totals.accumulated)+'</td>'
+    +'<td style="padding:10px 12px;text-align:right;color:#4ade80">'+money(d.totals.book_value)+'</td>'
+    +'</tr>';
+  });
+}
+
 // ── MORE SHEET ───────────────────────────────────────────────────────────────
 function openMoreSheet(){
   var bd=document.getElementById('more-backdrop');
@@ -5238,7 +5539,8 @@ function applyProfileType(ptype){
   // Mobil drawer firma bölümü
   var firmaIds = ['drw-firma-div','drw-firma-sect','drw-f-customers','drw-f-supplier',
     'drw-f-employees','drw-f-kdv','drw-f-ploss','drw-f-loans','drw-f-checks',
-    'drw-f-bilanco','drw-f-ratios','drw-f-muhtasar','drw-f-assets','drw-f-cardreport'];
+    'drw-f-bilanco','drw-f-ratios','drw-f-muhtasar','drw-f-assets','drw-f-amortisman',
+    'drw-f-cardreport','drw-f-mizan','drw-f-variance','drw-f-bankrecon'];
   firmaIds.forEach(function(id){
     var el=document.getElementById(id);
     if(el) el.style.display = isSirket ? '' : 'none';

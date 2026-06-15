@@ -8268,6 +8268,257 @@ def generate_qr():
     except ImportError:
         return _qr_fallback(url)
 
+# ── MİZAN (TRIAL BALANCE) ────────────────────────────────────────────────────
+
+@app.route("/api/mizan", methods=["GET"])
+@login_required
+def mizan():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    year  = request.args.get("year",  datetime.now().strftime("%Y"))
+    month = request.args.get("month", "")
+    date_filter = f"{year}-{month.zfill(2)}" if month else year
+    like_pat    = f"{date_filter}%" if month else f"{year}-%"
+
+    rows = db.execute(
+        """SELECT category, type, COALESCE(SUM(amount),0) AS total
+           FROM transactions
+           WHERE user_id=%s AND profile_id=%s AND date LIKE %s
+           GROUP BY category, type
+           ORDER BY category""",
+        (uid, pid, like_pat)
+    ).fetchall()
+
+    cats = {}
+    for r in rows:
+        cat = r["category"] or "Diğer"
+        if cat not in cats:
+            cats[cat] = {"category": cat, "borc": 0.0, "alacak": 0.0}
+        if r["type"] == "gider":
+            cats[cat]["borc"] += float(r["total"])
+        else:
+            cats[cat]["alacak"] += float(r["total"])
+
+    lines = []
+    total_borc = total_alacak = 0.0
+    for cat, v in sorted(cats.items()):
+        b, a = round(v["borc"], 2), round(v["alacak"], 2)
+        lines.append({"category": cat, "borc": b, "alacak": a, "bakiye": round(a - b, 2)})
+        total_borc   += b
+        total_alacak += a
+
+    return jsonify({
+        "period": date_filter,
+        "lines":  lines,
+        "total_borc":   round(total_borc, 2),
+        "total_alacak": round(total_alacak, 2),
+        "net_bakiye":   round(total_alacak - total_borc, 2),
+    })
+
+
+# ── BÜTÇE vs GERÇEKLEŞEN ─────────────────────────────────────────────────────
+
+@app.route("/api/budget/variance", methods=["GET"])
+@login_required
+def budget_variance():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    period = request.args.get("period", datetime.now().strftime("%Y-%m"))
+
+    budgets = db.execute(
+        "SELECT category, limit_ FROM budgets WHERE user_id=%s AND profile_id=%s",
+        (uid, pid)
+    ).fetchall()
+
+    actuals = db.execute(
+        """SELECT category, COALESCE(SUM(amount),0) AS spent
+           FROM transactions
+           WHERE user_id=%s AND profile_id=%s AND type='gider'
+             AND substr(date,1,7)=%s
+           GROUP BY category""",
+        (uid, pid, period)
+    ).fetchall()
+
+    actual_map = {r["category"]: float(r["spent"]) for r in actuals}
+
+    lines = []
+    total_budget = total_actual = 0.0
+    for b in budgets:
+        cat    = b["category"]
+        budget = float(b["limit_"])
+        actual = actual_map.get(cat, 0.0)
+        var    = budget - actual
+        pct    = round(actual / budget * 100, 1) if budget else 0
+        lines.append({
+            "category": cat,
+            "budget":   round(budget, 2),
+            "actual":   round(actual, 2),
+            "variance": round(var, 2),
+            "pct_used": pct,
+            "status":   "askin" if pct > 100 else ("uyari" if pct > 80 else "ok"),
+        })
+        total_budget += budget
+        total_actual += actual
+
+    # Bütçesi olmayan ancak harcama olan kategoriler
+    for cat, spent in actual_map.items():
+        if not any(l["category"] == cat for l in lines):
+            lines.append({
+                "category": cat,
+                "budget":   0,
+                "actual":   round(spent, 2),
+                "variance": round(-spent, 2),
+                "pct_used": 999,
+                "status":   "askin",
+            })
+            total_actual += spent
+
+    lines.sort(key=lambda x: -x["actual"])
+    return jsonify({
+        "period":       period,
+        "lines":        lines,
+        "total_budget": round(total_budget, 2),
+        "total_actual": round(total_actual, 2),
+        "total_var":    round(total_budget - total_actual, 2),
+    })
+
+
+# ── BANKA MUTABAKATII ─────────────────────────────────────────────────────────
+
+@app.route("/api/bank-recon", methods=["GET"])
+@login_required
+def bank_recon():
+    """Hesap bazında bakiye ve işlem özeti — mutabakat için."""
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    period = request.args.get("period", datetime.now().strftime("%Y-%m"))
+
+    accounts = db.execute(
+        "SELECT * FROM accounts WHERE user_id=%s AND profile_id=%s AND active=1 ORDER BY name",
+        (uid, pid)
+    ).fetchall()
+
+    result = []
+    for acc in accounts:
+        aid = acc["id"]
+        init = float(acc["initial_balance"] or 0)
+
+        # Dönem öncesi bakiye
+        pre = db.execute(
+            """SELECT COALESCE(SUM(CASE WHEN type='gelir' THEN amount ELSE -amount END),0) AS b
+               FROM transactions
+               WHERE user_id=%s AND profile_id=%s AND account_id=%s
+                 AND substr(date,1,7) < %s""",
+            (uid, pid, aid, period)
+        ).fetchone()
+        opening = init + float(pre["b"] if pre else 0)
+
+        # Dönem içi hareketler
+        txns = db.execute(
+            """SELECT type, COALESCE(SUM(amount),0) AS total, COUNT(*) AS cnt
+               FROM transactions
+               WHERE user_id=%s AND profile_id=%s AND account_id=%s
+                 AND substr(date,1,7)=%s
+               GROUP BY type""",
+            (uid, pid, aid, period)
+        ).fetchall()
+
+        income = sum(float(r["total"]) for r in txns if r["type"] == "gelir")
+        expense= sum(float(r["total"]) for r in txns if r["type"] == "gider")
+        closing = round(opening + income - expense, 2)
+
+        result.append({
+            "account_id":   aid,
+            "account_name": acc["name"],
+            "bank":         acc["bank"] or "",
+            "type":         acc["type"] or "hesap",
+            "opening":      round(opening, 2),
+            "income":       round(income, 2),
+            "expense":      round(expense, 2),
+            "closing":      closing,
+        })
+
+    return jsonify({"period": period, "accounts": result})
+
+
+# ── AMORTİSMAN RAPORU ─────────────────────────────────────────────────────────
+
+@app.route("/api/assets/depreciation", methods=["GET"])
+@login_required
+def asset_depreciation():
+    uid = session["user_id"]; pid = get_pid(); db = get_db()
+    year = int(request.args.get("year", datetime.now().year))
+
+    assets = db.execute(
+        "SELECT * FROM assets WHERE user_id=%s AND profile_id=%s AND active=1",
+        (uid, pid)
+    ).fetchall()
+
+    lines = []
+    total_cost = total_accum = total_year_dep = total_book = 0.0
+
+    for a in assets:
+        cost       = float(a["purchase_price"] or 0)
+        rate       = float(a["depreciation_rate"] or 20) / 100
+        method     = a["depreciation_method"] or "normal"
+        life       = int(a["useful_life_years"] or 5)
+        buy_date   = a["purchase_date"] or f"{year}-01-01"
+        buy_year   = int(buy_date[:4])
+        age_years  = year - buy_year
+
+        if method == "hizlandirilmis":
+            # Çift azalan bakiyeler
+            book = cost
+            accum = 0.0
+            year_dep = 0.0
+            for y in range(age_years + 1):
+                yr_dep = min(book * rate * 2, book)
+                if y < age_years:
+                    accum += yr_dep; book -= yr_dep
+                else:
+                    year_dep = yr_dep
+        else:
+            # Normal (doğrusal)
+            annual    = cost / life if life else 0
+            accum     = min(annual * age_years, cost)
+            year_dep  = annual if age_years < life else 0
+            book      = max(cost - accum, 0)
+
+        accum    = round(min(accum, cost), 2)
+        year_dep = round(year_dep, 2)
+        book     = round(max(cost - accum, 0), 2)
+
+        lines.append({
+            "id":           a["id"],
+            "name":         a["name"],
+            "asset_type":   a["asset_type"] or "diger",
+            "purchase_date":buy_date,
+            "cost":         round(cost, 2),
+            "method":       method,
+            "rate_pct":     float(a["depreciation_rate"] or 20),
+            "life_years":   life,
+            "age_years":    age_years,
+            "year_depreciation": year_dep,
+            "accumulated":  accum,
+            "book_value":   book,
+            "fully_written": book <= 0,
+        })
+
+        total_cost     += cost
+        total_accum    += accum
+        total_year_dep += year_dep
+        total_book     += book
+
+    lines.sort(key=lambda x: x["name"])
+    return jsonify({
+        "year":  year,
+        "lines": lines,
+        "totals": {
+            "cost":             round(total_cost, 2),
+            "accumulated":      round(total_accum, 2),
+            "year_depreciation":round(total_year_dep, 2),
+            "book_value":       round(total_book, 2),
+        }
+    })
+
+
 def _qr_fallback(url):
     """Simple placeholder SVG when qrcode library unavailable."""
     svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
