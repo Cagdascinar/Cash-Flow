@@ -4903,7 +4903,7 @@ def generate_notifications(pid, profile_type, db, today):
         })
 
     # ── CREDIT CARD DUE DATES ──────────────────────────────────────────────
-    cards = db.execute("SELECT * FROM cards WHERE profile_id=?", (pid,)).fetchall()
+    cards = db.execute("SELECT * FROM cards WHERE profile_id=%s", (pid,)).fetchall()
     for c in cards:
         due_day = c["due_day"] or 1
         used = c["used_"] or 0
@@ -4935,7 +4935,7 @@ def generate_notifications(pid, profile_type, db, today):
 
     # ── RECURRING PAYMENTS ────────────────────────────────────────────────
     recurrings = db.execute(
-        "SELECT * FROM recurring WHERE profile_id=? AND active=1", (pid,)
+        "SELECT * FROM recurring WHERE profile_id=%s AND active=1", (pid,)
     ).fetchall()
     for r in recurrings:
         dom = r["day_of_month"] or 1
@@ -4978,13 +4978,13 @@ def generate_notifications(pid, profile_type, db, today):
     _, last_day = mr(today.year, today.month)
     m_start = today.replace(day=1).isoformat()
     m_end   = today.replace(day=last_day).isoformat()
-    budgets = db.execute("SELECT * FROM budgets WHERE profile_id=?", (pid,)).fetchall()
+    budgets = db.execute("SELECT * FROM budgets WHERE profile_id=%s", (pid,)).fetchall()
     for b in budgets:
         limit = b["limit_"] or 0
         if limit <= 0:
             continue
         spent_row = db.execute(
-            "SELECT COALESCE(SUM(amount),0) as s FROM transactions WHERE profile_id=? AND category=? AND type='gider' AND date BETWEEN ? AND ?",
+            "SELECT COALESCE(SUM(amount),0) as s FROM transactions WHERE profile_id=%s AND category=%s AND type='gider' AND date BETWEEN %s AND %s",
             (pid, b["category"], m_start, m_end)
         ).fetchone()
         spent = float(spent_row["s"] or 0)
@@ -5052,7 +5052,7 @@ def generate_notifications(pid, profile_type, db, today):
 
     # ── SUPPLIER INVOICE DUE DATES ────────────────────────────────────────────
     sup_invs = db.execute(
-        "SELECT * FROM supplier_invoices WHERE profile_id=? AND status='bekliyor'", (pid,)
+        "SELECT * FROM supplier_invoices WHERE profile_id=%s AND status='bekliyor'", (pid,)
     ).fetchall()
     for si in sup_invs:
         try:
@@ -5076,7 +5076,7 @@ def generate_notifications(pid, profile_type, db, today):
 
     # ── ASSET MAINTENANCE & INSURANCE ────────────────────────────────────────
     assets_rows = db.execute(
-        "SELECT * FROM assets WHERE profile_id=? AND active=1", (pid,)
+        "SELECT * FROM assets WHERE profile_id=%s AND active=1", (pid,)
     ).fetchall()
     for a in assets_rows:
         name = a["name"]
@@ -5109,6 +5109,76 @@ def generate_notifications(pid, profile_type, db, today):
             except:
                 pass
 
+    # ── ÇEK VADELERİ ──────────────────────────────────────────────────────────
+    check_rows = db.execute(
+        "SELECT * FROM checks WHERE profile_id=%s AND status='bekliyor'", (pid,)
+    ).fetchall()
+    for ck in check_rows:
+        try:
+            due = date.fromisoformat(ck["due_date"])
+        except:
+            continue
+        d_val = days_until(due)
+        if -5 <= d_val <= 14:
+            amt   = float(ck["amount"])
+            ctype = ck["check_type"]
+            drawer = ck["drawer"] or ck["check_no"] or "Çek"
+            if d_val <= 0:
+                ico = "🚨"
+                msg = f"Vadesi geçmiş {'alacak' if ctype=='alacak' else 'borçlu'} çek: {drawer} — ₺{amt:,.0f} ({abs(d_val)} gün gecikti)"
+            elif d_val <= 2:
+                ico = "⚠️"
+                msg = f"Yarın/bugün vade: {drawer} {'alacak' if ctype=='alacak' else 'borçlu'} çeki ₺{amt:,.0f}"
+            else:
+                ico = "📋"
+                msg = f"{d_val} gün içinde vade: {drawer} — ₺{amt:,.0f}"
+            add(ico, "Çek Vadesi", msg, d_val, "cek")
+
+    # ── KREDİ TAKSİTLERİ ──────────────────────────────────────────────────────
+    loan_rows = db.execute(
+        "SELECT * FROM loans WHERE profile_id=%s AND status='aktif' AND installment_amount>0", (pid,)
+    ).fetchall()
+    for loan in loan_rows:
+        day = int(loan["installment_day"] or 1)
+        amt = float(loan["installment_amount"])
+        try:
+            if today.day <= day:
+                due_date = today.replace(day=day)
+            else:
+                if today.month == 12:
+                    due_date = today.replace(year=today.year+1, month=1, day=day)
+                else:
+                    due_date = today.replace(month=today.month+1, day=day)
+        except:
+            continue
+        d_val = days_until(due_date)
+        if -1 <= d_val <= 7:
+            bank = loan["bank_name"]
+            if d_val <= 0:
+                ico = "🔴"; msg = f"Bugün kredi taksit günü: {bank} — ₺{amt:,.0f}"
+            elif d_val == 1:
+                ico = "🔔"; msg = f"Yarın kredi taksit: {bank} — ₺{amt:,.0f}"
+            else:
+                ico = "🏦"; msg = f"{d_val} gün içinde kredi taksiti: {bank} — ₺{amt:,.0f}"
+            add(ico, "Kredi Taksiti", msg, d_val, "kredi")
+
+    # ── MÜŞTERI ALACAKLARI ────────────────────────────────────────────────────
+    cust_invs = db.execute(
+        "SELECT * FROM customer_invoices WHERE profile_id=%s AND status!='odendi'", (pid,)
+    ).fetchall()
+    for ci in cust_invs:
+        if not ci.get("due_date"):
+            continue
+        try:
+            due = date.fromisoformat(ci["due_date"])
+        except:
+            continue
+        d_val = days_until(due)
+        if d_val <= 0 and d_val >= -14:
+            amt = float(ci["amount"])
+            msg = f"Tahsil edilmemiş fatura: {ci.get('customer_name','Müşteri')} — ₺{amt:,.0f} ({abs(d_val)} gün gecikti)"
+            add("💰", "Gecikmiş Alacak", msg, d_val, "alacak")
+
     # Sort: urgent first, then by days
     notifs.sort(key=lambda x: (0 if x["urgency"]=="urgent" else 1 if x["urgency"]=="soon" else 2, x["days"]))
     return notifs
@@ -5120,7 +5190,7 @@ def api_notifications():
     db   = get_db()
     pid  = get_pid()
     uid  = session["user_id"]
-    prof = db.execute("SELECT type FROM profiles WHERE id=?", (pid,)).fetchone()
+    prof = db.execute("SELECT type FROM profiles WHERE id=%s", (pid,)).fetchone()
     ptype = prof["type"] if prof else "sahis"
     today_ = date.today()
     notifs = generate_notifications(pid, ptype, db, today_)
@@ -8169,6 +8239,38 @@ def cashflow():
         "total_gider": round(total_gider, 2),
         "net_cashflow": round(total_gelir - total_gider, 2),
     })
+
+@app.route("/api/qr")
+def generate_qr():
+    """Generate QR code SVG for a given URL."""
+    url = request.args.get("url", "").strip()
+    if not url:
+        return jsonify({"error": "url required"}), 400
+    try:
+        import qrcode
+        import qrcode.image.svg
+        import io
+        factory = qrcode.image.svg.SvgPathImage
+        img = qrcode.make(url, image_factory=factory,
+                          error_correction=qrcode.constants.ERROR_CORRECT_M,
+                          box_size=10, border=2)
+        buf = io.BytesIO()
+        img.save(buf)
+        svg = buf.getvalue()
+        return svg, 200, {"Content-Type": "image/svg+xml", "Cache-Control": "public,max-age=86400"}
+    except ImportError:
+        return _qr_fallback(url)
+
+def _qr_fallback(url):
+    """Simple placeholder SVG when qrcode library unavailable."""
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+<rect width="200" height="200" fill="#0b0e11" rx="12"/>
+<text x="100" y="85" font-size="40" text-anchor="middle">📱</text>
+<text x="100" y="130" font-size="11" fill="#d5fd73" text-anchor="middle" font-family="Arial">QR yükleniyor...</text>
+<text x="100" y="150" font-size="8" fill="#6b7280" text-anchor="middle" font-family="Arial">{url[:30]}</text>
+</svg>'''
+    return svg, 200, {"Content-Type": "image/svg+xml"}
+
 
 if __name__ == "__main__":
     init_db()

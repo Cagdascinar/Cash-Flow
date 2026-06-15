@@ -1581,6 +1581,9 @@ body{top:0!important}
     </div>
 
     <div class="nav-sect">Sistem</div>
+    <div class="nl nl-desktop" data-page="download" onclick="goPage('download',this)">
+      <span class="ico">📱</span>Uygulamayı İndir
+    </div>
     <div class="nl nl-desktop" data-page="help" onclick="goPage('help',this)">
       <span class="ico">❓</span>Yardım
     </div>
@@ -2423,6 +2426,75 @@ body{top:0!important}
 </div>
 
 <!-- ── YARDIM ─────────────────────────────────────────────────── -->
+<div class="page" id="page-download">
+  <div class="page-hdr"><h1 class="page-title">📱 Uygulamayı İndir</h1></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:700px;margin-bottom:20px" id="dl-grid">
+    <!-- Google Play -->
+    <div class="f-card" style="text-align:center">
+      <div style="font-size:2rem;margin-bottom:8px">🤖</div>
+      <div style="font-weight:800;font-size:1rem;color:var(--txt);margin-bottom:4px">Google Play</div>
+      <div style="font-size:.75rem;color:var(--txt2);margin-bottom:14px">Android · com.kirpi.cashflow</div>
+      <div id="qr-android" style="display:flex;justify-content:center;margin-bottom:14px">
+        <div style="background:#fff;padding:8px;border-radius:12px;display:inline-block">
+          <img src="/api/qr?url=https://play.google.com/store/apps/details?id=com.kirpi.cashflow"
+               width="160" height="160" alt="Android QR" style="display:block;border-radius:6px"
+               onerror="this.style.display='none';document.getElementById('qr-android-fb').style.display='flex'">
+        </div>
+        <div id="qr-android-fb" style="display:none;width:160px;height:160px;background:var(--bg3);border-radius:12px;align-items:center;justify-content:center;font-size:.75rem;color:var(--txt2);text-align:center;padding:12px">QR yakında aktif olacak</div>
+      </div>
+      <a href="https://play.google.com/store/apps/details?id=com.kirpi.cashflow" target="_blank"
+         style="display:inline-flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 16px;text-decoration:none;color:var(--txt);font-size:.82rem;font-weight:600;transition:.1s">
+        <span>▶</span> Play Store'a Git
+      </a>
+    </div>
+
+    <!-- App Store -->
+    <div class="f-card" style="text-align:center">
+      <div style="font-size:2rem;margin-bottom:8px">🍎</div>
+      <div style="font-weight:800;font-size:1rem;color:var(--txt);margin-bottom:4px">App Store</div>
+      <div style="font-size:.75rem;color:var(--txt2);margin-bottom:14px">iPhone & iPad · com.kirpi.cashflow</div>
+      <div id="qr-ios" style="display:flex;justify-content:center;margin-bottom:14px">
+        <div style="background:#fff;padding:8px;border-radius:12px;display:inline-block">
+          <img src="/api/qr?url=https://apps.apple.com/tr/app/kirpi-finans/id6742878560"
+               width="160" height="160" alt="iOS QR" style="display:block;border-radius:6px"
+               onerror="this.style.display='none';document.getElementById('qr-ios-fb').style.display='flex'">
+        </div>
+        <div id="qr-ios-fb" style="display:none;width:160px;height:160px;background:var(--bg3);border-radius:12px;align-items:center;justify-content:center;font-size:.75rem;color:var(--txt2);text-align:center;padding:12px">QR yakında aktif olacak</div>
+      </div>
+      <a href="https://apps.apple.com/tr/app/kirpi-finans/id6742878560" target="_blank"
+         style="display:inline-flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 16px;text-decoration:none;color:var(--txt);font-size:.82rem;font-weight:600;transition:.1s">
+        <span></span> App Store'a Git
+      </a>
+    </div>
+  </div>
+
+  <!-- PWA / Web install -->
+  <div class="f-card" style="max-width:700px;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="font-size:2rem">🌐</div>
+      <div style="flex:1">
+        <div style="font-weight:800;font-size:.95rem;color:var(--txt);margin-bottom:3px">Web Uygulaması (PWA)</div>
+        <div style="font-size:.8rem;color:var(--txt2)">Uygulama indirmeden tarayıcıdan kullanın — veya "Ana Ekrana Ekle" seçeneğiyle uygulama gibi kurun</div>
+      </div>
+      <div style="background:#fff;padding:6px;border-radius:10px;display:inline-block">
+        <img src="/api/qr?url=https://web-production-ba700.up.railway.app"
+             width="100" height="100" alt="Web QR" style="display:block;border-radius:4px">
+      </div>
+    </div>
+  </div>
+
+  <!-- Bilgi -->
+  <div class="f-card" style="max-width:700px">
+    <div style="font-size:.7rem;font-weight:800;color:var(--txt2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">ℹ️ Bilgi</div>
+    <div style="font-size:.83rem;color:var(--txt2);line-height:1.7">
+      Kirpi Finans, Google Play Store ve Apple App Store'da yayınlanmaktadır.<br>
+      QR kodu telefonun kamerasıyla okutun ya da store bağlantısına doğrudan tıklayın.<br>
+      Tüm cihazlarınızda hesabınız senkronize kalır.
+    </div>
+  </div>
+</div>
+
 <div class="page" id="page-help">
   <div class="page-title">Yardım & SSS</div>
   <div class="page-sub">Sık sorulan sorular ve kullanım rehberi</div>
@@ -4694,6 +4766,7 @@ function goPage(id, el){
     if(id==='employees') initEmployeesPage();
     if(id==='kdv')  initKDVPage();
     if(id==='ploss') initPLossPage();
+    if(id==='download') {} // static page, no init needed
     if(id==='loans') initLoansPage();
     if(id==='checks') initChecksPage();
     if(id==='bilanco') initBilancoPage();
