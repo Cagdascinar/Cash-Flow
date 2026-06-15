@@ -25,6 +25,15 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Install NDK and CMake
+        run: |
+          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "ndk;26.1.10909125" \
+            "cmake;3.22.1" \
+            "build-tools;34.0.0" \
+            "platforms;android-35" \
+            2>&1 | tail -5
+
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
@@ -38,26 +47,27 @@ jobs:
         run: npm install --legacy-peer-deps
 
       - name: Create local.properties
-        run: echo "sdk.dir=/usr/local/lib/android/sdk" > mobile/android/local.properties
+        run: |
+          echo "sdk.dir=$ANDROID_HOME" > mobile/android/local.properties
+          echo "ndk.dir=$ANDROID_HOME/ndk/26.1.10909125" >> mobile/android/local.properties
 
       - name: Build Debug APK
         working-directory: mobile/android
         env:
-          ANDROID_HOME: /usr/local/lib/android/sdk
-          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon 2>&1 | tee /tmp/gradle.log
           STATUS=${PIPESTATUS[0]}
           if [ $STATUS -ne 0 ]; then
-            echo "====== HATA SATIRI ======"
-            grep -E "error:|Error|FAILED|Exception|Could not" /tmp/gradle.log | grep -v "^Note:" | head -30
-            echo "====== SON 20 SATIR ======"
+            echo "=== HATA ==="
+            grep -E "^.*[Ee]rror:|FAILED|Exception|Could not" /tmp/gradle.log | grep -v "^Note:" | head -40
+            echo "=== SON 20 SATIR ==="
             tail -20 /tmp/gradle.log
             exit $STATUS
           fi
 
-      - name: Upload Gradle log
+      - name: Upload Gradle log on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -65,13 +75,13 @@ jobs:
           path: /tmp/gradle.log
           retention-days: 7
 
-      - name: Locate and copy APK
+      - name: Locate APK
         run: |
-          APK=$(find mobile/android -name "*.apk" | head -1)
+          APK=$(find mobile/android -name "*.apk" | grep -v "unsigned" | head -1)
           echo "APK: $APK"
           cp "$APK" kirpi-finans.apk
 
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: kirpi-finans-v${{ github.run_number }}
@@ -83,7 +93,7 @@ jobs:
         with:
           tag_name: build-${{ github.run_number }}
           name: "Kirpi Finans - Build ${{ github.run_number }}"
-          body: "APK test sürümü. Telefona direkt yüklenebilir."
+          body: "Android APK - Test sürümü"
           files: kirpi-finans.apk
           prerelease: true
           fail_on_unmatched_files: false
