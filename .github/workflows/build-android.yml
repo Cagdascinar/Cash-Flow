@@ -47,7 +47,23 @@ jobs:
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon 2>&1 | tee /tmp/gradle.log
+          STATUS=${PIPESTATUS[0]}
+          if [ $STATUS -ne 0 ]; then
+            echo "====== HATA SATIRI ======"
+            grep -E "error:|Error|FAILED|Exception|Could not" /tmp/gradle.log | grep -v "^Note:" | head -30
+            echo "====== SON 20 SATIR ======"
+            tail -20 /tmp/gradle.log
+            exit $STATUS
+          fi
+
+      - name: Upload Gradle log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-log-${{ github.run_number }}
+          path: /tmp/gradle.log
+          retention-days: 7
 
       - name: Locate and copy APK
         run: |
