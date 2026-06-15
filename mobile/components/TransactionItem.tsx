@@ -44,6 +44,8 @@ export function TransactionItem({ item, onPress, onDelete }: {
   }
 
   const pan = useRef(PanResponder.create({
+    onMoveShouldSetPanResponderCapture: (_, g) =>
+      Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 2,
     onMoveShouldSetPanResponder: (_, g) =>
       Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
     onPanResponderMove: (_, g) => {

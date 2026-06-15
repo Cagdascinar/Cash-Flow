@@ -29,8 +29,15 @@ export function SwipeableRow({ children, actions, style }: {
   }
 
   const pan = useRef(PanResponder.create({
+    // Capture phase: steal clearly-horizontal gestures BEFORE children (TouchableOpacity) can claim them.
+    // Higher threshold so normal taps with slight drift still reach the child.
+    onMoveShouldSetPanResponderCapture: (_, g) =>
+      Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 2,
+
+    // Bubble phase: also claim if the child didn't take it yet (lower threshold).
     onMoveShouldSetPanResponder: (_, g) =>
       Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+
     onPanResponderMove: (_, g) => {
       const base = isOpen.current ? -totalW : 0;
       x.setValue(Math.min(0, Math.max(-totalW, base + g.dx)));
@@ -41,6 +48,9 @@ export function SwipeableRow({ children, actions, style }: {
       } else {
         snapTo(g.dx < OPEN_THRESHOLD ? -totalW : 0);
       }
+    },
+    onPanResponderTerminate: () => {
+      snapTo(0);
     },
   })).current;
 

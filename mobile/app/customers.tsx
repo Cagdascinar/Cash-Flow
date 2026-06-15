@@ -94,6 +94,16 @@ export default function CustomersScreen() {
     } catch (e: any) { Alert.alert('Hata', e.message); }
   }
 
+  async function delInvoice(id: number) {
+    Alert.alert('Fatura Sil', 'Bu faturayı silmek istiyor musunuz?', [
+      { text: 'İptal', style: 'cancel' },
+      { text: 'Sil', style: 'destructive', onPress: async () => {
+        try { await custApi.deleteInvoice(id); setInvoices(p => p.filter(x => x.id !== id)); }
+        catch (e: any) { Alert.alert('Hata', e.message); }
+      }},
+    ]);
+  }
+
   async function del(id: number, nm: string) {
     Alert.alert('Sil', `"${nm}" silinsin mi?`, [
       { text: 'İptal', style: 'cancel' },
@@ -243,12 +253,17 @@ export default function CustomersScreen() {
                       <Text style={[s.amount, { color: inv.status === 'odendi' ? '#4ade80' : '#f0b90b' }]}>
                         {money(inv.amount)}
                       </Text>
-                      {inv.status !== 'odendi' && (
-                        <TouchableOpacity onPress={() => payInvoice(inv.id)} style={s.payBtn}>
-                          <Text style={s.payBtnTxt}>Tahsil Et</Text>
+                      <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                        {inv.status !== 'odendi' && (
+                          <TouchableOpacity onPress={() => payInvoice(inv.id)} style={s.payBtn}>
+                            <Text style={s.payBtnTxt}>Tahsil Et</Text>
+                          </TouchableOpacity>
+                        )}
+                        {inv.status === 'odendi' && <Text style={{ color: '#4ade80', fontSize: 11 }}>✓ Ödendi</Text>}
+                        <TouchableOpacity onPress={() => delInvoice(inv.id)} style={s.delInvBtn}>
+                          <Text style={s.delInvTxt}>🗑️</Text>
                         </TouchableOpacity>
-                      )}
-                      {inv.status === 'odendi' && <Text style={{ color: '#4ade80', fontSize: 11 }}>✓ Ödendi</Text>}
+                      </View>
                     </View>
                   </View>
                 ))
@@ -291,6 +306,8 @@ const s = StyleSheet.create({
   invForm:    { backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border },
   invCard:    { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: C.border },
   invNo:      { fontSize: 14, fontWeight: '700', color: C.txt },
-  payBtn:     { backgroundColor: '#166534', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  payBtnTxt:  { fontSize: 11, fontWeight: '700', color: '#4ade80' },
+  payBtn:      { backgroundColor: '#166534', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  payBtnTxt:   { fontSize: 11, fontWeight: '700', color: '#4ade80' },
+  delInvBtn:   { width: 28, height: 28, borderRadius: 8, backgroundColor: 'rgba(220,38,38,.15)', alignItems: 'center', justifyContent: 'center' },
+  delInvTxt:   { fontSize: 14 },
 });
