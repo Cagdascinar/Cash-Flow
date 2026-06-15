@@ -10173,9 +10173,12 @@ function loadCustInvoices(){
             '<div style="font-size:.75rem;color:var(--txt2);margin-top:2px">'+escHtml(inv.invoice_no||'')+' · '+inv.invoice_date+'</div>'+
             (inv.due_date?'<div style="font-size:.72rem;color:var(--txt2)">Vade: '+inv.due_date+'</div>':'')+
           '</div>'+
-          '<div style="text-align:right">'+
-            '<div style="font-size:.95rem;font-weight:800;color:var(--txt)">'+fmt(inv.total_amount)+'</div>'+
-            '<div style="font-size:.7rem;color:'+sColor+';font-weight:600;margin-top:2px">'+(statusMap[inv.status]||inv.status)+'</div>'+
+          '<div style="display:flex;align-items:flex-start;gap:8px">'+
+            '<div style="text-align:right">'+
+              '<div style="font-size:.95rem;font-weight:800;color:var(--txt)">'+fmt(inv.total_amount)+'</div>'+
+              '<div style="font-size:.7rem;color:'+sColor+';font-weight:600;margin-top:2px">'+(statusMap[inv.status]||inv.status)+'</div>'+
+            '</div>'+
+            '<button onclick="delCustInvoice('+inv.id+')" title="Sil" style="background:none;border:none;color:var(--txt2);cursor:pointer;font-size:1rem;padding:2px 4px;flex-shrink:0;-webkit-tap-highlight-color:transparent">🗑</button>'+
           '</div>'+
         '</div>'+
         (balance>0&&inv.status!=='odendi' ? '<div style="margin-top:10px;display:flex;gap:8px">'+
@@ -10213,6 +10216,14 @@ function payCustInvoice(id, balance){
     if(d&&d.ok){ loadCustInvoices(); loadCustSummary(); }
     else alert(d&&d.error||'Hata');
   });
+}
+
+function delCustInvoice(id){
+  if(!confirm('Bu fatura silinsin mi?')) return;
+  xhr('/api/customer-invoices/'+id, null, function(d){
+    if(d&&d.ok===false){ alert(d.error||'Hata'); return; }
+    loadCustInvoices(); loadCustSummary();
+  }, false, true);
 }
 
 function delCustomer(id, name){
