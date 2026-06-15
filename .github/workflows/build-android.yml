@@ -11,11 +11,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - name: Install JS dependencies
+        working-directory: mobile
+        run: npm install --legacy-peer-deps
 
       - name: Generate keystore
         working-directory: mobile/android
