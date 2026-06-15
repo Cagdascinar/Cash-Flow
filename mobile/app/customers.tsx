@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { GestureHandlerRootView, ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 import { C, money, fmtDate } from '../constants/Colors';
 import { customers as custApi } from '../services/api';
@@ -215,11 +215,9 @@ export default function CustomersScreen() {
               <Text style={s.mTitle}>{selCust?.name}</Text>
               <TouchableOpacity onPress={() => setInvModal(false)}><Text style={s.close}>✕</Text></TouchableOpacity>
             </View>
-            <ScrollView
+            <GHScrollView
               style={{ flex: 1 }}
               contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-              directionalLockEnabled
-              disableScrollViewPanResponder
             >
               {/* Yeni Fatura */}
               <View style={s.invForm}>
@@ -285,7 +283,7 @@ export default function CustomersScreen() {
                     </SwipeableRow>
                   ))
               }
-            </ScrollView>
+            </GHScrollView>
           </SafeAreaView>
         </GestureHandlerRootView>
       </Modal>

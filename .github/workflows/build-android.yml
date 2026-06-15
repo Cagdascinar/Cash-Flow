@@ -34,30 +34,21 @@ jobs:
         working-directory: mobile
         run: npm install --legacy-peer-deps
 
-      - name: Generate keystore
-        working-directory: mobile/android
-        run: |
-          keytool -genkeypair -v \
-            -keystore app/release.keystore \
-            -alias kirpi \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=Kirpi Finans,O=Kirpi,C=TR" \
-            -storepass kirpi123 -keypass kirpi123
+      - name: Create local.properties
+        run: echo "sdk.dir=/usr/local/lib/android/sdk" > mobile/android/local.properties
 
-      - name: Build Release APK
+      - name: Build Debug APK
         working-directory: mobile/android
         env:
           ANDROID_HOME: /usr/local/lib/android/sdk
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --info \
-            -Pandroid.injected.signing.store.file="$(pwd)/app/release.keystore" \
-            -Pandroid.injected.signing.store.password=kirpi123 \
-            -Pandroid.injected.signing.key.alias=kirpi \
-            -Pandroid.injected.signing.key.password=kirpi123 \
-            2>&1 | tee /tmp/gradle.log; echo "EXIT:${PIPESTATUS[0]}"
-          grep -E "FAILED|error:|Error" /tmp/gradle.log | tail -30 || true
+          ./gradlew assembleDebug --no-daemon 2>&1 | tee /tmp/gradle.log
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            grep -E "error:|FAILED|Exception" /tmp/gradle.log | head -40
+            exit 1
+          fi
 
       - name: Upload log on failure
         if: failure()
@@ -68,9 +59,8 @@ jobs:
           retention-days: 3
 
       - name: Upload APK
-        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: kirpi-finans-${{ github.run_number }}
-          path: mobile/android/app/build/outputs/apk/release/app-release.apk
+          name: kirpi-finans-debug-${{ github.run_number }}
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
