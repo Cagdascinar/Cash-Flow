@@ -375,16 +375,34 @@ nav.nav-collapsed .nav-top-avatar{width:38px;height:38px}
 }
 
 /* ── MORE SHEET ── */
-.more-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);
-               z-index:9000;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
-.more-sheet{position:fixed;bottom:0;left:0;right:0;
-            background:var(--bg2);border-radius:28px 28px 0 0;
-            z-index:9001;padding:0 0 env(safe-area-inset-bottom,16px);
-            box-shadow:0 -8px 40px rgba(0,0,0,.18);
-            transform:translateY(100%);transition:transform .34s cubic-bezier(.4,0,.2,1);
-            max-height:82vh;overflow-y:auto}
-.more-sheet.open{transform:translateY(0)}
+.more-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
+               z-index:9000;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.more-sheet{position:fixed;top:0;left:0;bottom:0;
+            background:var(--bg2);border-radius:0 24px 24px 0;
+            z-index:9001;padding:0;
+            padding-bottom:env(safe-area-inset-bottom,16px);
+            box-shadow:6px 0 48px rgba(0,0,0,.32);
+            transform:translateX(-100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
+            width:min(82vw,300px);overflow-y:auto;
+            display:flex;flex-direction:column}
+.more-sheet.open{transform:translateX(0)}
 .more-backdrop.open{display:block}
+/* Drawer header */
+.mob-drw-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:calc(env(safe-area-inset-top,0px) + 14px) 14px 12px;
+  border-bottom:1px solid var(--border);background:var(--brand);flex-shrink:0}
+.mob-drw-profile{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.mob-drw-avatar{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.15);
+  display:flex;align-items:center;justify-content:center;font-size:1.15rem;overflow:hidden;
+  border:1.5px solid rgba(255,255,255,.2);flex-shrink:0}
+.mob-drw-name{font-size:.88rem;font-weight:800;color:#fff;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.mob-drw-sub{font-size:.64rem;color:rgba(255,255,255,.5);margin-top:1px}
+.mob-drw-close{background:rgba(255,255,255,.12);border:none;border-radius:9px;
+  width:32px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:1rem;cursor:pointer;-webkit-tap-highlight-color:transparent;
+  transition:.12s;margin-left:8px}
+.mob-drw-close:active{background:rgba(255,255,255,.25)}
 /* ── SPLASH SCREEN ── */
 /* ── SPLASH — CSS ile otomatik kapanır (JS hata yapsa bile) ── */
 #splash-screen{
@@ -437,11 +455,9 @@ nav.nav-collapsed .nav-top-avatar{width:38px;height:38px}
 .ob-num{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.25);
   display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:900;flex-shrink:0}
 
-.more-sheet-handle{width:40px;height:4px;border-radius:3px;background:var(--bg4);
-                   margin:14px auto 6px;cursor:grab}
 .more-sect-label{font-size:.62rem;font-weight:800;text-transform:uppercase;
-                 letter-spacing:.12em;color:var(--txt2);padding:10px 20px 6px;opacity:.5}
-.more-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 14px 8px}
+                 letter-spacing:.12em;color:var(--txt2);padding:10px 16px 6px;opacity:.5}
+.more-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:0 12px 8px}
 .more-tile{display:flex;flex-direction:column;align-items:center;gap:7px;
            padding:16px 8px 14px;background:var(--bg3);border-radius:18px;cursor:pointer;
            transition:.14s;-webkit-tap-highlight-color:transparent;border:1px solid var(--border)}
@@ -1214,10 +1230,10 @@ label{display:block;font-size:.75rem;color:var(--txt2);margin-bottom:4px;font-we
 
 /* ── PAGE TRANSITION ─────────────────────────────────────────── */
 @keyframes page-in{
-  from{opacity:0;transform:translateY(12px)}
-  to{opacity:1;transform:translateY(0)}
+  from{opacity:0;transform:translateY(16px) scale(.982)}
+  to  {opacity:1;transform:translateY(0)    scale(1)}
 }
-.page.active{animation:page-in .22s ease-out forwards}
+.page.active{animation:page-in .28s cubic-bezier(.22,1,.36,1) forwards}
 
 /* ── TAP FEEDBACK ────────────────────────────────────────────── */
 .tappable{cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s,opacity .12s;touch-action:manipulation}
@@ -1676,7 +1692,17 @@ body{top:0!important}
 <!-- ── MORE SHEET (mobile) ── -->
 <div class="more-backdrop" id="more-backdrop" onclick="closeMoreSheet()"></div>
 <div class="more-sheet" id="more-sheet">
-  <div class="more-sheet-handle" id="more-sheet-handle"></div>
+  <!-- Drawer header -->
+  <div class="mob-drw-hdr">
+    <div class="mob-drw-profile">
+      <div id="mob-drw-avatar" class="mob-drw-avatar">🦔</div>
+      <div style="min-width:0">
+        <div id="mob-drw-name" class="mob-drw-name">Kirpi Finans</div>
+        <div id="mob-drw-sub" class="mob-drw-sub">—</div>
+      </div>
+    </div>
+    <button class="mob-drw-close" onclick="closeMoreSheet()">✕</button>
+  </div>
 
   <div class="more-sect-label">Hesap & İşlem</div>
   <div class="more-grid">
@@ -4952,8 +4978,8 @@ function loadLoanList(){
       var pct=l.principal>0?Math.round((1-l.remaining/l.principal)*100):0;
       return '<div class="f-card" style="margin-bottom:10px">'
         +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
-        +'<div><div style="font-weight:700;font-size:.95rem">'+l.bank_name+'</div>'
-        +'<div style="color:var(--txt2);font-size:.78rem">'+l.loan_type+' · '+l.currency+' · Taksit günü: '+l.installment_day+'</div></div>'
+        +'<div><div style="font-weight:700;font-size:.95rem">'+escHtml(l.bank_name)+'</div>'
+        +'<div style="color:var(--txt2);font-size:.78rem">'+escHtml(l.loan_type)+' · '+escHtml(l.currency)+' · Taksit günü: '+escHtml(l.installment_day)+'</div></div>'
         +'<button onclick="deleteLoan('+l.id+')" style="background:none;border:none;color:var(--txt2);cursor:pointer;font-size:1rem">✕</button></div>'
         +'<div style="display:flex;gap:20px;margin-top:10px">'
         +'<div><div style="color:var(--r);font-weight:800;font-size:1.05rem">'+money(l.remaining)+'</div><div style="color:var(--txt2);font-size:.7rem">Kalan</div></div>'
@@ -5029,8 +5055,8 @@ function setCheckTab(tab){
       var late=c.status==='bekliyor'&&c.due_date<today;
       return '<div class="f-card" style="margin-bottom:8px;border-left:3px solid '+(c.check_type==='alacak'?'var(--g)':'var(--r)')+'">'
         +'<div style="display:flex;justify-content:space-between;align-items:center">'
-        +'<div><div style="font-weight:700">'+(c.check_no||'Çek')+' — '+(c.drawer||'—')+'</div>'
-        +'<div style="color:var(--txt2);font-size:.78rem">'+(c.bank_name||'')
+        +'<div><div style="font-weight:700">'+escHtml(c.check_no||'Çek')+' — '+escHtml(c.drawer||'—')+'</div>'
+        +'<div style="color:var(--txt2);font-size:.78rem">'+escHtml(c.bank_name||'')
         +' · Vade: <span style="color:'+(late?'var(--r)':'inherit')+'">'+c.due_date+(late?' ⚠':'')+'</span></div></div>'
         +'<div style="text-align:right">'
         +'<div style="font-weight:800;color:'+(c.check_type==='alacak'?'var(--g)':'var(--r)')+'">'+money(c.amount)+'</div>'
@@ -5205,28 +5231,26 @@ function closeMoreSheet(){
   sh.classList.remove('open');
   document.body.style.overflow='';
 }
-// Swipe-down to close more-sheet
+// Swipe-left to close drawer
 (function(){
-  var sh, startY=0, dragging=false;
+  var sh, startX=0, dragging=false;
   document.addEventListener('DOMContentLoaded',function(){
     sh=document.getElementById('more-sheet');
     if(!sh) return;
     sh.addEventListener('touchstart',function(e){
-      if(e.touches[0].clientY < sh.getBoundingClientRect().top + 60){
-        startY=e.touches[0].clientY; dragging=true;
-      }
+      startX=e.touches[0].clientX; dragging=true;
     },{passive:true});
     sh.addEventListener('touchmove',function(e){
       if(!dragging) return;
-      var dy=e.touches[0].clientY - startY;
-      if(dy>0) sh.style.transform='translateY('+dy+'px)';
+      var dx=e.touches[0].clientX - startX;
+      if(dx<0) sh.style.transform='translateX('+dx+'px)';
     },{passive:true});
     sh.addEventListener('touchend',function(e){
       if(!dragging) return;
       dragging=false;
-      var dy=e.changedTouches[0].clientY - startY;
+      var dx=e.changedTouches[0].clientX - startX;
       sh.style.transform='';
-      if(dy>80) closeMoreSheet();
+      if(dx<-60) closeMoreSheet();
     });
   });
 })();
@@ -5402,12 +5426,17 @@ function updateSidebarProfileAvatar(avatar){
   // Alt sidebar avatar (yuvarlak)
   var el=document.getElementById('sidebar-profile-avatar');
   if(el) el.innerHTML=avatar?'<img src="'+avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%">':'';
-  // Sol üst kare avatar
+  // Sol üst kare avatar (desktop)
   var img=document.getElementById('nav-top-avatar-img');
   var ini=document.getElementById('nav-top-avatar-initials');
   if(img && ini){
     if(avatar){ img.src=avatar; img.style.display='block'; ini.style.display='none'; }
     else { img.style.display='none'; ini.style.display=''; }
+  }
+  // Mobil drawer avatar
+  var drwAva=document.getElementById('mob-drw-avatar');
+  if(drwAva){
+    drwAva.innerHTML=avatar?'<img src="'+avatar+'" style="width:100%;height:100%;object-fit:cover;border-radius:9px">':'🦔';
   }
 }
 
@@ -5415,7 +5444,13 @@ function updateNavTopProfile(name, profileType){
   var nameEl=document.getElementById('nav-top-name');
   var typeEl=document.getElementById('nav-top-type');
   if(nameEl && name) nameEl.textContent=name;
-  if(typeEl) typeEl.textContent=profileType==='sirket'?'🏢 Ticari Hesap':'👤 Bireysel Hesap';
+  var typeStr=profileType==='sirket'?'🏢 Ticari Hesap':'👤 Bireysel Hesap';
+  if(typeEl) typeEl.textContent=typeStr;
+  // Mobil drawer
+  var dName=document.getElementById('mob-drw-name');
+  var dSub=document.getElementById('mob-drw-sub');
+  if(dName && name) dName.textContent=name;
+  if(dSub) dSub.textContent=typeStr;
 }
 
 function switchProfileThen(pid, cb){
