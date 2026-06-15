@@ -3631,6 +3631,7 @@ body{top:0!important}
       style="background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:8px 12px;font-size:.9rem;color:var(--txt)">
     </select>
     <button class="btn btn-ghost tappable" onclick="loadKDV()" style="padding:8px 14px">↻ Yenile</button>
+    <button class="btn btn-primary tappable" onclick="openKDVModal()" style="padding:8px 14px;margin-left:auto">＋ Kayıt Ekle</button>
   </div>
 
   <!-- KDV özet -->
@@ -4036,6 +4037,41 @@ body{top:0!important}
 </div>
 
 <!-- ── MODALS ──────────────────────────────────────────────────── -->
+
+<!-- KDV Kaydı Ekle Modalı -->
+<div id="mod-kdv" class="mod-backdrop" style="display:none" onclick="if(event.target===this)closeMod('mod-kdv')">
+  <div class="mod-sheet">
+    <div class="mod-handle"></div>
+    <div class="mod-title">KDV Kaydı Ekle</div>
+    <div class="mod-field">
+      <div class="mod-label">KDV Türü</div>
+      <select class="mod-input" id="kdv-type-sel">
+        <option value="tahsil">Tahsil Edilen (Satış)</option>
+        <option value="indirilen">İndirilecek (Alış)</option>
+      </select>
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Matrah (KDV Hariç Tutar) *</div>
+      <input type="text" inputmode="decimal" class="mod-input" id="kdv-base-inp" placeholder="0,00">
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">KDV Oranı (%)</div>
+      <select class="mod-input" id="kdv-rate-sel">
+        <option value="1">%1</option>
+        <option value="10">%10</option>
+        <option value="20" selected>%20</option>
+      </select>
+    </div>
+    <div class="mod-field">
+      <div class="mod-label">Açıklama</div>
+      <input type="text" class="mod-input" id="kdv-desc-inp" placeholder="İsteğe bağlı">
+    </div>
+    <div class="mod-actions">
+      <button class="mod-btn cancel" onclick="closeMod('mod-kdv')">İptal</button>
+      <button class="mod-btn primary" onclick="saveKDVRecord()">Kaydet</button>
+    </div>
+  </div>
+</div>
 
 <!-- Kategori Ekle Modalı -->
 <div id="mod-category" class="mod-backdrop" style="display:none" onclick="if(event.target===this)closeMod('mod-category')">
@@ -5084,11 +5120,11 @@ function saveLoan(){
   if(!body.bank_name){alert('Banka adı zorunlu');return;}
   xhr('/api/loans',body,function(r){
     if(r.ok){closeLoanModal();loadLoanList();}else alert(r.error||'Hata');
-  },'POST');
+  });
 }
 function deleteLoan(id){
   if(!confirm('Bu kredi silinsin mi?')) return;
-  xhr('/api/loans/'+id,null,function(){loadLoanList();},'DELETE');
+  xhr('/api/loans/'+id,null,function(){loadLoanList();},false,true);
 }
 
 // ── ÇEK TAKİBİ ───────────────────────────────────────────────────────────────
@@ -5161,14 +5197,14 @@ function saveCheck(){
   if(!body.amount||!body.due_date){alert('Tutar ve vade tarihi zorunlu');return;}
   xhr('/api/checks',body,function(r){
     if(r.ok){closeCheckModal();initChecksPage();}else alert(r.error||'Hata');
-  },'POST');
+  });
 }
 function collectCheck(id){
-  xhr('/api/checks/'+id,{status:'tahsil_edildi'},function(r){if(r.ok)initChecksPage();},'PUT');
+  xhr('/api/checks/'+id,{status:'tahsil_edildi'},function(r){if(r.ok)initChecksPage();},true);
 }
 function deleteCheck(id){
   if(!confirm('Çek silinsin mi?')) return;
-  xhr('/api/checks/'+id,null,function(){initChecksPage();},'DELETE');
+  xhr('/api/checks/'+id,null,function(){initChecksPage();},false,true);
 }
 
 // ── BİLANÇO ──────────────────────────────────────────────────────────────────
@@ -5721,7 +5757,7 @@ function updateNavTopProfile(name, profileType){
 }
 
 function switchProfileThen(pid, cb){
-  xhr('/api/profiles/'+pid+'/switch','POST',function(d){
+  xhr('/api/profiles/'+pid+'/switch',{},function(d){
     if(!d||!d.ok){ if(cb) cb(); return; }
     sessionStorage.setItem('cur_pid', pid);
     sessionStorage.setItem('cur_pname', d.name||'');
@@ -6911,6 +6947,7 @@ function fmt(n){
 }
 function fmtK(n){if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(0)+'K';return Math.round(n)+''}
 function fmtNum(n){return Number(n).toLocaleString(_curLocale,{minimumFractionDigits:2,maximumFractionDigits:2})}
+function money(n){ return fmt(n); }  // alias — used by loans, checks, bilanco pages
 
 // ── HERO FILTER SHORTCUT ────────────────────────────────────────────────────
 function _applyHeroPeriodToLedger(){
@@ -9127,7 +9164,8 @@ function openSupInvModal(id){
   setTimeout(setupNumInputs, 50);
 }
 
-function closeMod(id){ document.getElementById(id).style.display='none'; }
+function openMod(id){ var el=document.getElementById(id); if(el) el.style.display='flex'; }
+function closeMod(id){ var el=document.getElementById(id); if(el) el.style.display='none'; }
 
 function saveSupInv(){
   var supSel = document.getElementById('sup-inv-supplier-sel');
@@ -9682,7 +9720,7 @@ function saveIncomeSource(){
 function toggleIncomeSource(id, val){
   xhr('/api/income-sources/'+id, {is_active:val}, function(r){
     if(r&&r.ok){ loadIncomeSources(); }
-  }, false, false, 'PUT');
+  }, true);
 }
 
 function delIncomeSource(id){
@@ -10164,12 +10202,12 @@ function payCustInvoice(id, balance){
   xhr('/api/customer-invoices/'+id+'/pay', {paid_amount:parseFloat(amt)}, function(d){
     if(d&&d.ok){ loadCustInvoices(); loadCustSummary(); }
     else alert(d&&d.error||'Hata');
-  }, 'POST');
+  });
 }
 
 function delCustomer(id, name){
   if(!confirm('"'+name+'" silinsin mi?')) return;
-  xhr('/api/customers/'+id, null, function(){ loadCustList(); }, 'DELETE');
+  xhr('/api/customers/'+id, null, function(){ loadCustList(); }, false, true);
 }
 
 function openCustModal(){
@@ -10198,7 +10236,7 @@ function saveCust(){
   xhr('/api/customers',d,function(r){
     if(r&&r.ok){document.getElementById('mod-cust').remove();loadCustList();loadCustSummary();}
     else alert(r&&r.error||'Hata');
-  },'POST');
+  });
 }
 
 function openCustInvModal(){
@@ -10250,7 +10288,7 @@ function saveCustInv(){
   xhr('/api/customer-invoices',d,function(r){
     if(r&&r.ok){document.getElementById('mod-custinv').remove();loadCustInvoices();loadCustSummary();}
     else alert(r&&r.error||'Hata');
-  },'POST');
+  });
 }
 
 // ── KAR-ZARAR RAPORU ─────────────────────────────────────────────────────────
@@ -10347,6 +10385,27 @@ function loadKDV(){
         '<div style="font-size:.9rem;font-weight:700;color:'+r.color+'">'+fmt(r.amt)+'</div>'+
       '</div>';
     }).join('');
+  });
+}
+
+function openKDVModal(){
+  document.getElementById('kdv-base-inp').value='';
+  document.getElementById('kdv-desc-inp').value='';
+  document.getElementById('kdv-type-sel').value='tahsil';
+  document.getElementById('kdv-rate-sel').value='20';
+  openMod('mod-kdv');
+}
+
+function saveKDVRecord(){
+  var base = parseFloat((document.getElementById('kdv-base-inp').value||'0').replace(',','.'));
+  var rate = parseFloat(document.getElementById('kdv-rate-sel').value)||20;
+  var type = document.getElementById('kdv-type-sel').value;
+  var desc = document.getElementById('kdv-desc-inp').value.trim();
+  var period = document.getElementById('kdv-period').value;
+  if(!base){ toast('Matrah zorunlu'); return; }
+  xhr('/api/kdv/records', {amount_base:base, kdv_rate:rate, kdv_type:type, description:desc, period:period, source_type:'manuel'}, function(r){
+    if(r&&r.ok){ closeMod('mod-kdv'); toast('KDV kaydı eklendi ✓'); loadKDV(); }
+    else toast('Hata oluştu');
   });
 }
 
@@ -10521,7 +10580,7 @@ function empSalPreview(){
       : 'Net: '+fmt(d.net_salary)+' — İşv. Maliyeti: '+fmt(d.total_cost);
     var el = document.getElementById('emp-sal-preview');
     if(el) el.textContent = lbl;
-  },'POST');
+  });
 }
 
 function saveEmp(editId){
@@ -10546,18 +10605,18 @@ function saveEmp(editId){
   function doSave(gross){
     payload.gross_salary = gross;
     var url    = editId ? '/api/employees/'+editId : '/api/employees';
-    var method = editId ? 'PUT' : 'POST';
+    var isPut  = editId ? true : false;
     xhr(url, payload, function(r){
       if(r&&r.ok){ document.getElementById('mod-emp').remove(); loadEmpList(); loadEmpStats(); }
       else alert(r&&r.error||'Hata');
-    }, method);
+    }, isPut);
   }
 
   if(window._empSalType==='net'){
     xhr('/api/payroll/calculate',{net_salary:salVal},function(d){
       if(!d){alert('Hesaplama hatası');return;}
       doSave(d.gross_salary);
-    },'POST');
+    });
   } else {
     doSave(salVal);
   }
@@ -10565,7 +10624,7 @@ function saveEmp(editId){
 
 function delEmp(id, name){
   if(!confirm('"'+name+'" silinsin mi? Bu işlem geri alınamaz.')) return;
-  xhr('/api/employees/'+id, null, function(){ loadEmpList(); loadEmpStats(); }, 'DELETE');
+  xhr('/api/employees/'+id, null, function(){ loadEmpList(); loadEmpStats(); }, false, true);
 }
 
 // ── BORDRO ────────────────────────────────────────────────────────────────────
@@ -10724,7 +10783,7 @@ function prSalPreview(){
     document.getElementById('prp-net').textContent    = fmt(d.net_salary);
     document.getElementById('prp-deduct').textContent = fmt((d.sgk_employee||0)+(d.isizlik||0)+(d.gelir_vergisi||0)+(d.damga_vergisi||0));
     document.getElementById('prp-cost').textContent   = fmt(d.total_cost);
-  },'POST');
+  });
 }
 
 function savePayroll(){
@@ -10745,25 +10804,25 @@ function savePayroll(){
          gross_salary:gross,period:period,notes:notes},function(r){
       if(r&&r.ok){document.getElementById('mod-payroll').remove();loadPayrollList();}
       else{ alert(r&&r.error||'Hata'); if(btn) btn.disabled=false; }
-    },'POST');
+    });
   }
 
   if(window._prSalType==='net'){
     xhr('/api/payroll/calculate',{net_salary:salVal},function(d){
       if(!d){alert('Hesaplama hatası');if(btn)btn.disabled=false;return;}
       doSave(d.gross_salary);
-    },'POST');
+    });
   } else {
     doSave(salVal);
   }
 }
 
 function markPayrollPaid(id){
-  xhr('/api/payroll/'+id+'/pay', {}, function(r){ if(r&&r.ok) loadPayrollList(); }, 'POST');
+  xhr('/api/payroll/'+id+'/pay', {}, function(r){ if(r&&r.ok) loadPayrollList(); });
 }
 function delPayroll(id){
   if(!confirm('Bu bordro kaydı silinsin mi?')) return;
-  xhr('/api/payroll/'+id, null, function(){ loadPayrollList(); }, 'DELETE');
+  xhr('/api/payroll/'+id, null, function(){ loadPayrollList(); }, false, true);
 }
 
 // ── BORDRO HESAPLAYICI ────────────────────────────────────────────────────────
