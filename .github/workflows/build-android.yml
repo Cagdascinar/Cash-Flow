@@ -49,16 +49,25 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
-      - name: Rename APK
+      - name: Locate and copy APK
         run: |
-          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk \
-             kirpi-finans-v${{ github.run_number }}.apk
+          APK=$(find mobile/android -name "*.apk" | head -1)
+          echo "APK: $APK"
+          cp "$APK" kirpi-finans.apk
 
-      - name: Create GitHub Release
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kirpi-finans-v${{ github.run_number }}
+          path: kirpi-finans.apk
+          retention-days: 30
+
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: "Kirpi Finans v${{ github.run_number }}"
-          body: "Android APK - Test sürümü"
-          files: kirpi-finans-v${{ github.run_number }}.apk
+          tag_name: build-${{ github.run_number }}
+          name: "Kirpi Finans - Build ${{ github.run_number }}"
+          body: "APK test sürümü. Telefona direkt yüklenebilir."
+          files: kirpi-finans.apk
           prerelease: true
+          fail_on_unmatched_files: false
