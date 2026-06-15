@@ -375,34 +375,36 @@ nav.nav-collapsed .nav-top-avatar{width:38px;height:38px}
 }
 
 /* ── MORE SHEET ── */
-.more-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
-               z-index:9000;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.more-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
+               z-index:9000;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .more-sheet{position:fixed;top:0;left:0;bottom:0;
-            background:var(--brand);border-radius:0 20px 20px 0;
+            background:#0d1024;border-radius:0 24px 24px 0;
             z-index:9001;padding:0;
-            box-shadow:8px 0 48px rgba(0,0,0,.4);
-            transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
-            width:min(80vw,290px);overflow-y:auto;overflow-x:hidden;
+            box-shadow:12px 0 64px rgba(0,0,0,.65);
+            transform:translateX(-100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
+            width:min(82vw,300px);overflow-y:auto;overflow-x:hidden;
             -webkit-overflow-scrolling:touch;
             display:flex;flex-direction:column}
 .more-sheet.open{transform:translateX(0)}
 .more-backdrop.open{display:block}
-/* Drawer header */
+/* Drawer header — gradient brand */
 .mob-drw-hdr{display:flex;align-items:center;justify-content:space-between;
-  padding:calc(env(safe-area-inset-top,0px) + 14px) 14px 12px;
-  border-bottom:1px solid var(--border);background:var(--brand);flex-shrink:0}
-.mob-drw-profile{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
-.mob-drw-avatar{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.15);
-  display:flex;align-items:center;justify-content:center;font-size:1.15rem;overflow:hidden;
-  border:1.5px solid rgba(255,255,255,.2);flex-shrink:0}
-.mob-drw-name{font-size:.88rem;font-weight:800;color:#fff;white-space:nowrap;
+  padding:calc(env(safe-area-inset-top,0px) + 20px) 16px 18px;
+  background:linear-gradient(145deg,#0a0670 0%,#10069F 55%,#1814b8 100%);
+  flex-shrink:0;border-bottom:none}
+.mob-drw-profile{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
+.mob-drw-avatar{width:46px;height:46px;border-radius:14px;background:rgba(255,255,255,.18);
+  display:flex;align-items:center;justify-content:center;font-size:1.3rem;overflow:hidden;
+  border:2px solid rgba(255,255,255,.3);flex-shrink:0}
+.mob-drw-name{font-size:.92rem;font-weight:800;color:#fff;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis;max-width:160px}
-.mob-drw-sub{font-size:.64rem;color:rgba(255,255,255,.5);margin-top:1px}
-.mob-drw-close{background:rgba(255,255,255,.12);border:none;border-radius:9px;
-  width:32px;height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
-  color:#fff;font-size:1rem;cursor:pointer;-webkit-tap-highlight-color:transparent;
+.mob-drw-sub{font-size:.65rem;color:rgba(255,255,255,.5);margin-top:2px;
+  background:rgba(255,255,255,.1);border-radius:6px;padding:2px 7px;display:inline-block;margin-top:4px}
+.mob-drw-close{background:rgba(255,255,255,.12);border:none;border-radius:10px;
+  width:34px;height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:1.1rem;cursor:pointer;-webkit-tap-highlight-color:transparent;
   transition:.12s;margin-left:8px}
-.mob-drw-close:active{background:rgba(255,255,255,.25)}
+.mob-drw-close:active{background:rgba(255,255,255,.28)}
 /* ── SPLASH SCREEN ── */
 /* ── SPLASH — CSS ile otomatik kapanır (JS hata yapsa bile) ── */
 #splash-screen{
@@ -455,17 +457,21 @@ nav.nav-collapsed .nav-top-avatar{width:38px;height:38px}
 .ob-num{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.25);
   display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:900;flex-shrink:0}
 
-/* Drawer liste menüsü */
+/* Drawer liste menüsü — native app style */
 .drw-sect{font-size:.58rem;font-weight:800;text-transform:uppercase;letter-spacing:.13em;
-          color:rgba(255,255,255,.35);padding:14px 16px 4px;pointer-events:none}
-.drw-item{display:flex;align-items:center;gap:12px;padding:11px 16px;
-          cursor:pointer;color:rgba(255,255,255,.75);font-size:.88rem;font-weight:500;
-          transition:.12s;-webkit-tap-highlight-color:transparent;border-radius:10px;margin:0 6px}
-.drw-item:active{background:rgba(255,255,255,.12);color:#fff}
-.drw-item .di{font-size:1.15rem;width:24px;text-align:center;flex-shrink:0}
-.drw-item.active{background:var(--accent);color:#07091f;font-weight:700}
-.drw-divider{height:1px;background:rgba(255,255,255,.08);margin:6px 16px}
-/* Legacy tile (artık kullanılmıyor ama geriye dönük uyumluluk) */
+          color:rgba(255,255,255,.25);padding:16px 16px 5px;pointer-events:none}
+.drw-item{display:flex;align-items:center;gap:12px;padding:8px 10px;
+          cursor:pointer;color:rgba(255,255,255,.82);font-size:.88rem;font-weight:500;
+          transition:.1s;-webkit-tap-highlight-color:transparent;
+          border-radius:12px;margin:1px 8px}
+.drw-item:active{background:rgba(255,255,255,.08);transform:scale(.97)}
+.drw-item .di{font-size:1.05rem;width:36px;height:36px;
+              display:flex;align-items:center;justify-content:center;
+              background:rgba(255,255,255,.09);border-radius:10px;flex-shrink:0}
+.drw-item.active{background:rgba(213,253,115,.13);color:var(--accent);font-weight:700}
+.drw-item.active .di{background:rgba(213,253,115,.18)}
+.drw-divider{height:1px;background:rgba(255,255,255,.06);margin:5px 16px}
+/* Legacy tile (artık kullanılmıyor) */
 .more-sect-label{display:none}
 .more-grid{display:none}
 .more-tile{display:none}
@@ -1715,9 +1721,9 @@ body{top:0!important}
   <div class="mob-drw-hdr">
     <div class="mob-drw-profile">
       <div id="mob-drw-avatar" class="mob-drw-avatar">🦔</div>
-      <div style="min-width:0">
+      <div style="min-width:0;flex:1">
         <div id="mob-drw-name" class="mob-drw-name">Kirpi Finans</div>
-        <div id="mob-drw-sub" class="mob-drw-sub">—</div>
+        <div id="mob-drw-sub" class="mob-drw-sub">Bireysel</div>
       </div>
     </div>
     <button class="mob-drw-close" onclick="closeMoreSheet()">✕</button>
@@ -5554,6 +5560,10 @@ function closeMoreSheet(){
   });
 })();
 function goPageFromSheet(id){
+  // Mark active drawer item
+  document.querySelectorAll('.drw-item').forEach(function(it){ it.classList.remove('active'); });
+  var active=document.querySelector('.drw-item[onclick*="\''+id+'\'"]');
+  if(active) active.classList.add('active');
   closeMoreSheet();
   var el=document.querySelector('[data-page='+id+']');
   setTimeout(function(){ goPage(id, el); }, 200);
