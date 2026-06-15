@@ -1787,11 +1787,29 @@ body{top:0!important}
     <div class="more-tile" onclick="goPageFromSheet('cardreport')">
       <div class="mt-ico">📊</div><div class="mt-lbl">Kart Raporu</div>
     </div>
+    <div class="more-tile" onclick="goPageFromSheet('loans')">
+      <div class="mt-ico">🏦</div><div class="mt-lbl">Kredi Takibi</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('checks')">
+      <div class="mt-ico">📋</div><div class="mt-lbl">Çek Takibi</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('bilanco')">
+      <div class="mt-ico">⚖️</div><div class="mt-lbl">Bilanço</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('ratios')">
+      <div class="mt-ico">📈</div><div class="mt-lbl">Fin. Oranlar</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('muhtasar')">
+      <div class="mt-ico">📑</div><div class="mt-lbl">Muhtasar</div>
+    </div>
   </div>
 
   <div class="more-grid" style="margin-top:4px">
-    <div class="more-tile" onclick="goPageFromSheet('settings')" style="grid-column:1/-1;flex-direction:row;justify-content:center;gap:10px;padding:12px">
-      <div class="mt-ico" style="font-size:1.2rem">⚙️</div><div class="mt-lbl" style="font-size:.8rem">Ayarlar</div>
+    <div class="more-tile" onclick="goPageFromSheet('download')">
+      <div class="mt-ico">📱</div><div class="mt-lbl">Uygulamayı İndir</div>
+    </div>
+    <div class="more-tile" onclick="goPageFromSheet('settings')">
+      <div class="mt-ico">⚙️</div><div class="mt-lbl">Ayarlar</div>
     </div>
   </div>
   <div style="height:env(safe-area-inset-bottom,8px)"></div>
@@ -4461,7 +4479,7 @@ function loadInsights(){
       if(al){
         al.innerHTML=d.anomalies.map(function(a){
           return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">'
-            +'<div><div style="font-size:.84rem;font-weight:700;color:var(--txt)">'+a.cat+'</div>'
+            +'<div><div style="font-size:.84rem;font-weight:700;color:var(--txt)">'+escHtml(a.cat)+'</div>'
             +'<div style="font-size:.72rem;color:var(--txt2)">₺'+a.prv+' → ₺'+a.cur+'</div></div>'
             +'<div style="font-size:.9rem;font-weight:900;color:#ff9500">+%'+a.pct+'</div></div>';
         }).join('');
@@ -5362,7 +5380,7 @@ function renderDropdownProfiles(){
     var cur=(p.id===pid)?'cur':'';
     return '<div class="udrop-prof-item '+cur+'" onclick="switchProfile('+p.id+')">'
       +'<span class="udrop-prof-dot" style="background:'+(p.type==='sirket'?'var(--c)':'var(--b2)')+'"></span>'
-      +icon+' '+p.name
+      +icon+' '+escHtml(p.name)
       +(cur?' <span style="margin-left:auto;font-size:.65rem;color:var(--b2)">Aktif</span>':'')
       +'</div>';
   }).join('');
@@ -5388,7 +5406,7 @@ function renderSettingsProfiles(){
         +'</div>'
       +'</div>'
       +'<div style="flex:1;min-width:0">'
-        +'<div class="sp-info">'+p.name+'</div>'
+        +'<div class="sp-info">'+escHtml(p.name)+'</div>'
         +'<div class="sp-type">'+(p.type==='sirket'?'Şirket':'Kişisel')+'</div>'
       +'</div>'
       +(isActive?'<span class="sp-active">Aktif</span>':'<button onclick="switchProfile('+p.id+')" style="padding:5px 12px;background:var(--accent);border:none;border-radius:8px;color:#07091f;font-size:.75rem;cursor:pointer;font-weight:600">Geç</button>')
@@ -5602,8 +5620,8 @@ function renderNotifItem(item){
     +(read?'':'<div style="position:absolute;top:14px;right:14px;width:8px;height:8px;border-radius:50%;background:'+(item.urgency==='urgent'?'#ef4444':'#f59e0b')+'"></div>')
     +'<div class="notif-item-ico">'+item.icon+'</div>'
     +'<div class="notif-item-body">'
-      +'<div class="notif-item-title" style="'+(read?'opacity:.5':'')+'">'+item.title+'</div>'
-      +'<div class="notif-item-msg" style="'+(read?'opacity:.4':'')+'">'+item.body+'</div>'
+      +'<div class="notif-item-title" style="'+(read?'opacity:.5':'')+'">'+escHtml(item.title)+'</div>'
+      +'<div class="notif-item-msg" style="'+(read?'opacity:.4':'')+'">'+escHtml(item.body)+'</div>'
       +dayLabel
     +'</div>'
     +'</div>';
@@ -6109,14 +6127,14 @@ function loadCats(cb){
     var fc=document.getElementById('ledger-f-cat');
     if(fc){
       fc.innerHTML='<option value="">Tüm Kategoriler</option>';
-      CATS.all.forEach(function(c){fc.innerHTML+='<option>'+c+'</option>'});
+      CATS.all.forEach(function(c){fc.innerHTML+='<option>'+escHtml(c)+'</option>';});
     }
     if(cb)cb();
   });
 }
 function fillSel(id,list){
   var s=document.getElementById(id); if(!s)return; s.innerHTML='';
-  list.forEach(function(c){s.innerHTML+='<option>'+c+'</option>'});
+  list.forEach(function(c){s.innerHTML+='<option>'+escHtml(c)+'</option>';});
 }
 function setTab(t){
   curTab=t;
@@ -6294,8 +6312,8 @@ function renderTxList(listId, txns, type){
     return '<div class="tx-day-item" onclick="'+action+'">'+
       '<div class="tx-day-icon '+cls+'">'+lbl+'</div>'+
       '<div class="tx-day-info">'+
-        '<div class="tx-day-cat">'+t.category+'</div>'+
-        (t.description?'<div class="tx-day-desc">'+t.description+'</div>':'<div class="tx-day-desc" style="color:var(--txt2);opacity:.5">Açıklama yok</div>')+
+        '<div class="tx-day-cat">'+escHtml(t.category)+'</div>'+
+        (t.description?'<div class="tx-day-desc">'+escHtml(t.description)+'</div>':'<div class="tx-day-desc" style="color:var(--txt2);opacity:.5">Açıklama yok</div>')+
       '</div>'+
       '<div class="tx-day-amt" style="color:var(--'+(type==='gelir'?'g':'r')+')">'+(t.amount?amtStr:'?')+'</div>'+
     '</div>';
@@ -6790,7 +6808,7 @@ function renderMotivation(d){
   var el=document.getElementById('motiv-msgs');
   if(!d.msgs||!d.msgs.length){el.innerHTML='<div style="color:var(--txt2);font-size:.83rem">Veri girdikçe analiz burada görünür.</div>';return}
   el.innerHTML=d.msgs.map(function(m){
-    return '<div class="motiv-msg"><span class="ico">'+m.icon+'</span><span>'+m.text+'</span></div>';
+    return '<div class="motiv-msg"><span class="ico">'+m.icon+'</span><span>'+escHtml(m.text)+'</span></div>';
   }).join('');
 }
 
@@ -6932,8 +6950,8 @@ function loadGoalsList(){
       return '<div class="goal-item" style="border-color:'+bd+';background:'+bg+'">'
         +'<div class="goal-icon-wrap" style="background:'+bg+'">'+ico+'</div>'
         +'<div class="goal-info">'
-          +'<div class="goal-name">'+g.name+'</div>'
-          +'<div class="goal-meta">'+(g.note||typeLabel(g.goal_type))+'</div>'
+          +'<div class="goal-name">'+escHtml(g.name)+'</div>'
+          +'<div class="goal-meta">'+(g.note?escHtml(g.note):typeLabel(g.goal_type))+'</div>'
         +'</div>'
         +'<div class="goal-amount">'+fmt(g.monthly_target)+'/ay</div>'
         +'<button class="goal-del" onclick="deleteGoal('+g.id+')" title="Sil">✕</button>'
@@ -6988,7 +7006,7 @@ function loadGoalsAnalysis(){
     el.innerHTML=d.comments.map(function(c){
       return '<div class="comment-bubble '+(c.type||'info')+'">'
         +'<div class="cb-ico">'+c.icon+'</div>'
-        +'<div class="cb-text">'+c.text+'</div>'
+        +'<div class="cb-text">'+escHtml(c.text)+'</div>'
         +'</div>';
     }).join('');
     // also update bar with goals
@@ -7145,8 +7163,8 @@ function loadAccounts(){
       html+='<div class="acc-list-top">';
       html+=_bankLogo(a.bank);
       html+='<div class="acc-list-info">';
-      html+='<div class="acc-list-bank">'+a.bank+'</div>';
-      html+='<div class="acc-list-name">'+a.name+'</div>';
+      html+='<div class="acc-list-bank">'+escHtml(a.bank)+'</div>';
+      html+='<div class="acc-list-name">'+escHtml(a.name)+'</div>';
       html+='<span class="acc-type-tag" style="background:'+tagBg+';color:'+tagColor+'">'+label+'</span>';
       html+='</div>';
       html+='</div>';
@@ -7483,8 +7501,8 @@ function renderLedger(){
       '<td onclick="event.stopPropagation()"><div class="cell"><input type="checkbox" class="row-chk" data-id="'+t.id+'" onchange="rowChkChange()"></div></td>'+
       '<td><div class="cell">'+fmtDate(t.date)+'</div></td>'+
       '<td><div class="cell"><span class="badge '+(isG?'badge-g':'badge-r')+'">'+(isG?'Gelir':'Gider')+'</span></div></td>'+
-      '<td><div class="cell"><span class="badge badge-cat">'+t.category+'</span></div></td>'+
-      '<td><div class="cell" style="color:var(--txt2);font-size:.82rem">'+(t.description||'<span style="opacity:.4">—</span>')+'</div></td>'+
+      '<td><div class="cell"><span class="badge badge-cat">'+escHtml(t.category)+'</span></div></td>'+
+      '<td><div class="cell" style="color:var(--txt2);font-size:.82rem">'+(t.description?escHtml(t.description):'<span style="opacity:.4">—</span>')+'</div></td>'+
       '<td><div class="cell" style="font-size:.78rem;flex-direction:column;align-items:flex-start;gap:2px">'+
         (function(){
           if(t.card_id){
@@ -7492,11 +7510,11 @@ function renderLedger(){
             var typeLabel=ctype==='yemek'?'🍽️ Yemek Kartı':ctype==='banka'?'🏧 Banka Kartı':ctype==='hediye'?'🎁 Hediye Kartı':'💳 Kredi Kartı';
             var name=_cardName(t.card_id);
             return '<span style="font-weight:700;color:var(--txt);font-size:.75rem">'+typeLabel+'</span>'+
-                   (name?'<span style="color:var(--txt2);font-size:.7rem">'+name+'</span>':'');
+                   (name?'<span style="color:var(--txt2);font-size:.7rem">'+escHtml(name)+'</span>':'');
           } else if(t.account_id){
             var aname=_accName(t.account_id);
             return '<span style="font-weight:700;color:var(--txt);font-size:.75rem">🏧 Banka Kartı</span>'+
-                   (aname?'<span style="color:var(--txt2);font-size:.7rem">'+aname+'</span>':'');
+                   (aname?'<span style="color:var(--txt2);font-size:.7rem">'+escHtml(aname)+'</span>':'');
           } else if(t.type==='gelir'){
             return '<span style="color:var(--txt2);font-size:.75rem">—</span>';
           } else {
@@ -7936,11 +7954,11 @@ function loadInvestments(){
         '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'+
           '<span style="font-size:1.2rem">'+typeIcon+'</span>'+
           '<div style="flex:1">'+
-            '<div style="font-weight:600;font-size:.88rem">'+inv.name+'</div>'+
-            '<div style="font-size:.72rem;color:var(--txt2)">'+inv.symbol+' · '+inv.buy_date+'</div>'+
+            '<div style="font-weight:600;font-size:.88rem">'+escHtml(inv.name)+'</div>'+
+            '<div style="font-size:.72rem;color:var(--txt2)">'+escHtml(inv.symbol)+' · '+inv.buy_date+'</div>'+
           '</div>'+
           '<div style="display:flex;gap:6px">'+
-            '<button class="btn btn-green" style="font-size:.72rem;padding:4px 10px" onclick="openSellModal('+inv.id+',\''+inv.name.replace(/'/g,'\\\'')+'\',' +inv.quantity+','+inv.buy_price+')">Sat</button>'+
+            '<button class="btn btn-green" style="font-size:.72rem;padding:4px 10px" onclick="openSellModal('+inv.id+','+JSON.stringify(inv.name)+','+inv.quantity+','+inv.buy_price+')">Sat</button>'+
             '<button class="del-row" onclick="delInv('+inv.id+')">✕</button>'+
           '</div>'+
         '</div>'+
@@ -7951,7 +7969,7 @@ function loadInvestments(){
             '<div style="font-weight:700;color:'+(profit>0?'var(--g)':profit<0?'var(--r)':'var(--txt2)')+'">'+
               (profit!==null?(profit>=0?'+':'')+fmt(profit)+' ('+pct+'%)':'—')+'</div></div>'+
         '</div>'+
-        (hasVal && profit > 0 ? '<button class="btn btn-green" style="width:100%;margin-top:10px;padding:7px;font-size:.78rem" onclick="bookIncome('+inv.id+','+inv.profit_try+',\''+inv.name+'\')">+ Kâr olarak gelire yaz ('+fmt(profit)+')</button>' : '')+
+        (hasVal && profit > 0 ? '<button class="btn btn-green" style="width:100%;margin-top:10px;padding:7px;font-size:.78rem" onclick="bookIncome('+inv.id+','+inv.profit_try+','+JSON.stringify(inv.name)+')">+ Kâr olarak gelire yaz ('+fmt(profit)+')</button>' : '')+
       '</div>';
     }).join('');
     document.getElementById('inv-total').style.display = 'block';
@@ -8116,8 +8134,8 @@ function loadRecurring(){
             ';display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">'+
             (r.type==='gelir'?'📈':'📉')+'</div>'+
             '<div style="flex:1;min-width:0">'+
-              '<div style="font-weight:600;font-size:.88rem">'+(r.description||r.category)+'</div>'+
-              '<div style="font-size:.75rem;color:var(--txt2)">'+r.category+' &middot; Her ayın <strong>'+(r.days_of_month&&r.days_of_month.trim()?r.days_of_month.split(',').join('. ')+(r.days_of_month.split(',').length>1?'. günleri':'. günü'):r.day_of_month+'. günü')+'</strong></div>'+
+              '<div style="font-weight:600;font-size:.88rem">'+escHtml(r.description||r.category)+'</div>'+
+              '<div style="font-size:.75rem;color:var(--txt2)">'+escHtml(r.category)+' &middot; Her ayın <strong>'+(r.days_of_month&&r.days_of_month.trim()?r.days_of_month.split(',').join('. ')+(r.days_of_month.split(',').length>1?'. günleri':'. günü'):r.day_of_month+'. günü')+'</strong></div>'+
             '</div>'+
             '<div style="font-weight:800;font-size:.95rem;color:'+(r.type==='gelir'?'var(--g)':'var(--r)')+'">'+
               (r.type==='gelir'?'+':'-')+fmt(r.amount)+'</div>'+
@@ -8201,10 +8219,10 @@ function renderCsvPreview(d){
   tbody.innerHTML=d.rows.map(function(r,i){
     var isG=r.type==='gelir';
     var catSel='<select class="csv-cat-sel" data-i="'+i+'" onchange="csvRows[parseInt(this.dataset.i)].category=this.value" style="max-width:130px">'+
-      (isG?CATS.gelir:CATS.gider).map(function(c){return'<option'+(c===r.category?' selected':'')+'>'+c+'</option>'}).join('')+'</select>';
+      (isG?CATS.gelir:CATS.gider).map(function(c){return'<option'+(c===r.category?' selected':'')+'>'+escHtml(c)+'</option>';}).join('')+'</select>';
     return '<tr><td><input type="checkbox" class="prev-chk" data-i="'+i+'" checked></td>'+
       '<td>'+fmtDate(r.date)+'</td>'+
-      '<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+r.description+'">'+(r.description||'—')+'</td>'+
+      '<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escHtml(r.description||'')+'">'+(r.description?escHtml(r.description):'—')+'</td>'+
       '<td><span class="badge '+(isG?'badge-g':'badge-r')+'">'+(isG?'Gelir':'Gider')+'</span></td>'+
       '<td>'+catSel+'</td>'+
       '<td style="text-align:right;font-weight:600;color:'+(isG?'var(--g)':'var(--r)')+'">'+(isG?'+':'-')+fmt(r.amount)+'</td></tr>';
@@ -9148,9 +9166,9 @@ function loadCustomCats(){
     }
     el.innerHTML = filtered.map(function(c){
       return '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:8px">'
-        +'<span style="font-size:1.3rem">'+c.icon+'</span>'
+        +'<span style="font-size:1.3rem">'+escHtml(c.icon)+'</span>'
         +'<div style="flex:1">'
-          +'<div style="font-size:.9rem;font-weight:600;color:var(--txt)">'+c.name+'</div>'
+          +'<div style="font-size:.9rem;font-weight:600;color:var(--txt)">'+escHtml(c.name)+'</div>'
           +'<div style="font-size:.72rem;color:var(--txt2);margin-top:1px">'+(c.type==='gelir'?'↑ Gelir':'↓ Gider')+'</div>'
         +'</div>'
         +'<div style="width:16px;height:16px;border-radius:50%;background:'+c.color+';flex-shrink:0"></div>'
@@ -9210,9 +9228,9 @@ function initTagsPage(){
     if(empty) empty.style.display='none';
     if(!el) return;
     el.innerHTML = tags.map(function(t){
-      return '<div class="tappable" onclick="filterByTag(\''+t.replace(/'/g,"\\'")+'\')" '
+      return '<div class="tappable" onclick="filterByTag('+JSON.stringify(t)+')" '
         +'style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--bg2);border:1.5px solid var(--border2);border-radius:22px;cursor:pointer;font-size:.84rem;font-weight:600;color:var(--txt);transition:.15s">'
-        +'<span style="color:var(--accent);font-size:.7rem">🏷️</span>'+t
+        +'<span style="color:var(--accent);font-size:.7rem">🏷️</span>'+escHtml(t)
         +'</div>';
     }).join('');
   });
@@ -9234,8 +9252,8 @@ function filterByTag(tag){
       var col  = tx.type==='gelir'?'var(--g)':'var(--r)';
       return '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:8px">'
         +'<div style="flex:1;min-width:0">'
-          +'<div style="font-size:.88rem;font-weight:600;color:var(--txt)">'+tx.category+'</div>'
-          +'<div style="font-size:.75rem;color:var(--txt2);margin-top:2px">'+tx.date+(tx.description?' · '+tx.description:'')+'</div>'
+          +'<div style="font-size:.88rem;font-weight:600;color:var(--txt)">'+escHtml(tx.category)+'</div>'
+          +'<div style="font-size:.75rem;color:var(--txt2);margin-top:2px">'+tx.date+(tx.description?' · '+escHtml(tx.description):'')+'</div>'
         +'</div>'
         +'<div style="font-size:.95rem;font-weight:800;color:'+col+'">'+sign+fmt(tx.amount)+'</div>'
       +'</div>';
@@ -9285,8 +9303,8 @@ function loadSchedList(){
         +'<div style="display:flex;align-items:flex-start;gap:12px">'
           +'<div style="width:36px;height:36px;border-radius:10px;background:'+(isGelir?'rgba(213,253,115,.12)':'rgba(246,70,93,.12)')+';display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">'+(isGelir?'📈':'📉')+'</div>'
           +'<div style="flex:1;min-width:0">'
-            +'<div style="font-size:.92rem;font-weight:700;color:var(--txt)">'+s.category+(s.description?' <span style="font-weight:400;color:var(--txt2)">· '+s.description+'</span>':'')+'</div>'
-            +'<div style="font-size:.75rem;margin-top:3px;color:'+dateColor+'">📅 '+s.scheduled_date+(isOverdue?' · Gecikmiş!':'')+(s.account_name?' · '+s.account_name:'')+'</div>'
+            +'<div style="font-size:.92rem;font-weight:700;color:var(--txt)">'+escHtml(s.category)+(s.description?' <span style="font-weight:400;color:var(--txt2)">· '+escHtml(s.description)+'</span>':'')+'</div>'
+            +'<div style="font-size:.75rem;margin-top:3px;color:'+dateColor+'">📅 '+s.scheduled_date+(isOverdue?' · Gecikmiş!':'')+(s.account_name?' · '+escHtml(s.account_name):'')+'</div>'
           +'</div>'
           +'<div style="text-align:right;flex-shrink:0">'
             +'<div style="font-size:1rem;font-weight:800;color:'+(isGelir?'var(--g)':'var(--r)')+'">'+(isGelir?'+':'-')+fmt(s.amount)+'</div>'
@@ -9380,7 +9398,7 @@ function loadIncomeSources(){
       return '<div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--bg2);border:1px solid '+(s.is_active?'var(--border)':'var(--border2)')+';border-radius:14px;margin-bottom:10px;opacity:'+(s.is_active?'1':'.5')+'">'
         +'<div style="font-size:1.4rem">'+typeLabel.split(' ')[0]+'</div>'
         +'<div style="flex:1;min-width:0">'
-          +'<div style="font-size:.92rem;font-weight:700;color:var(--txt)">'+s.name+'</div>'
+          +'<div style="font-size:.92rem;font-weight:700;color:var(--txt)">'+escHtml(s.name)+'</div>'
           +'<div style="font-size:.75rem;color:var(--txt2);margin-top:2px">'+typeLabel.slice(typeLabel.indexOf(' ')+1)+' · '+freqLabel+'</div>'
         +'</div>'
         +'<div style="text-align:right">'
@@ -9854,8 +9872,8 @@ function loadCustInvoices(){
       return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'+
           '<div style="flex:1">'+
-            '<div style="font-size:.85rem;font-weight:700;color:var(--txt)">'+(inv.customer_name||'—')+'</div>'+
-            '<div style="font-size:.75rem;color:var(--txt2);margin-top:2px">'+inv.invoice_no+' · '+inv.invoice_date+'</div>'+
+            '<div style="font-size:.85rem;font-weight:700;color:var(--txt)">'+(inv.customer_name?escHtml(inv.customer_name):'—')+'</div>'+
+            '<div style="font-size:.75rem;color:var(--txt2);margin-top:2px">'+escHtml(inv.invoice_no||'')+' · '+inv.invoice_date+'</div>'+
             (inv.due_date?'<div style="font-size:.72rem;color:var(--txt2)">Vade: '+inv.due_date+'</div>':'')+
           '</div>'+
           '<div style="text-align:right">'+
@@ -9882,10 +9900,10 @@ function loadCustList(){
       return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px">'+
         '<div style="width:38px;height:38px;border-radius:10px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:1.3rem">🤝</div>'+
         '<div style="flex:1">'+
-          '<div style="font-size:.88rem;font-weight:700;color:var(--txt)">'+c.name+'</div>'+
-          '<div style="font-size:.75rem;color:var(--txt2);">'+(c.contact_name?c.contact_name+' · ':'')+c.phone+'</div>'+
+          '<div style="font-size:.88rem;font-weight:700;color:var(--txt)">'+escHtml(c.name)+'</div>'+
+          '<div style="font-size:.75rem;color:var(--txt2);">'+(c.contact_name?escHtml(c.contact_name)+' · ':'')+escHtml(c.phone||'')+'</div>'+
         '</div>'+
-        '<button onclick="delCustomer('+c.id+',\''+c.name+'\')" style="background:none;border:none;color:var(--txt2);cursor:pointer;font-size:1rem">✕</button>'+
+        '<button onclick="delCustomer('+c.id+','+JSON.stringify(c.name)+')" style="background:none;border:none;color:var(--txt2);cursor:pointer;font-size:1rem">✕</button>'+
       '</div>';
     }).join('');
   });

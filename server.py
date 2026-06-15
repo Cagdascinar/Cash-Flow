@@ -1036,12 +1036,12 @@ def register():
             vtok = secrets.token_urlsafe(32)
             with pg_connect() as con:
                 cur = con.execute(
-                    "INSERT INTO users (username,display_name,password_hash,email,email_verified,verify_token,phone,created_at) VALUES (?,?,?,?,0,?,?,?)",
+                    "INSERT INTO users (username,display_name,password_hash,email,email_verified,verify_token,phone,created_at) VALUES (%s,%s,%s,%s,0,%s,%s,%s)",
                     (username, display or username, generate_password_hash(password), email, vtok, phone, datetime.now().isoformat())
                 )
                 uid = cur.lastrowid
                 con.execute(
-                    "INSERT INTO profiles (user_id,name,type,created_at) VALUES (?,?,?,?)",
+                    "INSERT INTO profiles (user_id,name,type,created_at) VALUES (%s,%s,%s,%s)",
                     (uid, prof_name, ptype, datetime.now().isoformat())
                 )
         except psycopg2.IntegrityError:
@@ -1066,7 +1066,7 @@ def login():
             mins = remaining // 60 + 1
             return AUTH_HTML_render("login", f"⛔ Çok fazla hatalı deneme. {mins} dakika sonra tekrar deneyin.")
         with pg_connect() as con:
-            row = con.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+            row = con.execute("SELECT * FROM users WHERE username=%s", (username,)).fetchone()
         if row and check_password_hash(row["password_hash"], password):
             if not row["email_verified"]:
                 return AUTH_HTML_render("login", "✉️ Email adresiniz doğrulanmamış. Şifreyi biliyorsanız <a href='/forgot-password' style='color:#818cf8'>şifre sıfırla</a> yaparak hem şifreyi sıfırlayın hem de emailinizi doğrulatın. Ya da <a href='/resend-verify' style='color:#818cf8'>yeni doğrulama maili al</a>.")
@@ -1077,7 +1077,7 @@ def login():
             session["username"] = row["username"]
             session["display"]  = row["display_name"]
             with pg_connect() as con2:
-                prof = con2.execute("SELECT * FROM profiles WHERE user_id=? ORDER BY id LIMIT 1",(row["id"],)).fetchone()
+                prof = con2.execute("SELECT * FROM profiles WHERE user_id=%s ORDER BY id LIMIT 1",(row["id"],)).fetchone()
                 if prof:
                     session["profile_id"]   = prof["id"]
                     session["profile_name"] = prof["name"]
@@ -1120,7 +1120,7 @@ def forgot_password():
             expires = (datetime.now() + timedelta(hours=1)).isoformat()
             with pg_connect() as con:
                 con.execute(
-                    "INSERT INTO password_reset_tokens (user_id,token,expires_at,created_at) VALUES (?,?,?,?)",
+                    "INSERT INTO password_reset_tokens (user_id,token,expires_at,created_at) VALUES (%s,%s,%s,%s)",
                     (row["id"], token, expires, datetime.now().isoformat())
                 )
             sent = send_reset_email(row["email"], row["display_name"] or row["username"], row["username"], token)
@@ -1133,7 +1133,7 @@ def forgot_password():
 def reset_password(token):
     with pg_connect() as con:
         tok = con.execute(
-            "SELECT * FROM password_reset_tokens WHERE token=? AND used=0", (token,)
+            "SELECT * FROM password_reset_tokens WHERE token=%s AND used=0", (token,)
         ).fetchone()
     if not tok or datetime.fromisoformat(tok["expires_at"]) < datetime.now():
         return AUTH_HTML_render("reset_invalid", "Bu link geçersiz veya süresi dolmuş.")
@@ -1148,21 +1148,21 @@ def reset_password(token):
             return AUTH_HTML_render("reset", "Şifreler eşleşmiyor", token=token)
         with pg_connect() as con:
             con.execute(
-                "UPDATE users SET password_hash=?, email_verified=1, verify_token=NULL WHERE id=?",
+                "UPDATE users SET password_hash=%s, email_verified=1, verify_token=NULL WHERE id=%s",
                 (generate_password_hash(password), tok["user_id"])
             )
-            con.execute("UPDATE password_reset_tokens SET used=1 WHERE token=?", (token,))
+            con.execute("UPDATE password_reset_tokens SET used=1 WHERE token=%s", (token,))
         return redirect("/login?reset=1")
     return AUTH_HTML_render("reset", token=token)
 
 @app.route("/verify-email/<token>")
 def verify_email(token):
     with pg_connect() as con:
-        row = con.execute("SELECT * FROM users WHERE verify_token=? AND email_verified=0", (token,)).fetchone()
+        row = con.execute("SELECT * FROM users WHERE verify_token=%s AND email_verified=0", (token,)).fetchone()
     if not row:
         return AUTH_HTML_render("reset_invalid", "Bu doğrulama linki geçersiz veya zaten kullanılmış.")
     with pg_connect() as con:
-        con.execute("UPDATE users SET email_verified=1, verify_token=NULL WHERE id=?", (row["id"],))
+        con.execute("UPDATE users SET email_verified=1, verify_token=NULL WHERE id=%s", (row["id"],))
     return redirect("/login?verified=1")
 
 @app.route("/resend-verify", methods=["GET", "POST"])
@@ -1173,11 +1173,11 @@ def resend_verify():
             return AUTH_HTML_render("resend_verify", "Geçersiz istek. Lütfen sayfayı yenileyin."), 403
         email = request.form.get("email","").strip().lower()
         with pg_connect() as con:
-            row = con.execute("SELECT * FROM users WHERE email=? AND email_verified=0", (email,)).fetchone()
+            row = con.execute("SELECT * FROM users WHERE email=%s AND email_verified=0", (email,)).fetchone()
         if row:
             vtok = secrets.token_urlsafe(32)
             with pg_connect() as con:
-                con.execute("UPDATE users SET verify_token=? WHERE id=?", (vtok, row["id"]))
+                con.execute("UPDATE users SET verify_token=%s WHERE id=%s", (vtok, row["id"]))
             send_verify_email(email, row["display_name"] or row["username"], vtok)
         return AUTH_HTML_render("forgot_sent", "Eğer bu email doğrulanmamış bir hesaba aitse, yeni doğrulama linki gönderildi.")
     return AUTH_HTML_render("resend_verify")
@@ -1246,7 +1246,7 @@ def mobile_login():
         mins = remaining // 60 + 1
         return jsonify({"ok": False, "error": f"Çok fazla hatalı deneme. {mins} dakika sonra tekrar deneyin."}), 429
     with pg_connect() as con:
-        row = con.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+        row = con.execute("SELECT * FROM users WHERE username=%s", (username,)).fetchone()
     if not (row and check_password_hash(row["password_hash"], password)):
         _record_failed_login(username)
         return jsonify({"ok": False, "error": "Kullanıcı adı veya şifre hatalı"}), 401
@@ -1255,14 +1255,14 @@ def mobile_login():
     _clear_login_attempts(username)
     with pg_connect() as con2:
         prof = con2.execute(
-            "SELECT * FROM profiles WHERE user_id=? ORDER BY id LIMIT 1", (row["id"],)
+            "SELECT * FROM profiles WHERE user_id=%s ORDER BY id LIMIT 1", (row["id"],)
         ).fetchone()
         profiles = con2.execute(
-            "SELECT * FROM profiles WHERE user_id=? ORDER BY id", (row["id"],)
+            "SELECT * FROM profiles WHERE user_id=%s ORDER BY id", (row["id"],)
         ).fetchall()
         token = secrets.token_urlsafe(40)
         con2.execute(
-            "INSERT INTO mobile_tokens (user_id, token, profile_id, created_at) VALUES (?,?,?,?)",
+            "INSERT INTO mobile_tokens (user_id, token, profile_id, created_at) VALUES (%s,%s,%s,%s)",
             (row["id"], token, prof["id"] if prof else None, datetime.now().isoformat())
         )
     sub = get_sub_status(row["id"])
@@ -1302,12 +1302,12 @@ def mobile_register():
     try:
         with pg_connect() as con:
             cur = con.execute(
-                "INSERT INTO users (username,display_name,password_hash,email,email_verified,verify_token,created_at) VALUES (?,?,?,?,0,?,?)",
+                "INSERT INTO users (username,display_name,password_hash,email,email_verified,verify_token,created_at) VALUES (%s,%s,%s,%s,0,%s,%s)",
                 (username, username, generate_password_hash(password), email, vtok, datetime.now().isoformat())
             )
             uid = cur.lastrowid
             con.execute(
-                "INSERT INTO profiles (user_id,name,type,created_at) VALUES (?,?,?,?)",
+                "INSERT INTO profiles (user_id,name,type,created_at) VALUES (%s,%s,%s,%s)",
                 (uid, prof_name, ptype, datetime.now().isoformat())
             )
     except Exception:
@@ -1329,9 +1329,9 @@ def mobile_logout():
 def mobile_me():
     uid = session["user_id"]
     with pg_connect() as con:
-        row      = con.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+        row      = con.execute("SELECT * FROM users WHERE id=%s", (uid,)).fetchone()
         profiles = con.execute(
-            "SELECT * FROM profiles WHERE user_id=? ORDER BY id", (uid,)
+            "SELECT * FROM profiles WHERE user_id=%s ORDER BY id", (uid,)
         ).fetchall()
     sub = get_sub_status(uid)
     return jsonify({
@@ -1352,7 +1352,7 @@ def mobile_me():
 def api_me():
     uid = session.get("user_id")
     db  = get_db()
-    row = db.execute("SELECT display_name,username,email,avatar,phone FROM users WHERE id=?", (uid,)).fetchone()
+    row = db.execute("SELECT display_name,username,email,avatar,phone FROM users WHERE id=%s", (uid,)).fetchone()
     avatar = row["avatar"] if row else ""
     sub    = get_sub_status(uid)
     return jsonify({
@@ -1377,10 +1377,10 @@ def api_me_update():
     uid     = session["user_id"]
     db      = get_db()
     if display:
-        db.execute("UPDATE users SET display_name=? WHERE id=?", (display, uid))
+        db.execute("UPDATE users SET display_name=%s WHERE id=%s", (display, uid))
         session["display"] = display
     if phone is not None:
-        db.execute("UPDATE users SET phone=? WHERE id=?", (phone, uid))
+        db.execute("UPDATE users SET phone=%s WHERE id=%s", (phone, uid))
     if avatar is not None:
         safe_prefixes = ("data:image/png;base64,", "data:image/jpeg;base64,",
                          "data:image/jpg;base64,", "data:image/webp;base64,")
@@ -1388,7 +1388,7 @@ def api_me_update():
             return jsonify({"ok": False, "error": "Geçersiz resim formatı"}), 400
         if avatar and len(avatar) > 700_000:  # ~500KB base64 limit
             return jsonify({"ok": False, "error": "Resim çok büyük (max 500KB)"}), 400
-        db.execute("UPDATE users SET avatar=? WHERE id=?", (avatar, uid))
+        db.execute("UPDATE users SET avatar=%s WHERE id=%s", (avatar, uid))
     db.commit()
     return jsonify({"ok": True})
 
@@ -1401,14 +1401,14 @@ def api_me_password():
     confirm = data.get("confirm", "")
     uid     = session["user_id"]
     db      = get_db()
-    user    = db.execute("SELECT password_hash FROM users WHERE id=?", (uid,)).fetchone()
+    user    = db.execute("SELECT password_hash FROM users WHERE id=%s", (uid,)).fetchone()
     if not user or not check_password_hash(user["password_hash"], current):
         return jsonify({"ok": False, "error": "Mevcut şifre yanlış"})
     if len(new_pw) < 6:
         return jsonify({"ok": False, "error": "Şifre en az 6 karakter olmalı"})
     if new_pw != confirm:
         return jsonify({"ok": False, "error": "Şifreler eşleşmiyor"})
-    db.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(new_pw), uid))
+    db.execute("UPDATE users SET password_hash=%s WHERE id=%s", (generate_password_hash(new_pw), uid))
     db.commit()
     return jsonify({"ok": True})
 
@@ -1419,7 +1419,7 @@ def api_me_delete():
     data = request.get_json(force=True)
     pw   = data.get("password", "")
     db   = get_db()
-    user = db.execute("SELECT password_hash FROM users WHERE id=?", (uid,)).fetchone()
+    user = db.execute("SELECT password_hash FROM users WHERE id=%s", (uid,)).fetchone()
     if not user or not check_password_hash(user["password_hash"], pw):
         return jsonify({"ok": False, "error": "Şifre hatalı"}), 403
     user_tables = [
@@ -1441,7 +1441,7 @@ def api_me_delete():
 def api_report_settings_get():
     uid = session["user_id"]
     db  = get_db()
-    row = db.execute("SELECT report_name,report_contact,report_logo FROM users WHERE id=?", (uid,)).fetchone()
+    row = db.execute("SELECT report_name,report_contact,report_logo FROM users WHERE id=%s", (uid,)).fetchone()
     if not row:
         return jsonify({"report_name":"","report_contact":"","report_logo":""})
     return jsonify({"report_name":row["report_name"],"report_contact":row["report_contact"],"report_logo":row["report_logo"]})
@@ -1494,7 +1494,7 @@ def get_pid():
 @login_required
 def list_profiles():
     uid = session["user_id"]
-    rows = get_db().execute("SELECT * FROM profiles WHERE user_id=? ORDER BY id",(uid,)).fetchall()
+    rows = get_db().execute("SELECT * FROM profiles WHERE user_id=%s ORDER BY id",(uid,)).fetchall()
     return jsonify([row_to_dict(r) for r in rows])
 
 @app.route("/api/profiles", methods=["POST"])
@@ -1508,7 +1508,7 @@ def add_profile():
         return jsonify({"ok":False,"error":"Geçersiz veri"}),400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO profiles (user_id,name,type,created_at) VALUES (?,?,?,?)",
+        "INSERT INTO profiles (user_id,name,type,created_at) VALUES (%s,%s,%s,%s)",
         (uid, name, ptype, datetime.now().isoformat()))
     db.commit()
     return jsonify({"ok":True,"id":cur.lastrowid,"name":name,"type":ptype})
@@ -1526,7 +1526,7 @@ def update_profile_avatar(pid):
     if avatar and len(avatar) > 700_000:
         return jsonify({"ok": False, "error": "Resim çok büyük (max 500KB)"}), 400
     db = get_db()
-    db.execute("UPDATE profiles SET avatar=? WHERE id=? AND user_id=?", (avatar, pid, uid))
+    db.execute("UPDATE profiles SET avatar=%s WHERE id=%s AND user_id=%s", (avatar, pid, uid))
     db.commit()
     return jsonify({"ok": True})
 
@@ -1555,12 +1555,12 @@ def switch_profile(pid):
 def del_profile(pid):
     uid = session["user_id"]
     db  = get_db()
-    count = db.execute("SELECT COUNT(*) AS n FROM profiles WHERE user_id=?",(uid,)).fetchone()["n"]
+    count = db.execute("SELECT COUNT(*) AS n FROM profiles WHERE user_id=%s",(uid,)).fetchone()["n"]
     if count <= 1: return jsonify({"ok":False,"error":"En az bir profil olmalı"}),400
-    db.execute("DELETE FROM profiles WHERE id=? AND user_id=?",(pid,uid))
+    db.execute("DELETE FROM profiles WHERE id=%s AND user_id=%s",(pid,uid))
     db.commit()
     if session.get("profile_id") == pid:
-        first = db.execute("SELECT * FROM profiles WHERE user_id=? ORDER BY id LIMIT 1",(uid,)).fetchone()
+        first = db.execute("SELECT * FROM profiles WHERE user_id=%s ORDER BY id LIMIT 1",(uid,)).fetchone()
         if first:
             session["profile_id"]   = first["id"]
             session["profile_name"] = first["name"]
@@ -1601,14 +1601,14 @@ def add_transaction():
         return jsonify({"ok": False, "error": "Geçersiz veri"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,card_id,project_id,tags,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,card_id,project_id,tags,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (uid, pid, ttype, amount, cat, desc, dt, account_id, card_id, project_id, tags, datetime.now().isoformat()))
     # Kart borcu otomatik güncelle
     if card_id:
         if ttype == "gider":
-            db.execute("UPDATE cards SET used_=used_+? WHERE id=? AND profile_id=?", (amount, card_id, pid))
+            db.execute("UPDATE cards SET used_=used_+%s WHERE id=%s AND profile_id=%s", (amount, card_id, pid))
         elif ttype == "gelir":
-            db.execute("UPDATE cards SET used_=GREATEST(0,used_-?) WHERE id=? AND profile_id=?", (amount, card_id, pid))
+            db.execute("UPDATE cards SET used_=GREATEST(0,used_-%s) WHERE id=%s AND profile_id=%s", (amount, card_id, pid))
     db.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
 
@@ -1618,7 +1618,7 @@ def update_transaction(tid):
     pid = get_pid(); db = get_db()
     d = request.get_json(force=True)
     # Eski işlemi oku — kart borcu senkronizasyonu için
-    old = db.execute("SELECT * FROM transactions WHERE id=? AND profile_id=?", (tid, pid)).fetchone()
+    old = db.execute("SELECT * FROM transactions WHERE id=%s AND profile_id=%s", (tid, pid)).fetchone()
     if not old: return jsonify({"ok": False, "error": "İşlem bulunamadı"}), 404
 
     fields, params = [], []
@@ -1633,7 +1633,7 @@ def update_transaction(tid):
                 params.append(d[col])
     if not fields: return jsonify({"ok": False}), 400
     params += [tid, pid]
-    db.execute(f"UPDATE transactions SET {','.join(fields)} WHERE id=? AND profile_id=?", params)
+    db.execute(f"UPDATE transactions SET {','.join(fields)} WHERE id=%s AND profile_id=%s", params)
 
     # Kart borcu senkronizasyonu: eski etkiyi geri al, yeni etkiyi uygula
     old_card_id = old["card_id"]
@@ -1647,10 +1647,10 @@ def update_transaction(tid):
         if not card_id: return
         sign = -1 if reverse else 1
         if ttype == "gider":
-            db.execute("UPDATE cards SET used_=GREATEST(0,used_+?) WHERE id=? AND profile_id=?",
+            db.execute("UPDATE cards SET used_=GREATEST(0,used_+%s) WHERE id=%s AND profile_id=%s",
                        (sign * amount, card_id, pid))
         elif ttype == "gelir":
-            db.execute("UPDATE cards SET used_=GREATEST(0,used_+?) WHERE id=? AND profile_id=?",
+            db.execute("UPDATE cards SET used_=GREATEST(0,used_+%s) WHERE id=%s AND profile_id=%s",
                        (-sign * amount, card_id, pid))
 
     if old_card_id or new_card_id:
@@ -1664,7 +1664,7 @@ def update_transaction(tid):
 @login_required
 def del_transaction(tid):
     pid = get_pid(); db = get_db()
-    tx = db.execute("SELECT * FROM transactions WHERE id=? AND profile_id=?", (tid, pid)).fetchone()
+    tx = db.execute("SELECT * FROM transactions WHERE id=%s AND profile_id=%s", (tid, pid)).fetchone()
     if tx and tx.get("card_id"):
         cid = tx["card_id"]
         amt = float(tx["amount"])
@@ -1672,14 +1672,14 @@ def del_transaction(tid):
         if tx["type"] == "gider":
             if has_account:
                 # Kart ödemesi silindi → borcu geri yükle (ödeme geri alındı)
-                db.execute("UPDATE cards SET used_=used_+? WHERE id=? AND profile_id=?", (amt, cid, pid))
+                db.execute("UPDATE cards SET used_=used_+%s WHERE id=%s AND profile_id=%s", (amt, cid, pid))
             else:
                 # Kart harcaması silindi → borcu düşür (harcama geri alındı)
-                db.execute("UPDATE cards SET used_=GREATEST(0,used_-?) WHERE id=? AND profile_id=?", (amt, cid, pid))
+                db.execute("UPDATE cards SET used_=GREATEST(0,used_-%s) WHERE id=%s AND profile_id=%s", (amt, cid, pid))
         elif tx["type"] == "gelir":
             # İade silindi → borcu geri yükle
-            db.execute("UPDATE cards SET used_=used_+? WHERE id=? AND profile_id=?", (amt, cid, pid))
-    db.execute("DELETE FROM transactions WHERE id=? AND profile_id=?", (tid, pid))
+            db.execute("UPDATE cards SET used_=used_+%s WHERE id=%s AND profile_id=%s", (amt, cid, pid))
+    db.execute("DELETE FROM transactions WHERE id=%s AND profile_id=%s", (tid, pid))
     db.commit()
     return jsonify({"ok": True})
 
@@ -1690,7 +1690,7 @@ def bulk_delete():
     ids = request.get_json(force=True)
     if not isinstance(ids, list): return jsonify({"ok": False}), 400
     placeholders = ",".join("?" * len(ids))
-    get_db().execute(f"DELETE FROM transactions WHERE id IN ({placeholders}) AND profile_id=?", ids + [pid])
+    get_db().execute(f"DELETE FROM transactions WHERE id IN ({placeholders}) AND profile_id=%s", ids + [pid])
     get_db().commit()
     return jsonify({"ok": True, "deleted": len(ids)})
 
@@ -1728,16 +1728,16 @@ def summary():
     bar = []
     for m in range(1,13):
         s,e2 = month_range(today_d.year, m)
-        totals = db.execute("SELECT type,SUM(amount) as t FROM transactions WHERE profile_id=? AND date BETWEEN ? AND ? GROUP BY type",(pid,s,e2)).fetchall()
+        totals = db.execute("SELECT type,SUM(amount) as t FROM transactions WHERE profile_id=%s AND date BETWEEN %s AND %s GROUP BY type",(pid,s,e2)).fetchall()
         g_val  = float(next((r["t"] for r in totals if r["type"]=="gelir"),0) or 0)
         ex_val = float(next((r["t"] for r in totals if r["type"]=="gider"),0) or 0)
         bar.append({"month":m,"gelir":round(g_val,2),"gider":round(ex_val,2)})
-    bal = db.execute("SELECT SUM(CASE WHEN type='gelir' THEN amount ELSE -amount END) as b FROM transactions WHERE profile_id=?",(pid,)).fetchone()
-    budgets = {r["category"]:r["limit_"] for r in db.execute("SELECT * FROM budgets WHERE profile_id=?",(pid,)).fetchall()}
+    bal = db.execute("SELECT SUM(CASE WHEN type='gelir' THEN amount ELSE -amount END) as b FROM transactions WHERE profile_id=%s",(pid,)).fetchone()
+    budgets = {r["category"]:r["limit_"] for r in db.execute("SELECT * FROM budgets WHERE profile_id=%s",(pid,)).fetchall()}
 
     # ── Net Kullanılabilir Nakit ──────────────────────────────────────────────
     # Bu ay gelir - bu ay gider - kart asgari ödemeler (henüz ödenmemişse)
-    cards = db.execute("SELECT used_, min_pct, limit_ FROM cards WHERE profile_id=?", (pid,)).fetchall()
+    cards = db.execute("SELECT used_, min_pct, limit_ FROM cards WHERE profile_id=%s", (pid,)).fetchall()
     toplam_kart_borcu   = sum(float(c["used_"] or 0) for c in cards)
     toplam_kart_limit   = sum(float(c["limit_"] or 0) for c in cards)
     toplam_asgari       = sum(
@@ -1746,7 +1746,7 @@ def summary():
     )
     # Recurring zorunlu giderler (aktif)
     recurring_gider = db.execute(
-        "SELECT COALESCE(SUM(amount),0) as t FROM recurring WHERE profile_id=? AND type='gider' AND active=1",
+        "SELECT COALESCE(SUM(amount),0) as t FROM recurring WHERE profile_id=%s AND type='gider' AND active=1",
         (pid,)
     ).fetchone()["t"] or 0
     # Kullanılabilir nakit = bu ay net - asgari ödemeler
@@ -1783,14 +1783,14 @@ def set_budget():
     cat = d.get("category",""); limit = float(d.get("limit",0))
     if not cat or limit<=0: return jsonify({"ok":False}),400
     db = get_db()
-    db.execute("INSERT INTO budgets(user_id,profile_id,category,limit_) VALUES(?,?,?,?) ON CONFLICT(profile_id,category) DO UPDATE SET limit_=excluded.limit_",(uid,pid,cat,limit))
+    db.execute("INSERT INTO budgets(user_id,profile_id,category,limit_) VALUES(%s,%s,%s,%s) ON CONFLICT(profile_id,category) DO UPDATE SET limit_=excluded.limit_",(uid,pid,cat,limit))
     db.commit(); return jsonify({"ok":True})
 
 @app.route("/api/goals", methods=["GET"])
 @login_required
 def list_goals():
     pid = get_pid(); db = get_db()
-    rows = db.execute("SELECT * FROM goals WHERE profile_id=? ORDER BY created_at", (pid,)).fetchall()
+    rows = db.execute("SELECT * FROM goals WHERE profile_id=%s ORDER BY created_at", (pid,)).fetchall()
     return jsonify([dict(r) for r in rows])
 
 @app.route("/api/goals", methods=["POST"])
@@ -1806,7 +1806,7 @@ def add_goal():
         return jsonify({"ok":False,"error":"İsim ve aylık hedef zorunlu"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO goals (user_id,profile_id,name,goal_type,monthly_target,note,created_at) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO goals (user_id,profile_id,name,goal_type,monthly_target,note,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s)",
         (uid, pid, name, gtype, monthly, note, datetime.now().isoformat())
     )
     db.commit()
@@ -1816,7 +1816,7 @@ def add_goal():
 @login_required
 def del_goal(gid):
     pid = get_pid(); db = get_db()
-    db.execute("DELETE FROM goals WHERE id=? AND profile_id=?", (gid, pid))
+    db.execute("DELETE FROM goals WHERE id=%s AND profile_id=%s", (gid, pid))
     db.commit()
     return jsonify({"ok":True})
 
@@ -1828,7 +1828,7 @@ def list_todos():
     pid = get_pid(); db = get_db()
     dt = request.args.get("date", date.today().isoformat())
     rows = db.execute(
-        "SELECT * FROM todos WHERE profile_id=? AND date=? ORDER BY id", (pid, dt)
+        "SELECT * FROM todos WHERE profile_id=%s AND date=%s ORDER BY id", (pid, dt)
     ).fetchall()
     return jsonify([dict(r) for r in rows])
 
@@ -1842,7 +1842,7 @@ def add_todo():
     if not text: return jsonify({"ok":False,"error":"Görev metni gerekli"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO todos (user_id,profile_id,text,date,done,archived,created_at) VALUES (?,?,?,?,0,0,?)",
+        "INSERT INTO todos (user_id,profile_id,text,date,done,archived,created_at) VALUES (%s,%s,%s,%s,0,0,%s)",
         (uid, pid, text, dt, datetime.now().isoformat())
     )
     db.commit()
@@ -1860,7 +1860,7 @@ def update_todo(tid):
             params.append(d[col])
     if not fields: return jsonify({"ok":False}), 400
     params += [tid, pid]
-    db.execute(f"UPDATE todos SET {','.join(fields)} WHERE id=? AND profile_id=?", params)
+    db.execute(f"UPDATE todos SET {','.join(fields)} WHERE id=%s AND profile_id=%s", params)
     db.commit()
     return jsonify({"ok":True})
 
@@ -1868,7 +1868,7 @@ def update_todo(tid):
 @login_required
 def del_todo(tid):
     pid = get_pid(); db = get_db()
-    db.execute("DELETE FROM todos WHERE id=? AND profile_id=?", (tid, pid))
+    db.execute("DELETE FROM todos WHERE id=%s AND profile_id=%s", (tid, pid))
     db.commit()
     return jsonify({"ok":True})
 
@@ -1878,7 +1878,7 @@ def del_todo(tid):
 @premium_required
 def list_suppliers():
     pid = get_pid(); db = get_db()
-    rows = db.execute("SELECT * FROM suppliers WHERE profile_id=? ORDER BY name", (pid,)).fetchall()
+    rows = db.execute("SELECT * FROM suppliers WHERE profile_id=%s ORDER BY name", (pid,)).fetchall()
     return jsonify([dict(r) for r in rows])
 
 @app.route("/api/suppliers", methods=["POST"])
@@ -1890,7 +1890,7 @@ def add_supplier():
     if not name: return jsonify({"ok":False,"error":"Tedarikçi adı zorunlu"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO suppliers (user_id,profile_id,name,unvan,tax_no,vergi_dairesi,contact,phone,email,address,payment_terms_days,notes,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO suppliers (user_id,profile_id,name,unvan,tax_no,vergi_dairesi,contact,phone,email,address,payment_terms_days,notes,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (uid, pid, name, d.get("unvan",""), d.get("tax_no","") or d.get("vkn",""),
          d.get("vergi_dairesi",""), d.get("contact","") or d.get("contact_name",""),
          d.get("phone",""), d.get("email",""), d.get("address",""),
@@ -1911,7 +1911,7 @@ def update_supplier(sid):
             params.append(d[col])
     if not fields: return jsonify({"ok":False}), 400
     params += [sid, pid]
-    db.execute(f"UPDATE suppliers SET {','.join(fields)} WHERE id=? AND profile_id=?", params)
+    db.execute(f"UPDATE suppliers SET {','.join(fields)} WHERE id=%s AND profile_id=%s", params)
     db.commit()
     return jsonify({"ok":True})
 
@@ -1919,7 +1919,7 @@ def update_supplier(sid):
 @premium_required
 def del_supplier(sid):
     pid = get_pid(); db = get_db()
-    db.execute("DELETE FROM suppliers WHERE id=? AND profile_id=?", (sid, pid))
+    db.execute("DELETE FROM suppliers WHERE id=%s AND profile_id=%s", (sid, pid))
     db.commit()
     return jsonify({"ok":True})
 
@@ -1935,11 +1935,11 @@ def list_supplier_invoices():
     status_db = status_map.get(status, status)
     if status_db:
         rows = db.execute(
-            "SELECT * FROM supplier_invoices WHERE profile_id=? AND status=? ORDER BY due_date", (pid, status_db)
+            "SELECT * FROM supplier_invoices WHERE profile_id=%s AND status=%s ORDER BY due_date", (pid, status_db)
         ).fetchall()
     else:
         rows = db.execute(
-            "SELECT * FROM supplier_invoices WHERE profile_id=? ORDER BY due_date DESC", (pid,)
+            "SELECT * FROM supplier_invoices WHERE profile_id=%s ORDER BY due_date DESC", (pid,)
         ).fetchall()
     return jsonify([dict(r) for r in rows])
 
@@ -1956,7 +1956,7 @@ def add_supplier_invoice():
         return jsonify({"ok":False,"error":"Tedarikçi, tutar ve vade zorunlu"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO supplier_invoices (user_id,profile_id,supplier_id,supplier_name,invoice_no,description,amount,currency,invoice_date,due_date,status,paid_date,reference_rate,notes,invoice_type,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO supplier_invoices (user_id,profile_id,supplier_id,supplier_name,invoice_no,description,amount,currency,invoice_date,due_date,status,paid_date,reference_rate,notes,invoice_type,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (uid, pid, int(d.get("supplier_id",0)), sup_name, d.get("invoice_no",""),
          d.get("description",""), amount, d.get("currency","TRY"), inv_date, due_date,
          "bekliyor", "", float(d.get("reference_rate",50)), d.get("notes",""),
@@ -1977,7 +1977,7 @@ def update_supplier_invoice(iid):
             params.append(float(d[col]) if col in ("amount","reference_rate") else d[col])
     if not fields: return jsonify({"ok":False}), 400
     params += [iid, pid]
-    db.execute(f"UPDATE supplier_invoices SET {','.join(fields)} WHERE id=? AND profile_id=?", params)
+    db.execute(f"UPDATE supplier_invoices SET {','.join(fields)} WHERE id=%s AND profile_id=%s", params)
     db.commit()
     return jsonify({"ok":True})
 
@@ -1985,7 +1985,7 @@ def update_supplier_invoice(iid):
 @premium_required
 def del_supplier_invoice(iid):
     pid = get_pid(); db = get_db()
-    db.execute("DELETE FROM supplier_invoices WHERE id=? AND profile_id=?", (iid, pid))
+    db.execute("DELETE FROM supplier_invoices WHERE id=%s AND profile_id=%s", (iid, pid))
     db.commit()
     return jsonify({"ok":True})
 
@@ -1999,7 +1999,7 @@ def pay_supplier_invoice(iid):
     payment_account_id   = d.get("payment_account_id") or None
     payment_account_name = d.get("payment_account_name", "")
     db.execute(
-        "UPDATE supplier_invoices SET status='odendi',paid_date=?,payment_method=?,payment_account_id=?,payment_account_name=? WHERE id=? AND profile_id=?",
+        "UPDATE supplier_invoices SET status='odendi',paid_date=%s,payment_method=%s,payment_account_id=%s,payment_account_name=%s WHERE id=%s AND profile_id=%s",
         (paid_date, payment_method, payment_account_id, payment_account_name, iid, pid)
     )
     db.commit()
@@ -2011,7 +2011,7 @@ def supplier_invoices_aging():
     pid = get_pid(); db = get_db()
     today_d = date.today()
     rows = db.execute(
-        "SELECT * FROM supplier_invoices WHERE profile_id=? AND status='bekliyor' ORDER BY due_date",
+        "SELECT * FROM supplier_invoices WHERE profile_id=%s AND status='bekliyor' ORDER BY due_date",
         (pid,)
     ).fetchall()
     buckets = {"0_30":[],"31_60":[],"61_90":[],"90plus":[]}
@@ -2043,7 +2043,7 @@ def supplier_invoices_float_gain():
     pid = get_pid(); db = get_db()
     today_d = date.today()
     rows = db.execute(
-        "SELECT * FROM supplier_invoices WHERE profile_id=? AND status='odendi' AND paid_date!=''",
+        "SELECT * FROM supplier_invoices WHERE profile_id=%s AND status='odendi' AND paid_date!=''",
         (pid,)
     ).fetchall()
     results = []
@@ -2087,7 +2087,7 @@ DEPRECIATION_RATES = {
 @premium_required
 def list_assets():
     pid = get_pid(); db = get_db()
-    rows = db.execute("SELECT * FROM assets WHERE profile_id=? AND active=1 ORDER BY name", (pid,)).fetchall()
+    rows = db.execute("SELECT * FROM assets WHERE profile_id=%s AND active=1 ORDER BY name", (pid,)).fetchall()
     result = []
     for r in rows:
         item = dict(r)
@@ -2112,7 +2112,7 @@ def add_asset():
     life = int(d.get("useful_life_years", defaults["life"]))
     db = get_db()
     cur = db.execute(
-        "INSERT INTO assets (user_id,profile_id,name,asset_type,plate_no,serial_no,purchase_date,purchase_price,useful_life_years,depreciation_method,depreciation_rate,maintenance_date,insurance_date,insurance_company,notes,active,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)",
+        "INSERT INTO assets (user_id,profile_id,name,asset_type,plate_no,serial_no,purchase_date,purchase_price,useful_life_years,depreciation_method,depreciation_rate,maintenance_date,insurance_date,insurance_company,notes,active,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1,%s)",
         (uid, pid, name, atype, d.get("plate_no",""), d.get("serial_no",""),
          d.get("purchase_date", date.today().isoformat()), float(d.get("purchase_price",0)),
          life, d.get("depreciation_method","normal"), rate,
@@ -2136,7 +2136,7 @@ def update_asset(aid):
             params.append(float(d[col]) if col in ("purchase_price","depreciation_rate") else d[col])
     if not fields: return jsonify({"ok":False}), 400
     params += [aid, pid]
-    db.execute(f"UPDATE assets SET {','.join(fields)} WHERE id=? AND profile_id=?", params)
+    db.execute(f"UPDATE assets SET {','.join(fields)} WHERE id=%s AND profile_id=%s", params)
     db.commit()
     return jsonify({"ok":True})
 
@@ -2144,7 +2144,7 @@ def update_asset(aid):
 @premium_required
 def del_asset(aid):
     pid = get_pid(); db = get_db()
-    db.execute("UPDATE assets SET active=0 WHERE id=? AND profile_id=?", (aid, pid))
+    db.execute("UPDATE assets SET active=0 WHERE id=%s AND profile_id=%s", (aid, pid))
     db.commit()
     return jsonify({"ok":True})
 
@@ -2153,7 +2153,7 @@ def del_asset(aid):
 def list_asset_maintenance(aid):
     pid = get_pid(); db = get_db()
     rows = db.execute(
-        "SELECT * FROM asset_maintenance WHERE profile_id=? AND asset_id=? ORDER BY date DESC",
+        "SELECT * FROM asset_maintenance WHERE profile_id=%s AND asset_id=%s ORDER BY date DESC",
         (pid, aid)
     ).fetchall()
     return jsonify([dict(r) for r in rows])
@@ -2166,14 +2166,14 @@ def add_asset_maintenance(aid):
     dt = d.get("date", date.today().isoformat())
     db = get_db()
     cur = db.execute(
-        "INSERT INTO asset_maintenance (user_id,profile_id,asset_id,date,mtype,description,cost,odometer,next_date,notes,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO asset_maintenance (user_id,profile_id,asset_id,date,mtype,description,cost,odometer,next_date,notes,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (uid, pid, aid, dt, d.get("mtype","bakim"), d.get("description",""),
          float(d.get("cost",0)), float(d.get("odometer",0)),
          d.get("next_date",""), d.get("notes",""), datetime.now().isoformat())
     )
     db.commit()
     # Update asset maintenance_date
-    db.execute("UPDATE assets SET maintenance_date=? WHERE id=? AND profile_id=?",
+    db.execute("UPDATE assets SET maintenance_date=%s WHERE id=%s AND profile_id=%s",
                (d.get("next_date",""), aid, pid))
     db.commit()
     return jsonify({"ok":True,"id":cur.lastrowid})
@@ -2182,7 +2182,7 @@ def add_asset_maintenance(aid):
 @premium_required
 def del_asset_maintenance(mid):
     pid = get_pid(); db = get_db()
-    db.execute("DELETE FROM asset_maintenance WHERE id=? AND profile_id=?", (mid, pid))
+    db.execute("DELETE FROM asset_maintenance WHERE id=%s AND profile_id=%s", (mid, pid))
     db.commit()
     return jsonify({"ok":True})
 
@@ -2192,18 +2192,18 @@ def del_asset_maintenance(mid):
 @login_required
 def card_daily_report():
     pid = get_pid(); db = get_db()
-    cards = db.execute("SELECT * FROM cards WHERE profile_id=? ORDER BY bank_name", (pid,)).fetchall()
+    cards = db.execute("SELECT * FROM cards WHERE profile_id=%s ORDER BY bank_name", (pid,)).fetchall()
     today_str = date.today().isoformat()
     yesterday_str = (date.today() - __import__("datetime").timedelta(days=1)).isoformat()
     result = []
     for c in cards:
         cid = c["id"]
         today_row = db.execute(
-            "SELECT balance FROM card_daily_balance WHERE profile_id=? AND card_id=? AND date=?",
+            "SELECT balance FROM card_daily_balance WHERE profile_id=%s AND card_id=%s AND date=%s",
             (pid, cid, today_str)
         ).fetchone()
         yest_row = db.execute(
-            "SELECT balance FROM card_daily_balance WHERE profile_id=? AND card_id=? AND date=?",
+            "SELECT balance FROM card_daily_balance WHERE profile_id=%s AND card_id=%s AND date=%s",
             (pid, cid, yesterday_str)
         ).fetchone()
         today_bal = float(today_row["balance"]) if today_row else None
@@ -2233,15 +2233,15 @@ def save_card_daily_balance():
     db = get_db()
     # Upsert
     existing = db.execute(
-        "SELECT id FROM card_daily_balance WHERE profile_id=? AND card_id=? AND date=?",
+        "SELECT id FROM card_daily_balance WHERE profile_id=%s AND card_id=%s AND date=%s",
         (pid, cid, dt)
     ).fetchone()
     if existing:
-        db.execute("UPDATE card_daily_balance SET balance=?,notes=? WHERE id=?",
+        db.execute("UPDATE card_daily_balance SET balance=%s,notes=%s WHERE id=%s",
                    (bal, d.get("notes",""), existing["id"]))
     else:
         db.execute(
-            "INSERT INTO card_daily_balance (user_id,profile_id,card_id,date,balance,notes,created_at) VALUES (?,?,?,?,?,?,?)",
+            "INSERT INTO card_daily_balance (user_id,profile_id,card_id,date,balance,notes,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s)",
             (uid, pid, cid, dt, bal, d.get("notes",""), datetime.now().isoformat())
         )
     db.commit()
@@ -3242,7 +3242,7 @@ def add_account():
         return jsonify({"ok":False,"error":"Banka ve ürün adı gerekli"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO accounts (user_id,profile_id,name,bank,type,initial_balance,limit_,color,owner,active,created_at) VALUES (?,?,?,?,?,?,?,?,?,1,?)",
+        "INSERT INTO accounts (user_id,profile_id,name,bank,type,initial_balance,limit_,color,owner,active,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,1,%s)",
         (uid, pid, name, bank, atype, initial, limit_, color, owner, datetime.now().isoformat())
     )
     db.commit()
@@ -3264,7 +3264,7 @@ def update_account(aid):
         fields.append("active=?"); params.append(int(d["active"]))
     if not fields: return jsonify({"ok":False}), 400
     params += [aid, pid]
-    get_db().execute(f"UPDATE accounts SET {','.join(fields)} WHERE id=? AND profile_id=?", params)
+    get_db().execute(f"UPDATE accounts SET {','.join(fields)} WHERE id=%s AND profile_id=%s", params)
     get_db().commit()
     return jsonify({"ok":True})
 
@@ -3272,7 +3272,7 @@ def update_account(aid):
 @login_required
 def delete_account(aid):
     pid = get_pid()
-    get_db().execute("DELETE FROM accounts WHERE id=? AND profile_id=?", (aid, pid))
+    get_db().execute("DELETE FROM accounts WHERE id=%s AND profile_id=%s", (aid, pid))
     get_db().commit()
     return jsonify({"ok":True})
 
@@ -3355,7 +3355,7 @@ def export_excel():
         ws.row_dimensions[row].height = 24
 
     # ── Veri çekme ───────────────────────────────────────────────────────────
-    profile_row  = db.execute("SELECT name FROM profiles WHERE id=?", (pid,)).fetchone()
+    profile_row  = db.execute("SELECT name FROM profiles WHERE id=%s", (pid,)).fetchone()
     profile_name = profile_row["name"] if profile_row else ""
 
     # Ödeme yöntemi bilgisiyle birlikte işlemler
@@ -3398,7 +3398,7 @@ def export_excel():
 
     sorted_months = sorted(active_months)
     assets = db.execute(
-        "SELECT * FROM assets WHERE profile_id=? AND active=1 ORDER BY name", (pid,)
+        "SELECT * FROM assets WHERE profile_id=%s AND active=1 ORDER BY name", (pid,)
     ).fetchall()
 
     wb = Workbook()
@@ -3677,7 +3677,7 @@ def export_excel():
     ws_sup.row_dimensions[2].height = 22
 
     for i, row in enumerate(db.execute(
-        "SELECT * FROM supplier_invoices WHERE profile_id=? ORDER BY due_date", (pid,)
+        "SELECT * FROM supplier_invoices WHERE profile_id=%s ORDER BY due_date", (pid,)
     ).fetchall()):
         dr = 3 + i
         try:
@@ -3783,9 +3783,9 @@ def export_excel():
     ws0 = wb.active
     ws0.title = "Hesap Hareketleri"
     txs = db.execute(
-        "SELECT * FROM transactions WHERE profile_id=? ORDER BY date DESC, id DESC", (pid,)
+        "SELECT * FROM transactions WHERE profile_id=%s ORDER BY date DESC, id DESC", (pid,)
     ).fetchall()
-    profile_row = db.execute("SELECT name FROM profiles WHERE id=?", (pid,)).fetchone()
+    profile_row = db.execute("SELECT name FROM profiles WHERE id=%s", (pid,)).fetchone()
     profile_name = profile_row["name"] if profile_row else ""
 
     ws0.merge_cells("A1:F1")
@@ -3907,7 +3907,7 @@ def export_excel():
     write_col_headers(ws1, data_row, cols, [22,14,14,10,14,14,12,20])
     data_row += 1
     invoices = db.execute(
-        "SELECT * FROM supplier_invoices WHERE profile_id=? ORDER BY due_date", (pid,)
+        "SELECT * FROM supplier_invoices WHERE profile_id=%s ORDER BY due_date", (pid,)
     ).fetchall()
     for ri, row in enumerate(invoices):
         vals = [row["supplier_name"], row["invoice_no"], float(row["amount"]),
@@ -3939,7 +3939,7 @@ def export_excel():
     aging_data = {"0-30 Gün (Güncel)":[],"31-60 Gün":[],"61-90 Gün":[],"90+ Gün (Kritik)":[]}
     aging_totals = {k:0.0 for k in aging_data}
     pending = db.execute(
-        "SELECT * FROM supplier_invoices WHERE profile_id=? AND status='bekliyor' ORDER BY due_date",
+        "SELECT * FROM supplier_invoices WHERE profile_id=%s AND status='bekliyor' ORDER BY due_date",
         (pid,)
     ).fetchall()
     for row in pending:
@@ -3996,7 +3996,7 @@ def export_excel():
     write_col_headers(ws3, data_row, cols3, [22,14,14,14,14,14,14])
     data_row += 1
     paid_inv = db.execute(
-        "SELECT * FROM supplier_invoices WHERE profile_id=? AND status='odendi' AND paid_date!=''",
+        "SELECT * FROM supplier_invoices WHERE profile_id=%s AND status='odendi' AND paid_date!=''",
         (pid,)
     ).fetchall()
     total_gain = 0.0
@@ -4042,7 +4042,7 @@ def export_excel():
     cols4 = ["Varlık Adı","Tür","Alış Tarihi","Alış Bedeli","Oran %","Yıllık Amortisman","Birikmiş","Defter Değeri"]
     write_col_headers(ws4, data_row, cols4, [22,14,14,14,10,16,14,14])
     data_row += 1
-    assets = db.execute("SELECT * FROM assets WHERE profile_id=? AND active=1 ORDER BY name", (pid,)).fetchall()
+    assets = db.execute("SELECT * FROM assets WHERE profile_id=%s AND active=1 ORDER BY name", (pid,)).fetchall()
     for ri, row in enumerate(assets):
         dep = calc_depreciation(float(row["purchase_price"]), row["purchase_date"],
                                 float(row["depreciation_rate"]))
@@ -4130,7 +4130,7 @@ def export_pdf():
 
     # Kullanıcı rapor ayarları (logo, firma adı, iletişim)
     uid = session["user_id"]
-    urow = db.execute("SELECT report_name,report_contact,report_logo FROM users WHERE id=?", (uid,)).fetchone()
+    urow = db.execute("SELECT report_name,report_contact,report_logo FROM users WHERE id=%s", (uid,)).fetchone()
     report_name    = (urow["report_name"]    if urow else "") or ""
     report_contact = (urow["report_contact"] if urow else "") or ""
     report_logo    = (urow["report_logo"]    if urow else "") or ""
@@ -4152,7 +4152,7 @@ def export_pdf():
         start, end = month_range(year, month)
         period_label = f"{MONTHS_TR[month]} {year}"
 
-    profile = db.execute("SELECT name FROM profiles WHERE id=?", (pid,)).fetchone()
+    profile = db.execute("SELECT name FROM profiles WHERE id=%s", (pid,)).fetchone()
     prof_name = profile["name"] if profile else ""
 
     txns = db.execute(
@@ -4372,7 +4372,7 @@ def goals_analysis():
         _, last = mr(y, m)
         s = f"{y:04d}-{m:02d}-01"; e = f"{y:04d}-{m:02d}-{last:02d}"
         rows = db.execute(
-            "SELECT type,SUM(amount) as t FROM transactions WHERE profile_id=? AND date BETWEEN ? AND ? GROUP BY type",
+            "SELECT type,SUM(amount) as t FROM transactions WHERE profile_id=%s AND date BETWEEN %s AND %s GROUP BY type",
             (pid, s, e)
         ).fetchall()
         gelir = next((float(r["t"]) for r in rows if r["type"]=="gelir"), 0)
@@ -4388,13 +4388,13 @@ def goals_analysis():
     m_start = today_d.replace(day=1).isoformat()
     m_end   = today_d.replace(day=last).isoformat()
     cat_rows = db.execute(
-        "SELECT category,SUM(amount) as t FROM transactions WHERE profile_id=? AND type='gider' AND date BETWEEN ? AND ? GROUP BY category ORDER BY t DESC",
+        "SELECT category,SUM(amount) as t FROM transactions WHERE profile_id=%s AND type='gider' AND date BETWEEN %s AND %s GROUP BY category ORDER BY t DESC",
         (pid, m_start, m_end)
     ).fetchall()
     cat_spend = {r["category"]: float(r["t"]) for r in cat_rows}
 
     # Goals
-    goals = db.execute("SELECT * FROM goals WHERE profile_id=?", (pid,)).fetchall()
+    goals = db.execute("SELECT * FROM goals WHERE profile_id=%s", (pid,)).fetchall()
     total_monthly_goals = sum(float(g["monthly_target"]) for g in goals)
     leftover = avg_net - total_monthly_goals
 
@@ -4489,7 +4489,7 @@ def api_init():
     """Tek çağrıyla tüm başlangıç verilerini döndür — yükleme süresini azaltır."""
     uid = session.get("user_id"); pid = get_pid()
     db  = get_db()
-    row = db.execute("SELECT display_name,username,email,avatar,phone FROM users WHERE id=?", (uid,)).fetchone()
+    row = db.execute("SELECT display_name,username,email,avatar,phone FROM users WHERE id=%s", (uid,)).fetchone()
     sub = get_sub_status(uid)
     user_info = {
         "username":     session.get("username"),
@@ -4503,11 +4503,11 @@ def api_init():
         "subscription": sub,
     }
     profiles = [row_to_dict(r) for r in db.execute(
-        "SELECT * FROM profiles WHERE user_id=? ORDER BY id", (uid,)).fetchall()]
+        "SELECT * FROM profiles WHERE user_id=%s ORDER BY id", (uid,)).fetchall()]
     accounts = [row_to_dict(r) for r in db.execute(
-        "SELECT id,name,bank,type,color,initial_balance FROM accounts WHERE profile_id=? AND active=1 ORDER BY name", (pid,)).fetchall()]
+        "SELECT id,name,bank,type,color,initial_balance FROM accounts WHERE profile_id=%s AND active=1 ORDER BY name", (pid,)).fetchall()]
     cards_raw = db.execute(
-        "SELECT id,bank_name,card_name,card_type,used_,limit_,due_day FROM cards WHERE profile_id=? ORDER BY bank_name", (pid,)).fetchall()
+        "SELECT id,bank_name,card_name,card_type,used_,limit_,due_day FROM cards WHERE profile_id=%s ORDER BY bank_name", (pid,)).fetchall()
     cards = [row_to_dict(r) for r in cards_raw]
     # Kart hatırlatıcıları
     today_d = date.today(); year, month = today_d.year, today_d.month
@@ -4526,7 +4526,7 @@ def api_init():
                 "due_date": due_date,
                 "days_until": days_until,
             })
-    tx_count = db.execute("SELECT COUNT(*) as n FROM transactions WHERE profile_id=?", (pid,)).fetchone()["n"]
+    tx_count = db.execute("SELECT COUNT(*) as n FROM transactions WHERE profile_id=%s", (pid,)).fetchone()["n"]
     return jsonify({
         "user":           user_info,
         "profiles":       profiles,
@@ -4548,7 +4548,7 @@ def reminders():
 
     # Yaklaşan tekrar eden işlemler (bu ay henüz girilmemiş, önümüzdeki 7 gün içinde)
     recurrings = db.execute(
-        "SELECT * FROM recurring WHERE profile_id=? AND active=1 ORDER BY day_of_month",
+        "SELECT * FROM recurring WHERE profile_id=%s AND active=1 ORDER BY day_of_month",
         (pid,)
     ).fetchall()
 
@@ -4559,7 +4559,7 @@ def reminders():
         days_until = (date.fromisoformat(due_date) - today_d).days
         if -2 <= days_until <= 7:
             already = db.execute(
-                "SELECT id FROM transactions WHERE profile_id=? AND description=? AND date=?",
+                "SELECT id FROM transactions WHERE profile_id=%s AND description=%s AND date=%s",
                 (pid, r["description"], due_date)
             ).fetchone()
             if not already:
@@ -4575,7 +4575,7 @@ def reminders():
 
     # Yaklaşan kart ödeme günleri
     cards = db.execute(
-        "SELECT card_name, bank_name, due_day, used_ FROM cards WHERE profile_id=? AND used_>0",
+        "SELECT card_name, bank_name, due_day, used_ FROM cards WHERE profile_id=%s AND used_>0",
         (pid,)
     ).fetchall()
     card_reminders = []
@@ -4592,7 +4592,7 @@ def reminders():
             })
 
     # Onboarding kontrolü
-    tx_count = db.execute("SELECT COUNT(*) as n FROM transactions WHERE profile_id=?", (pid,)).fetchone()["n"]
+    tx_count = db.execute("SELECT COUNT(*) as n FROM transactions WHERE profile_id=%s", (pid,)).fetchone()["n"]
     show_onboarding = tx_count == 0
 
     return jsonify({
@@ -4670,7 +4670,7 @@ def insights():
 
     # Kredi kartı toplam borcu (KMH kullanılan)
     card_debt = float(db.execute(
-        "SELECT COALESCE(SUM(used_),0) as d FROM cards WHERE profile_id=?", (pid,)
+        "SELECT COALESCE(SUM(used_),0) as d FROM cards WHERE profile_id=%s", (pid,)
     ).fetchone()["d"] or 0)
 
     # Banka hesapları toplam bakiyesi:
@@ -4713,12 +4713,12 @@ def insights():
 
     # Yatırım değeri (maliyet bazlı — piyasa değeri için ayrı API)
     invest_val = float(db.execute(
-        "SELECT COALESCE(SUM(quantity * buy_price),0) as v FROM investments WHERE profile_id=?", (pid,)
+        "SELECT COALESCE(SUM(quantity * buy_price),0) as v FROM investments WHERE profile_id=%s", (pid,)
     ).fetchone()["v"] or 0)
 
     # Kıymet değeri
     asset_val = float(db.execute(
-        "SELECT COALESCE(SUM(purchase_price),0) as v FROM assets WHERE profile_id=? AND active=1", (pid,)
+        "SELECT COALESCE(SUM(purchase_price),0) as v FROM assets WHERE profile_id=%s AND active=1", (pid,)
     ).fetchone()["v"] or 0)
 
     # Net Varlık = likit varlıklar + yatırımlar + kıymetler
@@ -4755,7 +4755,7 @@ def today_summary():
 
     # All today's transactions
     rows = db.execute(
-        "SELECT * FROM transactions WHERE profile_id=? AND date=? ORDER BY id DESC",
+        "SELECT * FROM transactions WHERE profile_id=%s AND date=%s ORDER BY id DESC",
         (pid, today_str)
     ).fetchall()
 
@@ -4770,7 +4770,7 @@ def today_summary():
     # Supplier invoices due today → expected income entries
     try:
         due_invs = db.execute(
-            "SELECT * FROM supplier_invoices WHERE profile_id=? AND due_date=? AND status='bekliyor'",
+            "SELECT * FROM supplier_invoices WHERE profile_id=%s AND due_date=%s AND status='bekliyor'",
             (pid, today_str)
         ).fetchall()
         for inv in due_invs:
@@ -4789,7 +4789,7 @@ def today_summary():
     today_gider = sum(x["amount"] for x in gider_list)
 
     # Credit cards
-    cards = db.execute("SELECT * FROM cards WHERE profile_id=? ORDER BY bank_name", (pid,)).fetchall()
+    cards = db.execute("SELECT * FROM cards WHERE profile_id=%s ORDER BY bank_name", (pid,)).fetchall()
     card_list = []
     total_avail_sum = 0   # Toplam: sadece pozitif avail'lar toplanır
     total_limit_sum = 0
@@ -4858,7 +4858,7 @@ def today_summary():
     today_dt = date.fromisoformat(today_str)
     recurring_gelir_today = False
     recs = db.execute(
-        "SELECT * FROM recurring WHERE profile_id=? AND active=1 AND type='gelir'", (pid,)
+        "SELECT * FROM recurring WHERE profile_id=%s AND active=1 AND type='gelir'", (pid,)
     ).fetchall()
     for r in recs:
         if r["day_of_month"] == today_dt.day:
@@ -5204,7 +5204,7 @@ def motivation():
     year, month = today.year, today.month
     start, end  = month_range(year, month)
     pid = get_pid()
-    rows = db.execute("SELECT type,SUM(amount) as t FROM transactions WHERE profile_id=? AND date BETWEEN ? AND ? GROUP BY type",(pid,start,end)).fetchall()
+    rows = db.execute("SELECT type,SUM(amount) as t FROM transactions WHERE profile_id=%s AND date BETWEEN %s AND %s GROUP BY type",(pid,start,end)).fetchall()
     gelir  = next((r["t"] for r in rows if r["type"]=="gelir"),0) or 0
     gider  = next((r["t"] for r in rows if r["type"]=="gider"),0) or 0
     net    = gelir - gider
@@ -5213,9 +5213,9 @@ def motivation():
     days_passed = today.day; days_left = days_in_month - days_passed
     daily_spend = gider / max(days_passed,1)
     projected   = daily_spend * days_in_month
-    bal = (db.execute("SELECT SUM(CASE WHEN type='gelir' THEN amount ELSE -amount END) as b FROM transactions WHERE profile_id=?",(pid,)).fetchone()["b"] or 0)
-    budgets = {r["category"]:r["limit_"] for r in db.execute("SELECT * FROM budgets WHERE profile_id=?",(pid,)).fetchall()}
-    top = db.execute("SELECT category,SUM(amount) as t FROM transactions WHERE profile_id=? AND date BETWEEN ? AND ? AND type='gider' GROUP BY category ORDER BY t DESC LIMIT 1",(pid,start,end)).fetchall()
+    bal = (db.execute("SELECT SUM(CASE WHEN type='gelir' THEN amount ELSE -amount END) as b FROM transactions WHERE profile_id=%s",(pid,)).fetchone()["b"] or 0)
+    budgets = {r["category"]:r["limit_"] for r in db.execute("SELECT * FROM budgets WHERE profile_id=%s",(pid,)).fetchall()}
+    top = db.execute("SELECT category,SUM(amount) as t FROM transactions WHERE profile_id=%s AND date BETWEEN %s AND %s AND type='gider' GROUP BY category ORDER BY t DESC LIMIT 1",(pid,start,end)).fetchall()
     top_cat = top[0]["category"] if top else None; top_amt = top[0]["t"] if top else 0
     msgs=[]; score=0
     if gelir==0:
@@ -5233,7 +5233,7 @@ def motivation():
     if budgets:
         over=[]
         for cat,lim in budgets.items():
-            sp=(db.execute("SELECT SUM(amount) as t FROM transactions WHERE profile_id=? AND date BETWEEN ? AND ? AND type='gider' AND category=?",(pid,start,end,cat)).fetchone()["t"] or 0)
+            sp=(db.execute("SELECT SUM(amount) as t FROM transactions WHERE profile_id=%s AND date BETWEEN %s AND %s AND type='gider' AND category=%s",(pid,start,end,cat)).fetchone()["t"] or 0)
             if sp>lim: over.append((cat,sp-lim))
         if not over: score+=20; msgs.append({"icon":"🎯","text":"Tüm bütçe hedeflerini tutturuyorsun. Süper disiplin!"})
         else:
@@ -5372,7 +5372,7 @@ def import_preview():
 @login_required
 def list_cards():
     pid = get_pid()
-    return jsonify([row_to_dict(r) for r in get_db().execute("SELECT * FROM cards WHERE profile_id=? ORDER BY bank_name",(pid,)).fetchall()])
+    return jsonify([row_to_dict(r) for r in get_db().execute("SELECT * FROM cards WHERE profile_id=%s ORDER BY bank_name",(pid,)).fetchall()])
 
 @app.route("/api/cards", methods=["POST"])
 @login_required
@@ -5390,7 +5390,7 @@ def add_card():
     # Yemek kartlarının limiti olabilir (0 da geçerli)
     if card_type not in ("yemek","hediye") and limit <= 0: return jsonify({"ok":False}), 400
     db = get_db()
-    cur = db.execute("INSERT INTO cards (user_id,profile_id,bank_name,card_name,owner,limit_,used_,due_day,min_pct,statement_day,card_type,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+    cur = db.execute("INSERT INTO cards (user_id,profile_id,bank_name,card_name,owner,limit_,used_,due_day,min_pct,statement_day,card_type,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                      (uid,pid,bank,card,owner,limit,used,due_day,min_pct,stmt_day,card_type,datetime.now().isoformat()))
     db.commit(); return jsonify({"ok":True,"id":cur.lastrowid})
 
@@ -5405,14 +5405,14 @@ def update_card(cid):
             params.append(float(d[col]) if col in ("limit_","used_","min_pct") else int(d[col]) if col in ("due_day","statement_day") else d[col])
     if not fields: return jsonify({"ok":False}),400
     params += [cid, pid]
-    get_db().execute(f"UPDATE cards SET {','.join(fields)} WHERE id=? AND profile_id=?",params); get_db().commit()
+    get_db().execute(f"UPDATE cards SET {','.join(fields)} WHERE id=%s AND profile_id=%s",params); get_db().commit()
     return jsonify({"ok":True})
 
 @app.route("/api/cards/<int:cid>", methods=["DELETE"])
 @login_required
 def del_card(cid):
     pid = get_pid()
-    get_db().execute("DELETE FROM cards WHERE id=? AND profile_id=?",(cid,pid)); get_db().commit()
+    get_db().execute("DELETE FROM cards WHERE id=%s AND profile_id=%s",(cid,pid)); get_db().commit()
     return jsonify({"ok":True})
 
 @app.route("/api/cards/<int:cid>/pay", methods=["POST"])
@@ -5421,7 +5421,7 @@ def pay_card(cid):
     """Kredi kartı ödemesi: gider işlemi oluştur + kart borcunu düş."""
     uid = session["user_id"]; pid = get_pid()
     db  = get_db()
-    card = db.execute("SELECT * FROM cards WHERE id=? AND profile_id=?", (cid, pid)).fetchone()
+    card = db.execute("SELECT * FROM cards WHERE id=%s AND profile_id=%s", (cid, pid)).fetchone()
     if not card:
         return jsonify({"ok": False, "error": "Kart bulunamadı"}), 404
     d = request.get_json(force=True)
@@ -5436,12 +5436,12 @@ def pay_card(cid):
     desc = d.get("description") or f"{card['bank_name']} {card.get('card_name') or ''} ödemesi".strip()
     # Ödeme işlemini kaydet — vadesiz hesap ve kartla ilişkilendir
     db.execute(
-        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,card_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,card_id,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (uid, pid, "gider", amount, cat, desc, date.today().isoformat(), account_id, cid, datetime.now().isoformat())
     )
     # Kart borcunu düş (transaction insert'teki card_id zaten etkisini yapıyor — burada manuel düzeltiriz)
     new_debt = max(0, current_debt - amount)
-    db.execute("UPDATE cards SET used_=? WHERE id=?", (new_debt, cid))
+    db.execute("UPDATE cards SET used_=%s WHERE id=%s", (new_debt, cid))
     db.commit()
     return jsonify({"ok": True, "paid": amount, "new_debt": new_debt,
                     "limit": float(card["limit_"] or 0),
@@ -5464,16 +5464,16 @@ def create_transfer():
     if int(from_id) == int(to_id):
         return jsonify({"ok": False, "error": "Kaynak ve hedef hesap aynı olamaz"}), 400
     db = get_db()
-    ok1 = db.execute("SELECT id FROM accounts WHERE id=? AND profile_id=?", (from_id, pid)).fetchone()
-    ok2 = db.execute("SELECT id FROM accounts WHERE id=? AND profile_id=?", (to_id, pid)).fetchone()
+    ok1 = db.execute("SELECT id FROM accounts WHERE id=%s AND profile_id=%s", (from_id, pid)).fetchone()
+    ok2 = db.execute("SELECT id FROM accounts WHERE id=%s AND profile_id=%s", (to_id, pid)).fetchone()
     if not ok1 or not ok2:
         return jsonify({"ok": False, "error": "Hesap bulunamadı"}), 404
     now = datetime.now().isoformat()
     db.execute(
-        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (uid, pid, "gider", amount, "Hesaplar Arası Transfer", desc, dt, from_id, now))
     db.execute(
-        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (uid, pid, "gelir", amount, "Hesaplar Arası Transfer", desc, dt, to_id, now))
     db.commit()
     return jsonify({"ok": True})
@@ -5529,7 +5529,7 @@ def api_rates():
 @premium_required
 def list_investments():
     pid = get_pid()
-    rows = get_db().execute("SELECT * FROM investments WHERE profile_id=? ORDER BY buy_date DESC",(pid,)).fetchall()
+    rows = get_db().execute("SELECT * FROM investments WHERE profile_id=%s ORDER BY buy_date DESC",(pid,)).fetchall()
     return jsonify([row_to_dict(r) for r in rows])
 
 @app.route("/api/investments", methods=["POST"])
@@ -5549,7 +5549,7 @@ def add_investment():
         return jsonify({"ok": False, "error": "Geçersiz veri"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO investments (user_id,profile_id,name,itype,symbol,quantity,buy_price,buy_date,note,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO investments (user_id,profile_id,name,itype,symbol,quantity,buy_price,buy_date,note,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (uid, pid, name, itype, symbol, quantity, buy_price, buy_date, note, datetime.now().isoformat()))
     # Nakit çıkışını transaction olarak da kaydet (rapor için)
     _icat = {"doviz":"Döviz Alımı","altin":"Altın Alımı","fon":"Yatırım Fonu","hisse":"Hisse Senedi"}
@@ -5557,7 +5557,7 @@ def add_investment():
     desc = name + (f" ({symbol})" if symbol else "") + (f" — {note}" if note else "")
     total_cost = round(quantity * buy_price, 2)
     db.execute(
-        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (uid, pid, "gider", total_cost, cat, desc, buy_date, account_id, datetime.now().isoformat()))
     db.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
@@ -5566,7 +5566,7 @@ def add_investment():
 @premium_required
 def del_investment(iid):
     pid = get_pid()
-    get_db().execute("DELETE FROM investments WHERE id=? AND profile_id=?", (iid,pid)); get_db().commit()
+    get_db().execute("DELETE FROM investments WHERE id=%s AND profile_id=%s", (iid,pid)); get_db().commit()
     return jsonify({"ok": True})
 
 @app.route("/api/investments/<int:iid>/sell", methods=["POST"])
@@ -5580,7 +5580,7 @@ def sell_investment(iid):
     if sell_price <= 0:
         return jsonify({"ok": False, "error": "Satış fiyatı geçersiz"}), 400
     db = get_db()
-    inv = db.execute("SELECT * FROM investments WHERE id=? AND profile_id=?", (iid, pid)).fetchone()
+    inv = db.execute("SELECT * FROM investments WHERE id=%s AND profile_id=%s", (iid, pid)).fetchone()
     if not inv:
         return jsonify({"ok": False, "error": "Yatırım bulunamadı"}), 404
     proceeds = round(inv["quantity"] * sell_price, 2)
@@ -5589,9 +5589,9 @@ def sell_investment(iid):
     _icat = {"doviz":"Döviz Alımı","altin":"Altın Alımı","fon":"Yatırım Fonu","hisse":"Hisse Senedi"}
     desc = f"{inv['name']} satışı" + (f" (K/Z: ₺{profit:+,.2f})" if profit else "")
     db.execute(
-        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,account_id,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
         (uid, pid, "gelir", proceeds, "Yatırım Geliri / Satış", desc, sell_date, account_id, datetime.now().isoformat()))
-    db.execute("DELETE FROM investments WHERE id=? AND profile_id=?", (iid, pid))
+    db.execute("DELETE FROM investments WHERE id=%s AND profile_id=%s", (iid, pid))
     db.commit()
     return jsonify({"ok": True, "proceeds": proceeds, "profit": profit})
 
@@ -5599,7 +5599,7 @@ def sell_investment(iid):
 @premium_required
 def investment_values():
     pid   = get_pid()
-    rows  = get_db().execute("SELECT * FROM investments WHERE profile_id=?",(pid,)).fetchall()
+    rows  = get_db().execute("SELECT * FROM investments WHERE profile_id=%s",(pid,)).fetchall()
     rates = get_rates()
     result = []
     for row in rows:
@@ -5654,7 +5654,7 @@ def book_investment_income(iid):
     db = get_db()
     uid = session["user_id"]; pid = get_pid()
     cur = db.execute(
-        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?,?)",
+        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
         (uid, pid, "gelir", amount, cat, desc, dt, datetime.now().isoformat()))
     db.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
@@ -5694,7 +5694,7 @@ def tefas_fon(fon_kod):
 @login_required
 def list_recurring():
     pid = get_pid()
-    rows = get_db().execute("SELECT * FROM recurring WHERE profile_id=? ORDER BY type DESC, day_of_month",(pid,)).fetchall()
+    rows = get_db().execute("SELECT * FROM recurring WHERE profile_id=%s ORDER BY type DESC, day_of_month",(pid,)).fetchall()
     return jsonify([row_to_dict(r) for r in rows])
 
 @app.route("/api/recurring", methods=["POST"])
@@ -5716,7 +5716,7 @@ def add_recurring():
         return jsonify({"ok": False, "error": "Geçersiz veri"}), 400
     db = get_db()
     cur = db.execute(
-        "INSERT INTO recurring (user_id,profile_id,type,amount,category,description,day_of_month,days_of_month,active,created_at) VALUES (?,?,?,?,?,?,?,?,1,?)",
+        "INSERT INTO recurring (user_id,profile_id,type,amount,category,description,day_of_month,days_of_month,active,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,1,%s)",
         (uid, pid, ttype, amount, cat, desc, day_first, days_str, datetime.now().isoformat()))
     db.commit()
     return jsonify({"ok": True, "id": cur.lastrowid})
@@ -5725,7 +5725,7 @@ def add_recurring():
 @login_required
 def del_recurring(rid):
     pid = get_pid()
-    get_db().execute("DELETE FROM recurring WHERE id=? AND profile_id=?", (rid,pid)); get_db().commit()
+    get_db().execute("DELETE FROM recurring WHERE id=%s AND profile_id=%s", (rid,pid)); get_db().commit()
     return jsonify({"ok": True})
 
 @app.route("/api/recurring/<int:rid>", methods=["PUT"])
@@ -5748,7 +5748,7 @@ def update_recurring(rid):
         fields.append("days_of_month=?"); params.append(days_str)
     if not fields: return jsonify({"ok": False}), 400
     params += [rid, pid]
-    get_db().execute(f"UPDATE recurring SET {','.join(fields)} WHERE id=? AND profile_id=?", params)
+    get_db().execute(f"UPDATE recurring SET {','.join(fields)} WHERE id=%s AND profile_id=%s", params)
     get_db().commit()
     return jsonify({"ok": True})
 
@@ -5767,7 +5767,7 @@ def apply_recurring():
     if year_end > today_y + 5: year_end = today_y + 5  # max 5 yıl ileri
 
     db        = get_db()
-    templates = db.execute("SELECT * FROM recurring WHERE profile_id=? AND active=1",(pid,)).fetchall()
+    templates = db.execute("SELECT * FROM recurring WHERE profile_id=%s AND active=1",(pid,)).fetchall()
     created   = 0; skipped = 0
 
     from calendar import monthrange as _monthrange
@@ -5783,12 +5783,12 @@ def apply_recurring():
                     day = min(d_val, last_day)
                     dt  = f"{yr:04d}-{m:02d}-{day:02d}"
                     exists = db.execute(
-                        "SELECT id FROM transactions WHERE profile_id=? AND type=? AND category=? AND description=? AND date=? AND amount=?",
+                        "SELECT id FROM transactions WHERE profile_id=%s AND type=%s AND category=%s AND description=%s AND date=%s AND amount=%s",
                         (pid, tpl["type"], tpl["category"], tpl["description"], dt, tpl["amount"])
                     ).fetchone()
                     if exists: skipped += 1; continue
                     db.execute(
-                        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?,?)",
+                        "INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
                         (uid, pid, tpl["type"], tpl["amount"], tpl["category"], tpl["description"], dt, datetime.now().isoformat()))
                     created += 1
 
@@ -5818,7 +5818,7 @@ def backup_download():
         ]
         for tbl, col in user_tables:
             try:
-                rows = db.execute(f"SELECT * FROM {tbl} WHERE {col}=?", (uid,)).fetchall()
+                rows = db.execute(f"SELECT * FROM {tbl} WHERE {col}=%s", (uid,)).fetchall()
                 if not rows: continue
                 cols = list(rows[0].keys())
                 out.write(f"-- {tbl} --\n")
@@ -5846,7 +5846,7 @@ def import_confirm():
     db=get_db(); now=datetime.now().isoformat(); count=0
     for r in rows:
         if not r.get("skip") and r.get("amount",0)>0:
-            db.execute("INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (?,?,?,?,?,?,?,?)",
+            db.execute("INSERT INTO transactions (user_id,profile_id,type,amount,category,description,date,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
                        (uid,pid,r["type"],r["amount"],r["category"],r.get("description",""),r["date"],now))
             count+=1
     db.commit(); return jsonify({"ok":True,"imported":count})
@@ -7474,11 +7474,15 @@ def payroll_pdf(rid):
     ).fetchone()
     if not row:
         return "Bordro bulunamadı", 404
-    p = row_to_dict(row)
+    p    = row_to_dict(row)
+    calc = _calc_payroll(float(p.get("gross_salary", 0)))  # doğru detaylı hesaplama
     user = db.execute("SELECT report_name, report_contact, report_logo FROM users WHERE id=%s",(uid,)).fetchone()
     company = (user["report_name"] or "Şirket Adı") if user else "Şirket Adı"
-    logo    = user["report_logo"] if user else ""
+    logo    = (user["report_logo"] or "") if user else ""
+    contact = (user["report_contact"] or "") if user else ""
     def m(v): return f"₺{float(v or 0):,.2f}".replace(",","X").replace(".",",").replace("X",".")
+    paid_str = ('✅ ÖDENDİ' + (f' · {p["paid_date"]}' if p.get("paid_date") else '')) if p.get("paid") else '⏳ ÖDEME BEKLİYOR'
+    paid_color = '#166534' if p.get('paid') else '#dc2626'
     html = f"""<!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -7486,79 +7490,82 @@ def payroll_pdf(rid):
 <title>Bordro — {p['employee_name']} — {p['period']}</title>
 <style>
   *{{box-sizing:border-box;margin:0;padding:0}}
-  body{{font-family:'Segoe UI',sans-serif;background:#fff;color:#111;font-size:13px;padding:24px}}
-  .header{{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #10069F;padding-bottom:14px;margin-bottom:20px}}
-  .company{{font-size:18px;font-weight:800;color:#10069F}}
-  .badge{{background:#10069F;color:#d5fd73;font-size:10px;font-weight:700;padding:3px 8px;border-radius:5px;margin-top:4px;display:inline-block}}
-  h2{{font-size:15px;font-weight:700;margin-bottom:14px;color:#10069F}}
-  table{{width:100%;border-collapse:collapse;margin-bottom:16px}}
-  th,td{{border:1px solid #e2e8f0;padding:8px 12px;text-align:left;font-size:12.5px}}
-  th{{background:#f1f5f9;font-weight:600;color:#475569}}
-  .total-row td{{font-weight:800;background:#f8fafc}}
+  body{{font-family:'Segoe UI',Arial,sans-serif;background:#fff;color:#111;font-size:13px;padding:28px}}
+  .header{{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2.5px solid #10069F;padding-bottom:16px;margin-bottom:22px}}
+  .company{{font-size:19px;font-weight:900;color:#10069F;letter-spacing:-.02em}}
+  .contact{{font-size:11px;color:#64748b;margin-top:4px}}
+  .badge{{background:#10069F;color:#d5fd73;font-size:10px;font-weight:700;padding:3px 10px;border-radius:6px;margin-top:6px;display:inline-block;letter-spacing:.05em}}
+  h2{{font-size:12.5px;font-weight:800;margin-bottom:10px;color:#10069F;text-transform:uppercase;letter-spacing:.07em}}
+  table{{width:100%;border-collapse:collapse;margin-bottom:18px}}
+  th,td{{border:1px solid #e2e8f0;padding:9px 13px;text-align:left;font-size:12.5px}}
+  th{{background:#f1f5f9;font-weight:700;color:#475569;font-size:11.5px}}
+  .num{{text-align:right}}
+  .deduct{{color:#dc2626}}
+  .sub{{color:#94a3b8;font-size:11.5px}}
+  .total-row td{{font-weight:800;background:#f8fafc;border-top:2px solid #cbd5e1}}
   .net-row td{{background:#10069F;color:#fff;font-weight:800;font-size:14px}}
-  .footer{{margin-top:28px;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px;text-align:center}}
-  .sign-row{{display:flex;justify-content:space-between;margin-top:40px;gap:20px}}
-  .sign-box{{flex:1;border-top:1px solid #94a3b8;padding-top:6px;text-align:center;font-size:11px;color:#475569}}
-  @media print{{
-    body{{padding:12px}}
-    button{{display:none!important}}
-  }}
+  .cost-row td{{background:#1e3a5f;color:#93c5fd;font-weight:800;font-size:13px}}
+  .footer{{margin-top:24px;font-size:11px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:10px;text-align:center}}
+  .sign-row{{display:flex;justify-content:space-between;margin-top:44px;gap:24px}}
+  .sign-box{{flex:1;border-top:1px solid #94a3b8;padding-top:6px;text-align:center;font-size:11px;color:#64748b}}
+  @media print{{body{{padding:14px}} .noprint{{display:none!important}}}}
 </style>
 </head>
 <body>
 <div class="header">
   <div>
-    {('<img src="'+logo+'" style="height:40px;margin-bottom:8px"><br>') if logo else ''}
+    {('<img src="'+logo+'" style="height:42px;margin-bottom:8px;display:block">') if logo else ''}
     <div class="company">{company}</div>
+    {('<div class="contact">'+contact+'</div>') if contact else ''}
     <span class="badge">BORDRO FİŞİ</span>
   </div>
   <div style="text-align:right">
-    <div style="font-weight:700">{p['employee_name']}</div>
-    <div style="color:#64748b;margin-top:2px">Dönem: {p['period']}</div>
-    <div style="color:{'#166534' if p.get('paid') else '#dc2626'};font-weight:700;margin-top:4px">
-      {'✅ ÖDENDİ · '+str(p.get('paid_date','')) if p.get('paid') else '⏳ ÖDEME BEKLİYOR'}
-    </div>
+    <div style="font-size:16px;font-weight:800;color:#0f172a">{p['employee_name']}</div>
+    <div style="color:#64748b;margin-top:3px;font-size:12px">Dönem: <b>{p['period']}</b></div>
+    <div style="color:{paid_color};font-weight:700;margin-top:5px;font-size:12px">{paid_str}</div>
   </div>
 </div>
 
-<h2>Gelir Unsurları</h2>
+<h2>Brüt Gelir</h2>
 <table>
   <tr><th>Açıklama</th><th style="text-align:right">Tutar</th></tr>
-  <tr><td>Brüt Maaş</td><td style="text-align:right;font-weight:700">{m(p['gross_salary'])}</td></tr>
+  <tr><td><b>Brüt Maaş</b></td><td class="num"><b>{m(calc['gross_salary'])}</b></td></tr>
 </table>
 
 <h2>İşçi Kesintileri</h2>
 <table>
   <tr><th>Kesinti Türü</th><th style="text-align:right">Tutar</th></tr>
-  <tr><td>SGK Primi İşçi Payı (%14)</td><td style="text-align:right;color:#dc2626">{m(float(p.get('sgk_employee',0))*0.14/0.15 if p.get('sgk_employee') else 0)}</td></tr>
-  <tr><td>İşsizlik Sigortası İşçi Payı (%1)</td><td style="text-align:right;color:#dc2626">{m(float(p.get('sgk_employee',0))*0.01/0.15 if p.get('sgk_employee') else 0)}</td></tr>
-  <tr><td>Gelir Vergisi</td><td style="text-align:right;color:#dc2626">{m(float(p.get('income_tax',0))*0.99241 if p.get('income_tax') else 0)}</td></tr>
-  <tr><td>Damga Vergisi (%0,759)</td><td style="text-align:right;color:#dc2626">{m(float(p.get('gross_salary',0))*0.00759)}</td></tr>
-  <tr class="total-row"><td><b>Toplam Kesinti</b></td><td style="text-align:right;color:#dc2626"><b>{m(float(p.get('sgk_employee',0)) + float(p.get('income_tax',0)))}</b></td></tr>
-  <tr class="net-row"><td><b>NET MAAŞ</b></td><td style="text-align:right"><b>{m(p['net_salary'])}</b></td></tr>
+  <tr><td>SGK Primi İşçi Payı <span class="sub">(%14,0)</span></td><td class="num deduct">{m(calc['sgk_employee'])}</td></tr>
+  <tr><td>İşsizlik Sigortası İşçi Payı <span class="sub">(%1,0)</span></td><td class="num deduct">{m(calc['isizlik'])}</td></tr>
+  <tr><td class="sub">= Gelir Vergisi Matrahı</td><td class="num sub">{m(calc['gelir_matrahi'])}</td></tr>
+  <tr><td>Gelir Vergisi Stopajı</td><td class="num deduct">{m(calc['gelir_vergisi'])}</td></tr>
+  <tr><td>Damga Vergisi <span class="sub">(%0,759)</span></td><td class="num deduct">{m(calc['damga_vergisi'])}</td></tr>
+  <tr class="total-row"><td><b>Toplam Kesinti</b></td><td class="num deduct"><b>{m(calc['total_employee_deductions'])}</b></td></tr>
+  <tr class="net-row"><td><b>NET MAAŞ</b></td><td class="num"><b>{m(calc['net_salary'])}</b></td></tr>
 </table>
 
 <h2>İşveren Maliyeti</h2>
 <table>
   <tr><th>Kalem</th><th style="text-align:right">Tutar</th></tr>
-  <tr><td>Brüt Maaş</td><td style="text-align:right">{m(p['gross_salary'])}</td></tr>
-  <tr><td>SGK Primi İşveren Payı (%20,5)</td><td style="text-align:right;color:#dc2626">{m(float(p.get('sgk_employer',0))*0.205/0.225 if p.get('sgk_employer') else 0)}</td></tr>
-  <tr><td>İşsizlik Sigortası İşveren Payı (%2)</td><td style="text-align:right;color:#dc2626">{m(float(p.get('sgk_employer',0))*0.02/0.225 if p.get('sgk_employer') else 0)}</td></tr>
-  <tr class="net-row"><td><b>TOPLAM İŞVEREN MALİYETİ</b></td><td style="text-align:right"><b>{m(p['total_cost'])}</b></td></tr>
+  <tr><td>Brüt Maaş</td><td class="num">{m(calc['gross_salary'])}</td></tr>
+  <tr><td>SGK Primi İşveren Payı <span class="sub">(%20,5)</span></td><td class="num deduct">{m(calc['sgk_employer'])}</td></tr>
+  <tr><td>İşsizlik Sigortası İşveren Payı <span class="sub">(%2,0)</span></td><td class="num deduct">{m(calc['isizlik_employer'])}</td></tr>
+  <tr class="cost-row"><td><b>TOPLAM İŞVEREN MALİYETİ</b></td><td class="num"><b>{m(calc['total_cost'])}</b></td></tr>
 </table>
 
-{('<div style="margin-top:8px;padding:10px;background:#fefce8;border:1px solid #fbbf24;border-radius:8px;font-size:11.5px;color:#92400e">'+p.get('notes','')+'</div>') if p.get('notes') else ''}
+{('<div style="background:#fefce8;border:1px solid #fbbf24;border-radius:8px;padding:10px 13px;font-size:11.5px;color:#92400e;margin-bottom:16px"><b>Not:</b> '+p.get('notes','')+'</div>') if p.get('notes') else ''}
 
 <div class="sign-row">
-  <div class="sign-box">İşveren / Yetkili İmza<br><br><br></div>
-  <div class="sign-box">Çalışan İmzası<br><br><br></div>
+  <div class="sign-box">İşveren / Yetkili İmzası<br><br><br>____________________</div>
+  <div class="sign-box">Çalışan İmzası<br><br><br>____________________</div>
 </div>
 
-<div class="footer">Bu bordro Kirpi Finans tarafından oluşturulmuştur · {p['period']} dönemi</div>
+<div class="footer">Kirpi Finans · {p['period']} Dönemi Bordrosu · 2025 SGK ve Vergi Parametreleri</div>
 
-<div style="text-align:center;margin-top:20px">
-  <button onclick="window.print()" style="background:#10069F;color:#d5fd73;border:none;border-radius:10px;padding:12px 28px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Yazdır / PDF İndir</button>
+<div class="noprint" style="text-align:center;margin-top:24px">
+  <button onclick="window.print()" style="background:#10069F;color:#d5fd73;border:none;border-radius:12px;padding:13px 32px;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 20px rgba(16,6,159,.3)">🖨️ Yazdır / PDF İndir</button>
 </div>
+<script>setTimeout(function(){{window.print();}},400);</script>
 </body>
 </html>"""
     return html, 200, {"Content-Type": "text/html; charset=utf-8"}
