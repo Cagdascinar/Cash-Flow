@@ -2,6 +2,7 @@ import React, { useEffect, Component } from 'react';
 import { Stack, useRouter, useSegments, useRootNavigationState } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '../stores/authStore';
 
 // ── Error Boundary ──────────────────────────────────────────────────────────
@@ -107,8 +108,10 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <ErrorBoundary>
-      <RootLayoutNav />
-    </ErrorBoundary>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ErrorBoundary>
+        <RootLayoutNav />
+      </ErrorBoundary>
+    </GestureHandlerRootView>
   );
 }
