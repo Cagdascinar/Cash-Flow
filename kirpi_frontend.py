@@ -378,12 +378,12 @@ nav.nav-collapsed .nav-top-avatar{width:38px;height:38px}
 .more-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
                z-index:9000;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
 .more-sheet{position:fixed;top:0;left:0;bottom:0;
-            background:var(--bg2);border-radius:0 24px 24px 0;
+            background:var(--brand);border-radius:0 20px 20px 0;
             z-index:9001;padding:0;
-            padding-bottom:env(safe-area-inset-bottom,16px);
-            box-shadow:6px 0 48px rgba(0,0,0,.32);
-            transform:translateX(-100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
-            width:min(82vw,300px);overflow-y:auto;
+            box-shadow:8px 0 48px rgba(0,0,0,.4);
+            transform:translateX(-100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
+            width:min(80vw,290px);overflow-y:auto;overflow-x:hidden;
+            -webkit-overflow-scrolling:touch;
             display:flex;flex-direction:column}
 .more-sheet.open{transform:translateX(0)}
 .more-backdrop.open{display:block}
@@ -455,17 +455,20 @@ nav.nav-collapsed .nav-top-avatar{width:38px;height:38px}
 .ob-num{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.25);
   display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:900;flex-shrink:0}
 
-.more-sect-label{font-size:.62rem;font-weight:800;text-transform:uppercase;
-                 letter-spacing:.12em;color:var(--txt2);padding:10px 16px 6px;opacity:.5}
-.more-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:0 12px 8px}
-.more-tile{display:flex;flex-direction:column;align-items:center;gap:7px;
-           padding:16px 8px 14px;background:var(--bg3);border-radius:18px;cursor:pointer;
-           transition:.14s;-webkit-tap-highlight-color:transparent;border:1px solid var(--border)}
-.more-tile:active{background:var(--bg4);transform:scale(.96)}
-.more-tile .mt-ico{font-size:1.7rem;line-height:1}
-.more-tile .mt-lbl{font-size:.72rem;font-weight:700;color:var(--txt);text-align:center}
-.more-tile[data-sirket]{display:none}
-.more-tile[data-sirket].sirket-visible{display:flex}
+/* Drawer liste menüsü */
+.drw-sect{font-size:.58rem;font-weight:800;text-transform:uppercase;letter-spacing:.13em;
+          color:rgba(255,255,255,.35);padding:14px 16px 4px;pointer-events:none}
+.drw-item{display:flex;align-items:center;gap:12px;padding:11px 16px;
+          cursor:pointer;color:rgba(255,255,255,.75);font-size:.88rem;font-weight:500;
+          transition:.12s;-webkit-tap-highlight-color:transparent;border-radius:10px;margin:0 6px}
+.drw-item:active{background:rgba(255,255,255,.12);color:#fff}
+.drw-item .di{font-size:1.15rem;width:24px;text-align:center;flex-shrink:0}
+.drw-item.active{background:var(--accent);color:#07091f;font-weight:700}
+.drw-divider{height:1px;background:rgba(255,255,255,.08);margin:6px 16px}
+/* Legacy tile (artık kullanılmıyor ama geriye dönük uyumluluk) */
+.more-sect-label{display:none}
+.more-grid{display:none}
+.more-tile{display:none}
 
 .nav-bottom{display:flex;align-items:center;gap:10px;padding:14px 16px;border-top:1px solid var(--border);cursor:pointer;transition:.12s}
 .nav-bottom:hover{background:var(--bg3)}
@@ -1704,115 +1707,56 @@ body{top:0!important}
     <button class="mob-drw-close" onclick="closeMoreSheet()">✕</button>
   </div>
 
-  <div class="more-sect-label">Hesap & İşlem</div>
-  <div class="more-grid">
-    <div class="more-tile" onclick="goPageFromSheet('hesaplar')">
-      <div class="mt-ico">🏦</div><div class="mt-lbl">Hesaplar</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('ledger')">
-      <div class="mt-ico">📋</div><div class="mt-lbl">İşlemler</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('scheduled')">
-      <div class="mt-ico">📅</div><div class="mt-lbl">Planlanmış</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('templates')">
-      <div class="mt-ico">📋</div><div class="mt-lbl">Şablonlar</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('recurring')">
-      <div class="mt-ico">🔁</div><div class="mt-lbl">Düzenli</div>
-    </div>
-  </div>
+  <!-- ── ANA ── -->
+  <div class="drw-sect">Ana</div>
+  <div class="drw-item" onclick="goPageFromSheet('dashboard')"><span class="di">🏠</span>Ana Sayfa</div>
+  <div class="drw-item" onclick="goPageFromSheet('ledger')"><span class="di">📋</span>İşlemler</div>
+  <div class="drw-item" onclick="goPageFromSheet('hesaplar')"><span class="di">🏦</span>Hesaplar & Kartlar</div>
+  <div class="drw-item" onclick="goPageFromSheet('invest')"><span class="di">📈</span>Yatırımlar</div>
 
-  <div class="more-sect-label">Planlama & Analiz</div>
-  <div class="more-grid">
-    <div class="more-tile" onclick="goPageFromSheet('budget')">
-      <div class="mt-ico">🎯</div><div class="mt-lbl">Bütçe & Hedefler</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('income-sources')">
-      <div class="mt-ico">💰</div><div class="mt-lbl">Para Kaynakları</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('projects')">
-      <div class="mt-ico">📁</div><div class="mt-lbl">Projeler</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('invest')">
-      <div class="mt-ico">📈</div><div class="mt-lbl">Yatırım</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('rates')">
-      <div class="mt-ico">💱</div><div class="mt-lbl">Döviz Kurları</div>
-    </div>
-  </div>
+  <div class="drw-divider"></div>
+  <!-- ── PLANLAMA ── -->
+  <div class="drw-sect">Planlama</div>
+  <div class="drw-item" onclick="goPageFromSheet('budget')"><span class="di">🎯</span>Bütçe & Hedefler</div>
+  <div class="drw-item" onclick="goPageFromSheet('recurring')"><span class="di">🔁</span>Düzenli İşlemler</div>
+  <div class="drw-item" onclick="goPageFromSheet('income-sources')"><span class="di">💰</span>Para Kaynakları</div>
+  <div class="drw-item" onclick="goPageFromSheet('scheduled')"><span class="di">📅</span>Planlanmış İşlemler</div>
+  <div class="drw-item" onclick="goPageFromSheet('projects')"><span class="di">📁</span>Projeler</div>
 
-  <div class="more-sect-label">Organizasyon</div>
-  <div class="more-grid">
-    <div class="more-tile" onclick="goPageFromSheet('categories')">
-      <div class="mt-ico">🗂️</div><div class="mt-lbl">Kategoriler</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('tags')">
-      <div class="mt-ico">🏷️</div><div class="mt-lbl">Etiketler</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('import')">
-      <div class="mt-ico">📂</div><div class="mt-lbl">İçe/Dışa Aktar</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('todos')">
-      <div class="mt-ico">✅</div><div class="mt-lbl">Görevler</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('help')">
-      <div class="mt-ico">❓</div><div class="mt-lbl">Yardım</div>
-    </div>
-    <div class="more-tile" onclick="toggleDarkMode();closeMoreSheet()">
-      <div class="mt-ico" id="dark-mode-sheet-ico">🌙</div><div class="mt-lbl" id="dark-mode-sheet-lbl">Karanlık</div>
-    </div>
-  </div>
+  <div class="drw-divider"></div>
+  <!-- ── ARAÇLAR ── -->
+  <div class="drw-sect">Araçlar</div>
+  <div class="drw-item" onclick="goPageFromSheet('rates')"><span class="di">💱</span>Döviz Kurları</div>
+  <div class="drw-item" onclick="goPageFromSheet('todos')"><span class="di">✅</span>Görevler</div>
+  <div class="drw-item" onclick="goPageFromSheet('categories')"><span class="di">🗂️</span>Kategoriler</div>
+  <div class="drw-item" onclick="goPageFromSheet('tags')"><span class="di">🏷️</span>Etiketler</div>
+  <div class="drw-item" onclick="goPageFromSheet('import')"><span class="di">📂</span>İçe / Dışa Aktar</div>
+  <div class="drw-item" onclick="goPageFromSheet('templates')"><span class="di">📄</span>İşlem Şablonları</div>
 
-  <div class="more-sect-label" data-sirket style="display:none">Firma</div>
-  <div class="more-grid" id="more-sirket-grid" style="display:none">
-    <div class="more-tile" onclick="goPageFromSheet('customers')">
-      <div class="mt-ico">🤝</div><div class="mt-lbl">Müşteri & Alacak</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('supplier')">
-      <div class="mt-ico">🏭</div><div class="mt-lbl">Tedarikçiler</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('employees')">
-      <div class="mt-ico">👷</div><div class="mt-lbl">Çalışanlar & Bordro</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('kdv')">
-      <div class="mt-ico">🧾</div><div class="mt-lbl">KDV Takibi</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('ploss')">
-      <div class="mt-ico">📉</div><div class="mt-lbl">Kar-Zarar</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('assets')">
-      <div class="mt-ico">🏗️</div><div class="mt-lbl">Sabit Kıymetler</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('cardreport')">
-      <div class="mt-ico">📊</div><div class="mt-lbl">Kart Raporu</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('loans')">
-      <div class="mt-ico">🏦</div><div class="mt-lbl">Kredi Takibi</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('checks')">
-      <div class="mt-ico">📋</div><div class="mt-lbl">Çek Takibi</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('bilanco')">
-      <div class="mt-ico">⚖️</div><div class="mt-lbl">Bilanço</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('ratios')">
-      <div class="mt-ico">📈</div><div class="mt-lbl">Fin. Oranlar</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('muhtasar')">
-      <div class="mt-ico">📑</div><div class="mt-lbl">Muhtasar</div>
-    </div>
-  </div>
+  <div class="drw-divider" id="drw-firma-div" style="display:none"></div>
+  <!-- ── FİRMA (sadece şirket profilinde) ── -->
+  <div class="drw-sect" id="drw-firma-sect" style="display:none">Firma</div>
+  <div class="drw-item" id="drw-f-customers"  onclick="goPageFromSheet('customers')"  style="display:none"><span class="di">🤝</span>Müşteri & Alacak</div>
+  <div class="drw-item" id="drw-f-supplier"   onclick="goPageFromSheet('supplier')"   style="display:none"><span class="di">🏭</span>Tedarikçiler</div>
+  <div class="drw-item" id="drw-f-employees"  onclick="goPageFromSheet('employees')"  style="display:none"><span class="di">👷</span>Çalışanlar & Bordro</div>
+  <div class="drw-item" id="drw-f-kdv"        onclick="goPageFromSheet('kdv')"        style="display:none"><span class="di">🧾</span>KDV Takibi</div>
+  <div class="drw-item" id="drw-f-ploss"      onclick="goPageFromSheet('ploss')"      style="display:none"><span class="di">📉</span>Kar-Zarar Raporu</div>
+  <div class="drw-item" id="drw-f-loans"      onclick="goPageFromSheet('loans')"      style="display:none"><span class="di">🏦</span>Kredi Takibi</div>
+  <div class="drw-item" id="drw-f-checks"     onclick="goPageFromSheet('checks')"     style="display:none"><span class="di">📋</span>Çek Takibi</div>
+  <div class="drw-item" id="drw-f-bilanco"    onclick="goPageFromSheet('bilanco')"    style="display:none"><span class="di">⚖️</span>Bilanço</div>
+  <div class="drw-item" id="drw-f-ratios"     onclick="goPageFromSheet('ratios')"     style="display:none"><span class="di">📊</span>Finansal Oranlar</div>
+  <div class="drw-item" id="drw-f-muhtasar"   onclick="goPageFromSheet('muhtasar')"   style="display:none"><span class="di">📑</span>Muhtasar</div>
+  <div class="drw-item" id="drw-f-assets"     onclick="goPageFromSheet('assets')"     style="display:none"><span class="di">🏗️</span>Sabit Kıymetler</div>
+  <div class="drw-item" id="drw-f-cardreport" onclick="goPageFromSheet('cardreport')" style="display:none"><span class="di">📈</span>Kart Raporu</div>
 
-  <div class="more-grid" style="margin-top:4px">
-    <div class="more-tile" onclick="goPageFromSheet('download')">
-      <div class="mt-ico">📱</div><div class="mt-lbl">Uygulamayı İndir</div>
-    </div>
-    <div class="more-tile" onclick="goPageFromSheet('settings')">
-      <div class="mt-ico">⚙️</div><div class="mt-lbl">Ayarlar</div>
-    </div>
-  </div>
-  <div style="height:env(safe-area-inset-bottom,8px)"></div>
+  <div class="drw-divider"></div>
+  <!-- ── SİSTEM ── -->
+  <div class="drw-sect">Sistem</div>
+  <div class="drw-item" onclick="goPageFromSheet('download')"><span class="di">📱</span>Uygulamayı İndir</div>
+  <div class="drw-item" onclick="goPageFromSheet('help')"><span class="di">❓</span>Yardım</div>
+  <div class="drw-item" onclick="goPageFromSheet('settings')"><span class="di">⚙️</span>Ayarlar</div>
+  <div class="drw-item" onclick="toggleDarkMode();closeMoreSheet()"><span class="di" id="dark-mode-sheet-ico">🌙</span><span id="dark-mode-sheet-lbl">Karanlık Mod</span></div>
+  <div style="height:calc(env(safe-area-inset-bottom,12px) + 16px)"></div>
 </div>
 
 <!-- ── MAIN ── -->
@@ -5287,15 +5231,18 @@ var _curProfileType = 'sahis';
 function applyProfileType(ptype){
   _curProfileType = ptype || 'sahis';
   var isSirket = _curProfileType === 'sirket';
-  // Nav sidebar items
+  // Desktop nav sidebar items
   document.querySelectorAll('[data-sirket]').forEach(function(el){
-    if(!el.classList.contains('more-tile') && el.id !== 'more-sirket-grid'){
-      el.style.display = isSirket ? '' : 'none';
-    }
+    el.style.display = isSirket ? '' : 'none';
   });
-  // More-sheet sirket section
-  var sirketGrid = document.getElementById('more-sirket-grid');
-  if(sirketGrid) sirketGrid.style.display = isSirket ? 'grid' : 'none';
+  // Mobil drawer firma bölümü
+  var firmaIds = ['drw-firma-div','drw-firma-sect','drw-f-customers','drw-f-supplier',
+    'drw-f-employees','drw-f-kdv','drw-f-ploss','drw-f-loans','drw-f-checks',
+    'drw-f-bilanco','drw-f-ratios','drw-f-muhtasar','drw-f-assets','drw-f-cardreport'];
+  firmaIds.forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.style.display = isSirket ? '' : 'none';
+  });
   if(!isSirket){
     var cur = document.querySelector('.page.active');
     if(cur && ['page-supplier','page-assets','page-cardreport'].indexOf(cur.id) !== -1){
