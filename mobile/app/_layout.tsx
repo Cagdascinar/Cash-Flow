@@ -68,7 +68,7 @@ function RootLayoutNav() {
       <Stack
         screenOptions={{
           headerShown: false,
-          animation: 'ios',
+          animation: 'default',
           gestureEnabled: true,
           contentStyle: { backgroundColor: '#0b0e11' },
           animationDuration: 280,
@@ -85,7 +85,7 @@ function RootLayoutNav() {
         <Stack.Screen name="telegram"      options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="notifications" options={{ animation: 'slide_from_bottom' }} />
 
-        {/* Geri kalan tüm ekranlar screenOptions'dan 'ios' alır */}
+        {/* Geri kalan tüm ekranlar screenOptions'dan 'default' (iOS push/parallax) alır */}
         <Stack.Screen name="cards" />
         <Stack.Screen name="add-card" />
         <Stack.Screen name="accounts" />

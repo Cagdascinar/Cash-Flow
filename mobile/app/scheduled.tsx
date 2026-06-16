@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C, money, fmtDate } from '../constants/Colors';
 import { scheduled as schedApi } from '../services/api';
+import { SwipeableRow } from '../components/SwipeableRow';
 
 type StatusTab = 'bekliyor' | 'yapildi' | 'hepsi';
 
@@ -104,30 +105,33 @@ export default function ScheduledScreen() {
               : list.map(item => {
                   const overdue = isOverdue(item);
                   return (
-                    <View key={item.id} style={[s.card, overdue && s.cardOverdue]}>
-                      <View style={[s.typeDot, { backgroundColor: item.type === 'gelir' ? C.green : C.red }]} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.desc} numberOfLines={1}>{item.description || item.category || '—'}</Text>
-                        <Text style={[s.date, overdue && { color: C.red }]}>
-                          {overdue ? '⚠️ ' : '📅 '}{fmtDate(item.scheduled_date)}
-                          {item.category ? ` · ${item.category}` : ''}
+                    <SwipeableRow
+                      key={item.id}
+                      style={{ marginHorizontal: 16, marginBottom: 8, marginTop: 8, borderRadius: 14 }}
+                      actions={[{ label: 'Sil', icon: '🗑️', color: '#dc2626', onPress: () => del(item.id) }]}
+                    >
+                      <View style={[s.card, overdue && s.cardOverdue]}>
+                        <View style={[s.typeDot, { backgroundColor: item.type === 'gelir' ? C.green : C.red }]} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.desc} numberOfLines={1}>{item.description || item.category || '—'}</Text>
+                          <Text style={[s.date, overdue && { color: C.red }]}>
+                            {overdue ? '⚠️ ' : '📅 '}{fmtDate(item.scheduled_date)}
+                            {item.category ? ` · ${item.category}` : ''}
+                          </Text>
+                        </View>
+                        <Text style={[s.amount, { color: item.type === 'gelir' ? C.green : C.red }]}>
+                          {money(item.amount)}
                         </Text>
+                        {item.status === 'bekliyor' && (
+                          <TouchableOpacity style={s.execBtn} onPress={() => execute(item)}>
+                            <Text style={s.execTxt}>▶</Text>
+                          </TouchableOpacity>
+                        )}
+                        {item.status === 'yapildi' && (
+                          <View style={s.doneBadge}><Text style={s.doneTxt}>✓ Yapıldı</Text></View>
+                        )}
                       </View>
-                      <Text style={[s.amount, { color: item.type === 'gelir' ? C.green : C.red }]}>
-                        {money(item.amount)}
-                      </Text>
-                      {item.status === 'bekliyor' && (
-                        <TouchableOpacity style={s.execBtn} onPress={() => execute(item)}>
-                          <Text style={s.execTxt}>▶</Text>
-                        </TouchableOpacity>
-                      )}
-                      {item.status === 'yapildi' && (
-                        <View style={s.doneBadge}><Text style={s.doneTxt}>✓ Yapıldı</Text></View>
-                      )}
-                      <TouchableOpacity onPress={() => del(item.id)}>
-                        <Text style={{ color: C.muted, fontSize: 16 }}>✕</Text>
-                      </TouchableOpacity>
-                    </View>
+                    </SwipeableRow>
                   );
                 })
             }
@@ -195,7 +199,7 @@ const s = StyleSheet.create({
   tabBtnA:     { backgroundColor: C.card },
   tabTxt:      { fontSize: 13, fontWeight: '600', color: C.txt2 },
   tabTxtA:     { color: C.txt, fontWeight: '700' },
-  card:        { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 8, marginTop: 8, backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border, gap: 10 },
+  card:        { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border, gap: 10 },
   cardOverdue: { borderColor: C.red, backgroundColor: 'rgba(246,70,93,0.06)' },
   typeDot:     { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
   desc:        { fontSize: 15, fontWeight: '600', color: C.txt },

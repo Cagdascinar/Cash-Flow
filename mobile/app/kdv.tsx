@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C, money, fmtDate } from '../constants/Colors';
 import { kdv as kdvApi } from '../services/api';
+import { SwipeableRow } from '../components/SwipeableRow';
 
 const KDV_RATES = ['1', '8', '10', '18', '20'];
 const KDV_TYPES: Record<string, string> = { satis: 'Satış (Tahsil)', alis: 'Alış (İndirilecek)' };
@@ -132,23 +133,26 @@ export default function KDVScreen() {
             {records.length === 0
               ? <View style={s.empty}><Text style={s.emptyIco}>🧾</Text><Text style={s.emptyTxt}>KDV kaydı yok</Text></View>
               : records.map(rec => (
-                  <View key={rec.id} style={s.card}>
-                    <View style={[s.typeDot, { backgroundColor: rec.type === 'satis' ? '#166534' : '#7c2d12' }]} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.name}>{KDV_TYPES[rec.type] ?? rec.type}</Text>
-                      <Text style={s.sub}>%{rec.rate} · {fmtDate(rec.transaction_date)}</Text>
-                      {rec.description && <Text style={s.sub}>{rec.description}</Text>}
+                  <SwipeableRow
+                    key={rec.id}
+                    style={{ marginHorizontal: 16, marginBottom: 8, borderRadius: 14 }}
+                    actions={[{ label: 'Sil', icon: '🗑️', color: '#dc2626', onPress: () => del(rec.id) }]}
+                  >
+                    <View style={s.card}>
+                      <View style={[s.typeDot, { backgroundColor: rec.type === 'satis' ? '#166534' : '#7c2d12' }]} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.name}>{KDV_TYPES[rec.type] ?? rec.type}</Text>
+                        <Text style={s.sub}>%{rec.rate} · {fmtDate(rec.transaction_date)}</Text>
+                        {rec.description && <Text style={s.sub}>{rec.description}</Text>}
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={[s.amount, { color: rec.type === 'satis' ? '#4ade80' : '#f97316' }]}>
+                          {money(rec.kdv_amount)}
+                        </Text>
+                        <Text style={s.sub}>{money(rec.base_amount)} matrah</Text>
+                      </View>
                     </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={[s.amount, { color: rec.type === 'satis' ? '#4ade80' : '#f97316' }]}>
-                        {money(rec.kdv_amount)}
-                      </Text>
-                      <Text style={s.sub}>{money(rec.base_amount)} matrah</Text>
-                    </View>
-                    <TouchableOpacity onPress={() => del(rec.id)} style={{ paddingLeft: 8 }}>
-                      <Text style={{ color: C.muted }}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
+                  </SwipeableRow>
                 ))
             }
           </ScrollView>
@@ -229,7 +233,7 @@ const s = StyleSheet.create({
   sumVal:     { fontSize: 14, fontWeight: '800', color: C.txt },
   sumLbl:     { fontSize: 10, color: C.txt2, marginTop: 4, textAlign: 'center' },
   secTitle:   { fontSize: 11, fontWeight: '700', color: C.muted, textTransform: 'uppercase', letterSpacing: 1, paddingHorizontal: 16, marginTop: 16, marginBottom: 8 },
-  card:       { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 8, backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border, gap: 10 },
+  card:       { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border, gap: 10 },
   typeDot:    { width: 8, height: 8, borderRadius: 4 },
   name:       { fontSize: 14, fontWeight: '700', color: C.txt },
   sub:        { fontSize: 12, color: C.txt2, marginTop: 2 },

@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C, money } from '../constants/Colors';
 import { misc as miscApi } from '../services/api';
+import { SwipeableRow } from '../components/SwipeableRow';
 
 const COLORS = ['#007aff','#0ecb81','#f0b90b','#f6465d','#9b59b6','#ff6b35','#1abc9c'];
 
@@ -77,23 +78,28 @@ export default function ProjectsScreen() {
                   const pct = p.budget > 0 ? Math.min(100, Math.round(p.spent / p.budget * 100)) : 0;
                   const barColor = pct > 90 ? C.red : pct > 70 ? C.yellow : C.green;
                   return (
-                    <View key={p.id} style={s.card}>
-                      <View style={s.cardTop}>
-                        <View style={[s.dot, { backgroundColor: p.color }]} />
-                        <Text style={s.name} numberOfLines={1}>{p.name}</Text>
-                        <TouchableOpacity onPress={() => del(p.id)}><Text style={{ color: C.muted, fontSize: 16 }}>✕</Text></TouchableOpacity>
-                      </View>
-                      {p.description ? <Text style={s.desc}>{p.description}</Text> : null}
-                      <View style={s.stats}>
-                        <Text style={s.statTxt}>Harcanan: <Text style={{ color: C.txt, fontWeight: '700' }}>{money(p.spent)}</Text></Text>
-                        {p.budget > 0 && <Text style={s.statTxt}>Bütçe: <Text style={{ fontWeight: '700' }}>{money(p.budget)}</Text></Text>}
-                      </View>
-                      {p.budget > 0 && (
-                        <View style={s.barBg}>
-                          <View style={[s.barFill, { width: `${pct}%` as any, backgroundColor: barColor }]} />
+                    <SwipeableRow
+                      key={p.id}
+                      style={{ marginHorizontal: 16, marginBottom: 10, marginTop: 8, borderRadius: 14 }}
+                      actions={[{ label: 'Sil', icon: '🗑️', color: '#dc2626', onPress: () => del(p.id) }]}
+                    >
+                      <View style={s.card}>
+                        <View style={s.cardTop}>
+                          <View style={[s.dot, { backgroundColor: p.color }]} />
+                          <Text style={s.name} numberOfLines={1}>{p.name}</Text>
                         </View>
-                      )}
-                    </View>
+                        {p.description ? <Text style={s.desc}>{p.description}</Text> : null}
+                        <View style={s.stats}>
+                          <Text style={s.statTxt}>Harcanan: <Text style={{ color: C.txt, fontWeight: '700' }}>{money(p.spent)}</Text></Text>
+                          {p.budget > 0 && <Text style={s.statTxt}>Bütçe: <Text style={{ fontWeight: '700' }}>{money(p.budget)}</Text></Text>}
+                        </View>
+                        {p.budget > 0 && (
+                          <View style={s.barBg}>
+                            <View style={[s.barFill, { width: `${pct}%` as any, backgroundColor: barColor }]} />
+                          </View>
+                        )}
+                      </View>
+                    </SwipeableRow>
                   );
                 })
             }
@@ -146,7 +152,7 @@ const s = StyleSheet.create({
   title:     { fontSize: 20, fontWeight: '800', color: C.txt, flex: 1 },
   addBtn:    { backgroundColor: C.blue, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
   addTxt:    { fontSize: 14, fontWeight: '700', color: C.white },
-  card:      { marginHorizontal: 16, marginBottom: 10, marginTop: 8, backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border },
+  card:      { backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border },
   cardTop:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
   dot:       { width: 14, height: 14, borderRadius: 7, flexShrink: 0 },
   name:      { fontSize: 15, fontWeight: '700', color: C.txt, flex: 1 },

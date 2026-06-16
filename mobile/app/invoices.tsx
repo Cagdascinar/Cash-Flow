@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C, money, fmtDate } from '../constants/Colors';
 import { suppliers as suppApi, misc, accounts as accApi } from '../services/api';
+import { SwipeableRow } from '../components/SwipeableRow';
 
 export default function InvoicesScreen() {
   const router = useRouter();
@@ -176,20 +177,24 @@ export default function InvoicesScreen() {
                   const daysLeft = inv.due_date ? Math.ceil((new Date(inv.due_date).getTime() - Date.now()) / 86400000) : 0;
                   const isOverdue = daysLeft < 0 && tab === 'bekleyen';
                   return (
-                    <View key={inv.id} style={[s.card, isOverdue && { borderColor: C.red }]}>
-                      <View style={s.cardTop}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={s.invName}>{inv.supplier_name || '—'}</Text>
-                          {inv.invoice_no && <Text style={s.invSub}>Fatura No: {inv.invoice_no}</Text>}
-                          {inv.description && <Text style={s.invSub}>{inv.description}</Text>}
+                    <SwipeableRow
+                      key={inv.id}
+                      style={{ marginHorizontal: 16, marginBottom: 10, borderRadius: 14 }}
+                      actions={[{ label: 'Sil', icon: '🗑️', color: '#dc2626', onPress: () => delInvoice(inv.id) }]}
+                    >
+                      <View style={[s.card, isOverdue && { borderColor: C.red }]}>
+                        <View style={s.cardTop}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={s.invName}>{inv.supplier_name || '—'}</Text>
+                            {inv.invoice_no && <Text style={s.invSub}>Fatura No: {inv.invoice_no}</Text>}
+                            {inv.description && <Text style={s.invSub}>{inv.description}</Text>}
+                          </View>
+                          <Text style={[s.invAmt, isOverdue && { color: C.red }]}>{money(inv.amount)}</Text>
                         </View>
-                        <Text style={[s.invAmt, isOverdue && { color: C.red }]}>{money(inv.amount)}</Text>
-                      </View>
-                      <View style={s.cardBot}>
-                        <Text style={[s.dueDate, isOverdue && { color: C.red }]}>
-                          {isOverdue ? `⚠️ ${Math.abs(daysLeft)} gün geçti` : inv.due_date ? `Vade: ${fmtDate(inv.due_date)}` : ''}
-                        </Text>
-                        <View style={s.actions}>
+                        <View style={s.cardBot}>
+                          <Text style={[s.dueDate, isOverdue && { color: C.red }]}>
+                            {isOverdue ? `⚠️ ${Math.abs(daysLeft)} gün geçti` : inv.due_date ? `Vade: ${fmtDate(inv.due_date)}` : ''}
+                          </Text>
                           {tab === 'bekleyen' && (
                             <TouchableOpacity style={s.payBtn} onPress={() => openPayModal(inv.id)}>
                               <Text style={s.payTxt}>💳 Öde</Text>
@@ -200,12 +205,9 @@ export default function InvoicesScreen() {
                               {inv.payment_method === 'havale' ? '🏦' : inv.payment_method === 'kart' ? '💳' : '💵'} {inv.payment_account_name || inv.payment_method}
                             </Text>
                           )}
-                          <TouchableOpacity onPress={() => delInvoice(inv.id)}>
-                            <Text style={{ color: C.muted, fontSize: 18 }}>✕</Text>
-                          </TouchableOpacity>
                         </View>
                       </View>
-                    </View>
+                    </SwipeableRow>
                   );
                 })
             }
@@ -241,7 +243,7 @@ export default function InvoicesScreen() {
                 <Text style={[s.mLbl, { marginTop: 16 }]}>
                   {payMethod === 'kart' ? 'Hangi Karttan' : 'Hangi Hesaptan'}
                 </Text>
-                <TouchableOpacity style={[s.dropdown, payAccId && s.dropdownSelected]}
+                <TouchableOpacity style={[s.dropdown, !!payAccId && s.dropdownSelected]}
                   onPress={() => setAccPicker(true)}>
                   <Text style={[s.dropdownTxt, !payAccId && { color: C.muted }]}>
                     {selectedAcc ? `${selectedAcc.name}${selectedAcc.last4 ? ` ****${selectedAcc.last4}` : ''}` : 'Hesap / Kart seçin...'}
@@ -338,7 +340,7 @@ export default function InvoicesScreen() {
             <ScrollView style={{ padding: 16 }}>
               <Text style={s.mLbl}>Tedarikçi *</Text>
               <TouchableOpacity
-                style={[s.dropdown, suppId && s.dropdownSelected]}
+                style={[s.dropdown, !!suppId && s.dropdownSelected]}
                 onPress={() => { setSuppSearch(''); setSuppPicker(true); }}
               >
                 <Text style={[s.dropdownTxt, !suppId && { color: C.muted }]}>
@@ -383,7 +385,7 @@ const s = StyleSheet.create({
   tab:      { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
   tabA:     { backgroundColor: C.blue },
   tabTxt:   { fontSize: 14, fontWeight: '600', color: C.txt2 },
-  card:     { marginHorizontal: 16, marginTop: 10, backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border },
+  card:     { backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border },
   cardTop:  { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   invName:  { fontSize: 15, fontWeight: '700', color: C.txt },
   invSub:   { fontSize: 12, color: C.txt2, marginTop: 2 },

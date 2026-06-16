@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C, money } from '../constants/Colors';
 import { misc as miscApi, transactions as txApi } from '../services/api';
+import { SwipeableRow } from '../components/SwipeableRow';
 
 export default function TemplatesScreen() {
   const router = useRouter();
@@ -99,20 +100,25 @@ export default function TemplatesScreen() {
             {list.length === 0
               ? <View style={s.empty}><Text style={s.emptyIco}>📋</Text><Text style={s.emptyTxt}>Şablon eklenmedi</Text></View>
               : list.map(tpl => (
-                  <View key={tpl.id} style={s.card}>
-                    <View style={[s.typeDot, { backgroundColor: tpl.type === 'gelir' ? C.green : C.red }]} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.name}>{tpl.name}</Text>
-                      <Text style={s.sub}>{tpl.category}{tpl.description ? ` · ${tpl.description}` : ''}</Text>
+                  <SwipeableRow
+                    key={tpl.id}
+                    style={{ marginHorizontal: 16, marginBottom: 8, marginTop: 8, borderRadius: 14 }}
+                    actions={[{ label: 'Sil', icon: '🗑️', color: '#dc2626', onPress: () => del(tpl.id) }]}
+                  >
+                    <View style={s.card}>
+                      <View style={[s.typeDot, { backgroundColor: tpl.type === 'gelir' ? C.green : C.red }]} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.name}>{tpl.name}</Text>
+                        <Text style={s.sub}>{tpl.category}{tpl.description ? ` · ${tpl.description}` : ''}</Text>
+                      </View>
+                      <Text style={[s.amount, { color: tpl.type === 'gelir' ? C.green : C.red }]}>
+                        {money(tpl.amount)}
+                      </Text>
+                      <TouchableOpacity style={s.applyBtn} onPress={() => applyTemplate(tpl)}>
+                        <Text style={s.applyTxt}>▶</Text>
+                      </TouchableOpacity>
                     </View>
-                    <Text style={[s.amount, { color: tpl.type === 'gelir' ? C.green : C.red }]}>
-                      {money(tpl.amount)}
-                    </Text>
-                    <TouchableOpacity style={s.applyBtn} onPress={() => applyTemplate(tpl)}>
-                      <Text style={s.applyTxt}>▶</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => del(tpl.id)}><Text style={{ color: C.muted, fontSize: 16 }}>✕</Text></TouchableOpacity>
-                  </View>
+                  </SwipeableRow>
                 ))
             }
             <View style={{ height: 40 }} />
@@ -195,7 +201,7 @@ const s = StyleSheet.create({
   title:       { fontSize: 20, fontWeight: '800', color: C.txt, flex: 1 },
   addBtn:      { backgroundColor: C.blue, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 7 },
   addTxt:      { fontSize: 14, fontWeight: '700', color: C.white },
-  card:        { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 8, marginTop: 8, backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border, gap: 10 },
+  card:        { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border, gap: 10 },
   typeDot:     { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
   name:        { fontSize: 15, fontWeight: '700', color: C.txt },
   sub:         { fontSize: 12, color: C.txt2, marginTop: 2 },

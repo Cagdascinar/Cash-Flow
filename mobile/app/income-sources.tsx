@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C, money } from '../constants/Colors';
 import { incomeSources as srcApi } from '../services/api';
+import { SwipeableRow } from '../components/SwipeableRow';
 
 const IS_TYPES: Record<string, string> = {
   maas: '💼 Maaş', serbest: '💻 Serbest', kira: '🏠 Kira',
@@ -111,31 +112,34 @@ export default function IncomeSourcesScreen() {
             {list.length === 0
               ? <View style={s.empty}><Text style={s.emptyIco}>💰</Text><Text style={s.emptyTxt}>Kaynak eklenmedi</Text></View>
               : list.map(item => (
-                  <View key={item.id} style={[s.card, !item.is_active && s.cardPassive]}>
-                    <View style={s.cardLeft}>
-                      <Text style={s.icoTxt}>{IS_TYPES[item.type]?.split(' ')[0] ?? '💰'}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[s.name, !item.is_active && { color: C.txt2 }]}>{item.name}</Text>
-                      <Text style={s.sub}>
-                        {IS_FREQ[item.frequency] ?? item.frequency} · {IS_TYPES[item.type]?.split(' ').slice(1).join(' ') ?? item.type}
-                      </Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                      <Text style={[s.amount, { color: item.is_active ? '#4ade80' : C.muted }]}>
-                        {money(item.amount)}
-                      </Text>
-                      <TouchableOpacity style={[s.toggleBtn, item.is_active && s.toggleBtnActive]}
-                        onPress={() => toggle(item)}>
-                        <Text style={{ color: item.is_active ? C.white : C.txt2, fontSize: 11, fontWeight: '700' }}>
-                          {item.is_active ? '● Aktif' : '○ Pasif'}
+                  <SwipeableRow
+                    key={item.id}
+                    style={{ marginHorizontal: 16, marginBottom: 8, marginTop: 8, borderRadius: 14 }}
+                    actions={[{ label: 'Sil', icon: '🗑️', color: '#dc2626', onPress: () => del(item.id, item.name) }]}
+                  >
+                    <View style={[s.card, !item.is_active && s.cardPassive]}>
+                      <View style={s.cardLeft}>
+                        <Text style={s.icoTxt}>{IS_TYPES[item.type]?.split(' ')[0] ?? '💰'}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[s.name, !item.is_active && { color: C.txt2 }]}>{item.name}</Text>
+                        <Text style={s.sub}>
+                          {IS_FREQ[item.frequency] ?? item.frequency} · {IS_TYPES[item.type]?.split(' ').slice(1).join(' ') ?? item.type}
                         </Text>
-                      </TouchableOpacity>
+                      </View>
+                      <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                        <Text style={[s.amount, { color: item.is_active ? '#4ade80' : C.muted }]}>
+                          {money(item.amount)}
+                        </Text>
+                        <TouchableOpacity style={[s.toggleBtn, item.is_active && s.toggleBtnActive]}
+                          onPress={() => toggle(item)}>
+                          <Text style={{ color: item.is_active ? C.white : C.txt2, fontSize: 11, fontWeight: '700' }}>
+                            {item.is_active ? '● Aktif' : '○ Pasif'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                    <TouchableOpacity onPress={() => del(item.id, item.name)}>
-                      <Text style={{ color: C.muted, fontSize: 16 }}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
+                  </SwipeableRow>
                 ))
             }
             <View style={{ height: 40 }} />
@@ -200,7 +204,7 @@ const s = StyleSheet.create({
   sumCard:     { flex: 1, backgroundColor: C.card, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center' },
   sumVal:      { fontSize: 14, fontWeight: '800', color: C.txt },
   sumLbl:      { fontSize: 10, color: C.txt2, marginTop: 4 },
-  card:        { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 8, marginTop: 8, backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border, gap: 10 },
+  card:        { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border, gap: 10 },
   cardPassive: { opacity: 0.5 },
   cardLeft:    { width: 36, height: 36, borderRadius: 10, backgroundColor: C.input, alignItems: 'center', justifyContent: 'center' },
   icoTxt:      { fontSize: 18 },

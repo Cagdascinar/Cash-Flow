@@ -3,11 +3,13 @@ import {
   RefreshControl, TouchableOpacity, Alert, Modal, TextInput,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { GestureHandlerRootView, ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { useState, useEffect, useCallback } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { C, money } from '../constants/Colors';
 import { assets as assetsApi } from '../services/api';
+import { SwipeableRow } from '../components/SwipeableRow';
 
 const TYPES = ['Araç','Gayrimenkul','Elektronik','Makine','Ofis Ekipmanı','Diğer'];
 
@@ -121,25 +123,30 @@ export default function AssetsScreen() {
             {list.length === 0
               ? <View style={s.empty}><Text style={s.emptyIco}>🏗️</Text><Text style={s.emptyTxt}>Varlık eklenmedi</Text></View>
               : list.map(a => (
-                  <View key={a.id} style={s.card}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.aName}>{a.name}</Text>
-                        <Text style={s.aSub}>{a.asset_type} · {a.purchase_date?.split('T')[0]}</Text>
+                  <SwipeableRow
+                    key={a.id}
+                    style={{ marginHorizontal: 16, marginBottom: 10, marginTop: 4, borderRadius: 14 }}
+                    actions={[{ label: 'Sil', icon: '🗑️', color: '#dc2626', onPress: () => del(a.id) }]}
+                  >
+                    <View style={s.card}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.aName}>{a.name}</Text>
+                          <Text style={s.aSub}>{a.asset_type} · {a.purchase_date?.split('T')[0]}</Text>
+                        </View>
                       </View>
-                      <TouchableOpacity onPress={() => del(a.id)}><Text style={{ color: C.muted, fontSize: 16 }}>✕</Text></TouchableOpacity>
+                      <View style={s.aRow}>
+                        <View><Text style={s.aLbl}>Maliyet</Text><Text style={s.aVal}>{money(a.purchase_price)}</Text></View>
+                        <View><Text style={s.aLbl}>Amortisman</Text><Text style={s.aVal}>%{a.depreciation_rate}/yıl</Text></View>
+                        {a.total_maintenance > 0 && (
+                          <View><Text style={s.aLbl}>Bakım</Text><Text style={[s.aVal, { color: C.yellow }]}>{money(a.total_maintenance)}</Text></View>
+                        )}
+                      </View>
+                      <TouchableOpacity style={s.maintBtn} onPress={() => openMaint(a)}>
+                        <Text style={s.maintTxt}>🔧 Bakım Kayıtları {a.total_maintenance > 0 ? `· ${money(a.total_maintenance)}` : ''}</Text>
+                      </TouchableOpacity>
                     </View>
-                    <View style={s.aRow}>
-                      <View><Text style={s.aLbl}>Maliyet</Text><Text style={s.aVal}>{money(a.purchase_price)}</Text></View>
-                      <View><Text style={s.aLbl}>Amortisman</Text><Text style={s.aVal}>%{a.depreciation_rate}/yıl</Text></View>
-                      {a.total_maintenance > 0 && (
-                        <View><Text style={s.aLbl}>Bakım</Text><Text style={[s.aVal, { color: C.yellow }]}>{money(a.total_maintenance)}</Text></View>
-                      )}
-                    </View>
-                    <TouchableOpacity style={s.maintBtn} onPress={() => openMaint(a)}>
-                      <Text style={s.maintTxt}>🔧 Bakım Kayıtları {a.total_maintenance > 0 ? `· ${money(a.total_maintenance)}` : ''}</Text>
-                    </TouchableOpacity>
-                  </View>
+                  </SwipeableRow>
                 ))
             }
             <View style={{ height: 40 }} />
@@ -186,13 +193,14 @@ export default function AssetsScreen() {
 
       {/* Bakım Kayıtları Modal */}
       <Modal visible={maintModal} animationType="slide" presentationStyle="pageSheet">
+        <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaView style={s.bg} edges={['top']}>
           <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
             <View style={s.mHeader}>
               <Text style={s.mTitle}>🔧 {selAsset?.name}</Text>
               <TouchableOpacity onPress={() => setMaintModal(false)}><Text style={s.close}>✕</Text></TouchableOpacity>
             </View>
-            <ScrollView style={{ padding: 16 }}>
+            <GHScrollView style={{ padding: 16 }}>
               {/* Yeni bakım ekle */}
               <Text style={[s.mLbl, { marginBottom: 6 }]}>Yeni Bakım Kaydı</Text>
               <TextInput style={[s.mInput, { marginBottom: 8 }]} value={mDesc} onChangeText={setMDesc} placeholder="Bakım açıklaması" placeholderTextColor={C.muted} />
@@ -212,25 +220,29 @@ export default function AssetsScreen() {
                   : <>
                       <Text style={[s.mLbl, { marginBottom: 10 }]}>Geçmiş Bakımlar</Text>
                       {maintList.map(m => (
-                        <View key={m.id} style={[s.card, { marginHorizontal: 0, marginBottom: 8 }]}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                            <View style={{ flex: 1 }}>
-                              <Text style={s.aName}>{m.description}</Text>
-                              <Text style={s.aSub}>{m.date?.split('T')[0]}</Text>
+                        <SwipeableRow
+                          key={m.id}
+                          style={{ marginBottom: 8, borderRadius: 14 }}
+                          actions={[{ label: 'Sil', icon: '🗑️', color: '#dc2626', onPress: () => delMaint(m.id) }]}
+                        >
+                          <View style={s.card}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={s.aName}>{m.description}</Text>
+                                <Text style={s.aSub}>{m.date?.split('T')[0]}</Text>
+                              </View>
+                              <Text style={[s.aVal, { color: C.yellow }]}>{money(m.cost)}</Text>
                             </View>
-                            <Text style={[s.aVal, { color: C.yellow }]}>{money(m.cost)}</Text>
-                            <TouchableOpacity onPress={() => delMaint(m.id)} style={{ paddingLeft: 12 }}>
-                              <Text style={{ color: C.muted }}>✕</Text>
-                            </TouchableOpacity>
                           </View>
-                        </View>
+                        </SwipeableRow>
                       ))}
                     </>
               }
               <View style={{ height: 40 }} />
-            </ScrollView>
+            </GHScrollView>
           </KeyboardAvoidingView>
         </SafeAreaView>
+        </GestureHandlerRootView>
       </Modal>
     </SafeAreaView>
   );
@@ -247,7 +259,7 @@ const s = StyleSheet.create({
   totalCard: { margin: 16, backgroundColor: C.hero, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: 'rgba(99,160,255,.15)' },
   totalLbl:  { fontSize: 12, color: 'rgba(255,255,255,.45)', marginBottom: 4 },
   totalVal:  { fontSize: 20, fontWeight: '800' },
-  card:      { marginHorizontal: 16, marginBottom: 10, marginTop: 4, backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border },
+  card:      { backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border },
   aName:     { fontSize: 15, fontWeight: '700', color: C.txt },
   aSub:      { fontSize: 12, color: C.txt2, marginTop: 2 },
   aRow:      { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.border },
