@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '../stores/authStore';
+import { MoreDrawer } from '../components/MoreDrawer';
 
 // ── Error Boundary ──────────────────────────────────────────────────────────
 class ErrorBoundary extends Component<
@@ -115,6 +116,7 @@ function RootLayoutNav() {
         <Stack.Screen name="kdv" />
         <Stack.Screen name="ploss" />
       </Stack>
+      <MoreDrawer />
     </>
   );
 }

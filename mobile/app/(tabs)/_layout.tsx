@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { C } from '../../constants/Colors';
+import { useUIStore } from '../../stores/uiStore';
 
 function Icon({ emoji, label, focused }: { emoji: string; label: string; focused: boolean }) {
   return (
@@ -19,6 +20,8 @@ const ic = StyleSheet.create({
 });
 
 export default function TabsLayout() {
+  const openMoreMenu = useUIStore(s => s.openMoreMenu);
+
   return (
     <Tabs screenOptions={{
       headerShown: false,
@@ -42,7 +45,16 @@ export default function TabsLayout() {
         ),
       }} />
       <Tabs.Screen name="budget" options={{ tabBarIcon: ({ focused }) => <Icon emoji="🎯" label="Bütçe"    focused={focused} /> }} />
-      <Tabs.Screen name="more"   options={{ tabBarIcon: ({ focused }) => <Icon emoji="☰"  label="Daha"     focused={focused} /> }} />
+      <Tabs.Screen
+        name="more"
+        options={{ tabBarIcon: ({ focused }) => <Icon emoji="☰"  label="Daha"     focused={focused} /> }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            openMoreMenu();
+          },
+        }}
+      />
     </Tabs>
   );
 }
